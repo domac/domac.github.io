@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?><rss version="2.0">
   <channel>
-    <title>LHQ</title>
+    <title>浩泉的技术博客</title>
     <link>http://localhost/</link>
     <description>lihaoquan.xyz is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Sun, 19 Jun 2016 21:58:43 +0800</pubDate>
+    <pubDate>Sun, 19 Jun 2016 22:13:48 +0800</pubDate>
     <item>
       <title>关于 keepalived</title>
       <link>http://localhost/2015/9/3/about-keepalived.html</link>
