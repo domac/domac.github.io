@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?><rss version="2.0">
   <channel>
-    <title>浩泉的技术博客</title>
+    <title>LHQ的技术博客</title>
     <link>http://localhost/</link>
     <description>lihaoquan.xyz is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Mon, 20 Jun 2016 01:04:03 +0800</pubDate>
+    <pubDate>Mon, 20 Jun 2016 01:11:22 +0800</pubDate>
     <item>
       <title>NSQ使用总结</title>
       <link>http://localhost/2016/6/20/using-nsq.html</link>
