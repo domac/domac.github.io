@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>使用go-fsnotify文件监控工具 - LHQ</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="using fsnotity"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">LHQ <sup>技术学习与分享</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">9</span>
+                            <span class="day">1</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2015/9/1/using-fsnotity.html">使用go-fsnotify文件监控工具</a>
+                            </h3>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
+                        </aside>
+                        <section class="brief"><p>最近利用<code>Golang</code>+<code>fsnotify</code>写了一个服务器缓存文件变更通知工具, 并通过邮件等辅助手段实现相关监控功能.</p>
+
+<p>之后发现开源框架<code>Beego</code>也是使用fsnotify( 我进去<code>bee</code>工具的源码查阅了下,可能是另外一个版本的, 不过不重要,我们了解下原理 )来实现web应用的热编译实现功能的.可以同时监控多个目录</p>
+
+<!--more-->
+
+<h2 id="api">API</h2>
+
+<p>要运用fsnotify来编写自己的项目,首先得获取fsnotify :</p>
+<pre><code class="language-bash">  go get  github.com/go-fsnotify/fsnotify
+</code></pre>
+
+<p>获取后,即可查阅相关API进行操作 : <a href="https://godoc.org/gopkg.in/fsnotify.v1">Go Doc</a></p>
+
+<p>跨平台: Windows, Linux, BSD and OS X.</p>
+
+<table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>OS</th>
+<th>Status</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>inotify</td>
+<td>Linux, Android*</td>
+<td>Supported</td>
+</tr>
+
+<tr>
+<td>kqueue</td>
+<td>BSD, OS X, iOS*</td>
+<td>Supported</td>
+</tr>
+
+<tr>
+<td>ReadDirectoryChangesW</td>
+<td>Windows</td>
+<td>Supported</td>
+</tr>
+
+<tr>
+<td>FSEvents</td>
+<td>OS X</td>
+<td><a href="https://github.com/go-fsnotify/fsnotify/issues/11">Planned</a></td>
+</tr>
+
+<tr>
+<td>FEN</td>
+<td>Solaris 11</td>
+<td><a href="https://github.com/go-fsnotify/fsnotify/issues/12">Planned</a></td>
+</tr>
+
+<tr>
+<td>fanotify</td>
+<td>Linux 2.6.37+</td>
+<td></td>
+</tr>
+
+<tr>
+<td>USN Journals</td>
+<td>Windows</td>
+<td><a href="https://github.com/go-fsnotify/fsnotify/issues/53">Maybe</a></td>
+</tr>
+
+<tr>
+<td>Polling</td>
+<td><em>All</em></td>
+<td><a href="https://github.com/go-fsnotify/fsnotify/issues/9">Maybe</a></td>
+</tr>
+</tbody>
+</table>
+
+<p>*  目前未对 Android and iOS 进行测试.</p>
+
+<h2 id="使用实例">使用实例</h2>
+
+<p>下面是我项目中的一个小片段 :</p>
+<pre><code class="language-golang">for {
+        select {
+        case event := &lt;-util.Watcher.Events:
+            log.Println(&quot;event:&quot;, event)
+            if event.Op&amp;fsnotify.Write == fsnotify.Write { //修改文件
+
+                fmt.Println(&quot;&gt;&gt;&quot;,event.Name,&quot;[edit]&quot;)
+
+                oldMd5, ok := util.Md5Map[event.Name]
+                if ok {
+                    newMd5Str := util.GenerateMd5(event.Name)
+                    if newMd5Str != oldMd5 {
+                        util.Md5Map[event.Name] = newMd5Str
+                        util.LetItChanged(1, event.Name)
+                    }
+
+                }else {
+                    util.Md5Map[event.Name] = util.GenerateMd5(event.Name)
+                    util.LetItChanged(1, event.Name)
+                }
+
+            }else if event.Op&amp;fsnotify.Create == fsnotify.Create {//创建文件
+
+                fmt.Println(&quot;&gt;&gt;&quot;,event.Name,&quot;[create]&quot;)
+
+                fileInfo, err := os.Stat(event.Name)
+                if err == nil &amp;&amp; fileInfo.IsDir() {
+                    util.LetItWatcher(event.Name)
+                }
+
+                newMd5Str := util.GenerateMd5(event.Name)
+                if len(newMd5Str) &gt; 0 {
+                    util.Md5Map[event.Name] = newMd5Str
+                    util.LetItChanged(2, event.Name)
+                }
+
+            } else if event.Op&amp;fsnotify.Remove == fsnotify.Remove {//移除文件
+
+                fmt.Println(&quot;&gt;&gt;&quot;,event.Name,&quot;[remove]&quot;)
+
+                if _, ok := util.Md5Map[event.Name]; ok {
+                    delete(util.Md5Map, event.Name)
+                    util.LetItChanged(3, event.Name)
+                }
+            }else if event.Op&amp;fsnotify.Rename == fsnotify.Rename {//重命名文件
+
+                fmt.Println(&quot;&gt;&gt;&quot;,event.Name,&quot;[rename]&quot;)
+
+                if _, ok := util.Md5Map[event.Name]; ok {
+                    delete(util.Md5Map, event.Name)
+                    util.LetItChanged(4, event.Name)
+                }
+
+                util.DeleteItWatcher(event.Name)
+            }
+        case err := &lt;-util.Watcher.Errors:
+        //监听异常
+            if err != nil {
+                log.Println(&quot;error:&quot;, err)
+            }
+            return
+        }
+    }
+</code></pre>
+
+<p>可以看到, 通过简单的业务封装,即可获取目录下文件的新增改查的事件检测.</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="using-fsnotity" data-title="使用go-fsnotify文件监控工具 - LHQ" data-url="http://localhost/2015/9/1/using-fsnotity"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 LHQ.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.9.15 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>

@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>关于 lihaoquan.xyz - LHQ</title>
+    <title>http - LHQ</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="some words about me"/>
+    <meta name="description" content="lihaoquan.xyz is my site"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -24,7 +24,7 @@
                         <a href="/archive" >归档
                         </a>
                     </li>
-                    <li role="presentation" class="active">
+                    <li role="presentation" class="">
                         <a href="/about" >关于
                         </a>
                     </li>
@@ -39,64 +39,49 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-single">
+        <div id="article-list">
+            <h2 class="tag text-center">http</h2>
             <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
                             <div class="meta">
                         <span class="date">
-                            <span class="month">12</span>
-                            <span class="day">24</span>
+                            <span class="month">9</span>
+                            <span class="day">1</span>
                         </span>
                             </div>
                             <h3 class="title">
-                                <a href="/about.html">关于 lihaoquan.xyz</a>
+                                <a href="/2015/9/1/about-http-timeout.html">http timeout 研究</a>
                             </h3>
                         </header>
-                        <aside class="aside clearfix">
-                            <a class="stat label label-default pull-right" href="http://lihaoquan.xyz" target="_blank">lihaoquan</a>
-                        </aside>
-                        <section class="brief"><h3 id="关于我">关于我</h3>
+                        <section class="brief"><p>今晚看了有关http connection的超时处理的文章, 针对目前我们直接调用以下代码的时候</p>
+<pre><code class="language-go">resp,fetch_err := http.Get(url)
+</code></pre>
 
-<p>目前在广州，一名go语言爱好者</p>
+<p>当处于网络延迟或不稳定的情况下,一般会出现长时间的等待, 这样体验就会下降.</p>
 
-<h3 id="联系我">联系我</h3>
+<p>于是在网上看了几篇资料, 学习了目前<code>主流</code>的Go Http超时处理办法 :</p>
 
-<ul>
-<li><a href="http://weibo.com/328080453/">微博: DC浩泉</a></li>
-<li><strong>Email</strong>：quanix[at]163.com</li>
-</ul>
+<blockquote>
+<p><a href="https://gist.github.com/dmichael/5710968">gist 1</a>   by dmichael
+<a href="http://1234n.com/?post/mwsw2r">Go语言http.Get()超时设置</a>   by 达达</p>
+</blockquote>
 
-<hr />
-
-<p>powered by fuxiaohei&rsquo;s pugo</p>
+<p>其中第一篇文章原理是自定义Dial函数 :</p>
 </section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2015/9/1/about-http-timeout.html">继续阅读</a>
+                        </aside>
                     </div>
                 </div>
             </article>
+            
+            <div class="article-pager text-center">
+                
+                
+            </div>
         </div>
-        
-<section id="comment">
-    
-    <div class="row">
-        <div class="col-md-10 col-md-offset-1">
-            <div class="ds-thread" data-thread-key="about" data-title="关于 lihaoquan.xyz - LHQ" data-url="http://localhost/about"></div>
-            <script type="text/javascript">
-                var duoshuoQuery = {short_name:"phillihq"};
-                (function() {
-                    var ds = document.createElement('script');
-                    ds.type = 'text/javascript';ds.async = true;
-                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
-                    ds.charset = 'UTF-8';
-                    (document.getElementsByTagName('head')[0]
-                    || document.getElementsByTagName('body')[0]).appendChild(ds);
-                })();
-            </script>
-        </div>
-    </div>
-</section>
-
     </div>
 </section>
 <footer id="footer">

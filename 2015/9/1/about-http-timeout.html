@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>http timeout 研究 - LHQ</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="about http timeout"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">LHQ <sup>技术学习与分享</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">9</span>
+                            <span class="day">1</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2015/9/1/about-http-timeout.html">http timeout 研究</a>
+                            </h3>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/http.html">http</a>
+                        </aside>
+                        <section class="brief"><p>今晚看了有关http connection的超时处理的文章, 针对目前我们直接调用以下代码的时候</p>
+<pre><code class="language-go">resp,fetch_err := http.Get(url)
+</code></pre>
+
+<p>当处于网络延迟或不稳定的情况下,一般会出现长时间的等待, 这样体验就会下降.</p>
+
+<p>于是在网上看了几篇资料, 学习了目前<code>主流</code>的Go Http超时处理办法 :</p>
+
+<blockquote>
+<p><a href="https://gist.github.com/dmichael/5710968">gist 1</a>   by dmichael
+<a href="http://1234n.com/?post/mwsw2r">Go语言http.Get()超时设置</a>   by 达达</p>
+</blockquote>
+
+<p>其中第一篇文章原理是自定义Dial函数 :</p>
+
+<!--more-->
+<pre><code class="language-go">func TimeoutDialer(config *Config) func(net, addr string) (c net.Conn, err error) {
+    return func(netw, addr string) (net.Conn, error) {
+        conn, err := net.DialTimeout(netw, addr, config.ConnectTimeout)
+        if err != nil {
+            return nil, err
+        }
+        conn.SetDeadline(time.Now().Add(config.ReadWriteTimeout))
+        return conn, err
+    }
+}
+</code></pre>
+
+<p>&hellip;. (略)</p>
+<pre><code class="language-go">return &amp;http.Client{
+        Transport:&amp;http.Transport{
+            Dial: TimeoutDialer(config),
+        },
+    }
+</code></pre>
+
+<p>通过对Client的封装,实现了连接和读写的超时.</p>
+
+<p>其中达达的文章是解决了文章一针对长连接情况下的一些问题 , 为了达到模拟测试的环境, 具体方法是在发送请求时加一个keep-alive头，然后每次发送请求前加个Sleep，然后在Dial回调返回自己包装过的TimeoutConn，间接的调用真实的Conn，这样就可以再每次Read和Write之前设置超时时间了。</p>
+
+<p>总结以上, 解决方法基本都可以掌握七七八八了 :</p>
+
+<hr />
+
+<blockquote>
+<p>httpclient.go</p>
+</blockquote>
+<pre><code class="language-go">package httptimeout
+
+import (
+    &quot;net/http&quot;
+    &quot;time&quot;
+    &quot;fmt&quot;
+)
+
+type TimeoutTransport struct {
+    http.Transport
+    RoundTripTimeout time.Duration
+}
+
+type respAndErr struct {
+    resp *http.Response
+    err error
+}
+
+type netTimeoutError struct {
+    error
+}
+
+func (ne netTimeoutError) Timeout() bool { return true }
+
+// If you don't set RoundTrip on TimeoutTransport, this will always timeout at 0
+func (t *TimeoutTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+    timeout := time.After(t.RoundTripTimeout)
+    resp := make(chan respAndErr, 1)
+
+    go func() {
+        r, e := t.Transport.RoundTrip(req)
+        resp &lt;- respAndErr{
+            resp: r,
+            err: e,
+        }
+    }()
+
+    select {
+    case &lt;-timeout:// A round trip timeout has occurred.
+        t.Transport.CancelRequest(req)
+        return nil, netTimeoutError{
+            error: fmt.Errorf(&quot;timed out after %s&quot;, t.RoundTripTimeout),
+        }
+    case r := &lt;-resp: // Success!
+        return r.resp, r.err
+    }
+}
+</code></pre>
+
+<hr />
+
+<blockquote>
+<p>httpclient_test.go</p>
+</blockquote>
+<pre><code class="language-go">package httptimeout
+
+import (
+    &quot;io&quot;
+    &quot;io/ioutil&quot;
+    &quot;net&quot;
+    &quot;net/http&quot;
+    &quot;net/http/httptest&quot;
+    &quot;testing&quot;
+    &quot;time&quot;
+)
+
+func TestHttpTimeout(t *testing.T) {
+    http.HandleFunc(&quot;/normal&quot;, func(w http.ResponseWriter, req *http.Request) {
+        // Empirically, timeouts less than these seem to be flaky
+        time.Sleep(100 * time.Millisecond)
+        io.WriteString(w, &quot;ok&quot;)
+    })
+    http.HandleFunc(&quot;/timeout&quot;, func(w http.ResponseWriter, req *http.Request) {
+        time.Sleep(250 * time.Millisecond)
+        io.WriteString(w, &quot;ok&quot;)
+    })
+    ts := httptest.NewServer(http.DefaultServeMux)
+    defer ts.Close()
+
+    numDials := 0
+
+    client := &amp;http.Client{
+        Transport: &amp;TimeoutTransport{
+            Transport: http.Transport{
+                Dial: func(netw, addr string) (net.Conn, error) {
+                    t.Logf(&quot;dial to %s://%s&quot;, netw, addr)
+                    numDials++ // For testing only.
+                    return net.Dial(netw, addr) // Regular ass dial.
+                },
+            },
+            RoundTripTimeout: time.Millisecond * 200,
+        },
+    }
+
+    addr := ts.URL
+
+    SendTestRequest(t, client, &quot;1st&quot;, addr, &quot;normal&quot;)
+    if numDials != 1 {
+        t.Fatalf(&quot;Should only have 1 dial at this point.&quot;)
+    }
+    SendTestRequest(t, client, &quot;2st&quot;, addr, &quot;normal&quot;)
+    if numDials != 1 {
+        t.Fatalf(&quot;Should only have 1 dial at this point.&quot;)
+    }
+    SendTestRequest(t, client, &quot;3st&quot;, addr, &quot;timeout&quot;)
+    if numDials != 1 {
+        t.Fatalf(&quot;Should only have 1 dial at this point.&quot;)
+    }
+    SendTestRequest(t, client, &quot;4st&quot;, addr, &quot;normal&quot;)
+    if numDials != 2 {
+        t.Fatalf(&quot;Should have our 2nd dial.&quot;)
+    }
+
+    time.Sleep(time.Millisecond * 700)
+
+    SendTestRequest(t, client, &quot;5st&quot;, addr, &quot;normal&quot;)
+    if numDials != 2 {
+        t.Fatalf(&quot;Should still only have 2 dials.&quot;)
+    }
+}
+
+func SendTestRequest(t *testing.T, client *http.Client, id, addr, path string) {
+    req, err := http.NewRequest(&quot;GET&quot;, addr+&quot;/&quot;+path, nil)
+
+    if err != nil {
+        t.Fatalf(&quot;new request failed - %s&quot;, err)
+    }
+
+    req.Header.Add(&quot;Connection&quot;, &quot;keep-alive&quot;)
+
+    switch path {
+    case &quot;normal&quot;:
+        if resp, err := client.Do(req); err != nil {
+            t.Fatalf(&quot;%s request failed - %s&quot;, id, err)
+        } else {
+            result, err2 := ioutil.ReadAll(resp.Body)
+            if err2 != nil {
+                t.Fatalf(&quot;%s response read failed - %s&quot;, id, err2)
+            }
+            resp.Body.Close()
+            t.Logf(&quot;%s request - %s&quot;, id, result)
+        }
+    case &quot;timeout&quot;:
+        if _, err := client.Do(req); err == nil {
+            t.Fatalf(&quot;%s request not timeout&quot;, id)
+        } else {
+            t.Logf(&quot;%s request - %s&quot;, id, err)
+        }
+    }
+}
+</code></pre>
+
+<h4 id="代码相关-http-golang-org-pkg-net-http-httptest">代码相关 : <a href="http://golang.org/pkg/net/http/httptest/">http://golang.org/pkg/net/http/httptest/</a></h4>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="about-http-timeout" data-title="http timeout 研究 - LHQ" data-url="http://localhost/2015/9/1/about-http-timeout"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 LHQ.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.9.15 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>

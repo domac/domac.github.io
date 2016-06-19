@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>关于 keepalived - LHQ</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="about keepalived"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">LHQ <sup>技术学习与分享</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">9</span>
+                            <span class="day">3</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2015/9/3/about-keepalived.html">关于 keepalived</a>
+                            </h3>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/linux.html">linux</a>
+                        </aside>
+                        <section class="brief"><p>今天看了一些关于keepalived的资料,在这里复习总结一下:
+官网的介绍:
+  <a href="http://www.keepalived.org/">http://www.keepalived.org/</a></p>
+
+<p>Keeplived是Linux下的一个轻量级高可用解决方案, 专门用来监控集群系统中的各个服务节点的状态.其中,它的一个关键概念就是VRRP(Virtual Router Redundancy Protocol) 虚拟路由冗余协议, VRRP的目的是为了解决静态路由出现的单点故障问题.</p>
+
+<blockquote>
+<p>背景: 在现实的网络环境中, 主机之间的通讯都是通过配置静态路由(默认网关)完成的, 所以路由会成为单点瓶颈.所以引入VRRP</p>
+</blockquote>
+
+<p>用途: <code>服务器状态检测</code>, <code>故障隔离</code>, <code>HA cluster</code></p>
+
+<p>手段: VRRP可用将两台或者多台物理路由器设备虚拟成一个虚拟路由(通过虚拟IP对外提供服务), 并且多个物理理由协同工作,保证同一时刻只有一个物理路由作为主物理路由(用过选举)</p>
+
+<p>keepalived工作在TCP/IP参考模型的第三,第四和第五层,也就是网络层,传输层和应用层.运行机制如下:
+1. 在网络层 (IP, ICMP, ARP, RARP)
+2. 传输层 (TCP, UDP)
+3. 应用层(FTP, TELNET, SMTP, DNS)</p>
+
+<p>VRRP 工作流程:
+1.初始化
+&gt;路由器启动时，如果路由器的优先级是255(最高优先级，路由器拥有路由器地址)，要发送VRRP通告信息，并发送广播ARP信息通告路由器IP地址对应的MAC地址为路由虚拟MAC，设置通告信息定时器准备定时发送VRRP通告信息，转为MASTER状态；否则进入BACKUP状态，设置定时器检查定时检查是否收到MASTER的通告信息。</p>
+
+<p>2.Master
+&gt;设置定时通告定时器；
+        用VRRP虚拟MAC地址响应路由器IP地址的ARP请求；
+        转发目的MAC是VRRP虚拟MAC的数据包；
+        如果是虚拟路由器IP的拥有者，将接受目的地址是虚拟路由器IP的数据包，否则丢弃；
+        当收到shutdown的事件时删除定时通告定时器，发送优先权级为0的通告包，转初始化状态；
+        如果定时通告定时器超时时，发送VRRP通告信息；
+        收到VRRP通告信息时，如果优先权为0，发送VRRP通告信息；否则判断数据的优先级是否高于本机，或相等而且实际IP地址大于本地实际IP，设置定时通告定时器，复位主机超时定时器，转BACKUP状态；否则的话，丢弃该通告包；</p>
+
+<p>3.Backup
+&gt;设置主机超时定时器；
+        不能响应针对虚拟路由器IP的ARP请求信息；
+        丢弃所有目的MAC地址是虚拟路由器MAC地址的数据包；
+        不接受目的是虚拟路由器IP的所有数据包；
+        当收到shutdown的事件时删除主机超时定时器，转初始化状态；
+        主机超时定时器超时的时候，发送VRRP通告信息，广播ARP地址信息，转MASTER状态；
+        收到VRRP通告信息时，如果优先权为0，表示进入MASTER选举；否则判断数据的优先级是否高于本机，如果高的话承认MASTER有效，复位主机超时定时器；否则的话，丢弃该通告包；</p>
+
+<p>安装与配置可用参考这篇文章 : <a href="http://freeloda.blog.51cto.com/2033581/1280962">http://freeloda.blog.51cto.com/2033581/1280962</a></p>
+
+<!--more-->
+
+<p>下面是一个案例 (Keepalived+nginx+redis主从+tomcat一机多实例实现会话共享)</p>
+
+<h3 id="keepalived配置">keepalived配置</h3>
+
+<h3 id="nginx安装培训">nginx安装培训</h3>
+
+<ul>
+<li>安装nginx</li>
+</ul>
+<pre><code class="language-cpp">yum install nginx -y
+</code></pre>
+
+<ul>
+<li>调整nginx配置文件</li>
+</ul>
+<pre><code class="language-cpp">[root@redis ~]# sed -e 's@ @@g;/^$/d;/^#/d' /etc/nginx/nginx.conf
+worker_processes1;
+events{
+    worker_connections1024;
+}
+http{
+    includemime.types;
+    default_typeapplication/octet-stream;
+    sendfileon;
+    keepalive_timeout65;
+    upstream mycluser
+    {
+        server192.168.58.30:8080;
+        server192.168.58.30:8081;
+        server192.168.58.10:8080;
+        server192.168.58.10:8081;
+    }
+    server{
+        listen80;
+        server_namelocalhost;
+        location/{
+            roothtml;
+            indexindex.htmlindex.htmindex.jsp;
+            proxy_passhttp://mycluser;
+            proxy_set_headerX-Real-IP$remote_addr;
+            proxy_set_headerHost$host;
+            proxy_set_headerX-Forwarded-For$proxy_add_x_forwarded_for;
+            proxy_redirectoff;
+        }
+        error_page500502503504/50x.html;
+        location=/50x.html{
+            roothtml;
+        }
+    }
+}
+</code></pre>
+
+<h3 id="redis主从配置">redis主从配置</h3>
+
+<ul>
+<li>安装redis</li>
+</ul>
+<pre><code class="language-cpp">yum install redis -y
+</code></pre>
+
+<ul>
+<li>slave redis上添加slaveof 192.168.58.30 6379这一行，这就是二者的区别</li>
+</ul>
+<pre><code class="language-cpp">[root@mongo1 tmp]# sed -n '/^slaveof/p' /etc/redis.conf
+slaveof 192.168.58.30 6379
+[root@mongo1 tmp]#
+</code></pre>
+
+<ul>
+<li><p>测试会话共享</p></li>
+
+<li><p>master上</p></li>
+</ul>
+<pre><code class="language-cpp">[root@redis ~]# redis-cli -h 192.168.58.30
+redis 192.168.58.30:6379&gt; set name zhuima
+OK
+redis 192.168.58.30:6379&gt; get name
+&quot;zhuima&quot;
+redis 192.168.58.30:6379&gt;
+</code></pre>
+
+<ul>
+<li>slave上</li>
+</ul>
+<pre><code class="language-cpp">[root@mongo1 webapps]# redis-cli -h 192.168.58.10
+redis 192.168.58.10:6379&gt; get name
+&quot;zhuima&quot;
+redis 192.168.58.10:6379&gt;
+redis 192.168.58.10:6379&gt;
+</code></pre>
+
+<h3 id="tomcat一机多实例配置">tomcat一机多实例配置</h3>
+
+<ul>
+<li>配置jdk</li>
+</ul>
+<pre><code class="language-cpp">[root@redis tmp]# tar xf jdk-7u60-linux-x64.gz -C /usr/local
+</code></pre>
+
+<ul>
+<li>配置jdk环境变量</li>
+</ul>
+<pre><code class="language-cpp">[root@redis local]# cat /etc/profile.d/java.sh
+export JAVA_HOME=/usr/local/jdk1.7.0_60
+export PATH=$PATH:$JAVA_HOME/bin
+export JRE_HOME=$JAVA_HOME/jre
+[root@redis local]# source /etc/profile.d/java.sh
+[root@redis local]# java -version
+java version &quot;1.7.0_60&quot;
+Java(TM) SE Runtime Environment (build 1.7.0_60-b19)
+Java HotSpot(TM) 64-Bit Server VM (build 24.60-b09, mixed mode)
+[root@redis local]#
+</code></pre>
+
+<ul>
+<li>配置多实例tomcat</li>
+</ul>
+<pre><code class="language-cpp">[root@redis local]# tar xf apache-tomcat-7.0.54.tar.gz -C /usr/local/
+[root@redis local]# mv apache-tomcat-7.0.54/ tomcat1
+[root@redis local]# cp -Rf tomcat1 tomcat2
+</code></pre>
+
+<ul>
+<li>修改第二个tomcat的三个端口的配置信息</li>
+</ul>
+
+<h3 id="修改tomcat的content-xml文件">修改tomcat的content.xml文件</h3>
+<pre><code class="language-cpp">[root@www conf]# cat context.xml
+&lt;?xml version='1.0' encoding='utf-8'?&gt;
+&lt;!--
+    Licensed to the Apache Software Foundation (ASF) under one or more
+    contributor license agreements. See the NOTICE file distributed with
+    this work for additional information regarding copyright ownership.
+    The ASF licenses this file to You under the Apache License, Version 2.0
+    (the &quot;License&quot;); you may not use this file except in compliance with
+    the License. You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+--&gt;
+&lt;!-- The contents of this file will be loaded for each web application --&gt;
+&lt;Context&gt;
+    &lt;!-- Default set of monitored resources --&gt;
+    &lt;WatchedResource&gt;WEB-INF/web.xml&lt;/WatchedResource&gt;
+    &lt;Valve className=&quot;com.radiadesign.catalina.session.RedisSessionHandlerValve&quot; /&gt;
+    &lt;Manager className=&quot;com.radiadesign.catalina.session.RedisSessionManager&quot;
+        host=&quot;192.168.58.30&quot;
+        port=&quot;6379&quot;
+        database=&quot;0&quot;
+        maxInactiveInterval=&quot;60&quot;/&gt;
+        &lt;!-- Uncomment this to disable session persistence across Tomcat restarts --&gt;
+        &lt;!--
+    &lt;Manager pathname=&quot;&quot; /&gt;
+    --&gt;
+    &lt;!-- Uncomment this to enable Comet connection tacking (provides events
+    on session expiration as well as webapp lifecycle) --&gt;
+    &lt;!--
+    &lt;Valve className=&quot;org.apache.catalina.valves.CometConnectionManagerValve&quot; /&gt;
+    --&gt;
+&lt;/Context&gt;
+</code></pre>
+
+<ul>
+<li>复制给其他tomcat</li>
+</ul>
+<pre><code class="language-cpp">[root@redis conf]# yes | cp context.xml /usr/local/tomcat2/conf/
+cp: overwrite `/usr/local/tomcat2/conf/context.xml'? [root@redis conf]#
+</code></pre>
+<pre><code class="language-cpp">[root@redis conf]# for x in tomcat{1,2};do scp context.xml 192.168.58.10:/usr/local/$x/conf/;done
+root@192.168.58.10's password:
+context.xml 100% 1678 1.6KB/s 00:00
+root@192.168.58.10's password:
+context.xml 100% 1678 1.6KB/s 00:00
+[root@redis conf]#
+</code></pre>
+
+<h3 id="客户端验证会话共享">客户端验证会话共享</h3>
+
+<ul>
+<li>测试文件192.168.58.30上面</li>
+</ul>
+<pre><code class="language-cpp">[root@redis webapps]# cat index.jsp
+&lt;%@ page language=&quot;java&quot; %&gt;
+&lt;html&gt;
+    &lt;head&gt;&lt;title&gt;TomcatB&lt;/title&gt;&lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;&lt;font color=&quot;blue&quot;&gt;192.168.58.30:8081 Tomcat2 &lt;/h1&gt;
+        &lt;table align=&quot;centre&quot; border=&quot;1&quot;&gt;
+            &lt;tr&gt;
+                &lt;td&gt;Session ID&lt;/td&gt;
+                &lt;% session.setAttribute(&quot;abc&quot;,&quot;abc&quot;); %&gt;
+                &lt;td&gt;&lt;%= session.getId() %&gt;&lt;/td&gt;
+            &lt;/tr&gt;
+            &lt;tr&gt;
+                &lt;td&gt;Created on&lt;/td&gt;
+                &lt;td&gt;&lt;%= session.getCreationTime() %&gt;&lt;/td&gt;
+            &lt;/tr&gt;
+        &lt;/table&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<ul>
+<li>测试文件192.168.58.10上面</li>
+</ul>
+<pre><code class="language-cpp">&lt;%@ page language=&quot;java&quot; %&gt;
+&lt;html&gt;
+    &lt;head&gt;&lt;title&gt;TomcatB&lt;/title&gt;&lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;&lt;font color=&quot;red&quot;&gt;192.168.58.10:8080 Tomcat1 &lt;/h1&gt;
+        &lt;table align=&quot;centre&quot; border=&quot;1&quot;&gt;
+            &lt;tr&gt;
+                &lt;td&gt;Session ID&lt;/td&gt;
+                &lt;% session.setAttribute(&quot;abc&quot;,&quot;abc&quot;); %&gt;
+                &lt;td&gt;&lt;%= session.getId() %&gt;&lt;/td&gt;
+            &lt;/tr&gt;
+            &lt;tr&gt;
+                &lt;td&gt;Created on&lt;/td&gt;
+                &lt;td&gt;&lt;%= session.getCreationTime() %&gt;&lt;/td&gt;
+            &lt;/tr&gt;
+        &lt;/table&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<h3 id="查看进程存在与否">查看进程存在与否</h3>
+<pre><code class="language-cpp">[root@redis conf]# ps -ef | egrep &quot;[r]edis|[j]ava|[n]ginx&quot;
+root 5814 1 1 10:34 pts/0 00:00:41 /usr/local/jdk1.7.0_60/jre/bin/java -Djava.util.logging.config.file=/usr/local/tomcat1/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Djava.endorsed.dirs=/usr/local/tomcat1/endorsed -classpath /usr/local/tomcat1/bin/bootstrap.jar:/usr/local/tomcat1/bin/tomcat-juli.jar -Dcatalina.base=/usr/local/tomcat1 -Dcatalina.home=/usr/local/tomcat1 -Djava.io.tmpdir=/usr/local/tomcat1/temp org.apache.catalina.startup.Bootstrap start
+root 5830 1 1 10:35 pts/0 00:00:41 /usr/local/jdk1.7.0_60/jre/bin/java -Djava.util.logging.config.file=/usr/local/tomcat2/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Djava.endorsed.dirs=/usr/local/tomcat2/endorsed -classpath /usr/local/tomcat2/bin/bootstrap.jar:/usr/local/tomcat2/bin/tomcat-juli.jar -Dcatalina.base=/usr/local/tomcat2 -Dcatalina.home=/usr/local/tomcat2 -Djava.io.tmpdir=/usr/local/tomcat2/temp org.apache.catalina.startup.Bootstrap start
+redis 5921 1 0 11:07 ? 00:00:02 /usr/sbin/redis-server /etc/redis.conf
+root 5989 1 0 11:19 ? 00:00:00 nginx: master process /usr/sbin/nginx -c /etc/nginx/nginx.conf
+nginx 5991 5989 0 11:19 ? 00:00:00 nginx: worker process
+[root@redis conf]#
+</code></pre>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="about-keepalived" data-title="关于 keepalived - LHQ" data-url="http://localhost/2015/9/3/about-keepalived"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 LHQ.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.9.15 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>

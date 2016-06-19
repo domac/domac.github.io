@@ -3,7 +3,7 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>lock and sync - LHQ</title>
+    <title>lock 和 sync - LHQ</title>
     <meta name="keywords" content="go,golang,go语言"/>
     <meta name="description" content="lock and sync"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
@@ -17,19 +17,15 @@
             <nav id="site-nav">
                 <ul class="nav nav-inverse nav-pills pull-right">
                     <li role="presentation" class="">
-                        <a href="/" >Home
+                        <a href="/" >首页
                         </a>
                     </li>
                     <li role="presentation" class="">
-                        <a href="/archive" >Archive
+                        <a href="/archive" >归档
                         </a>
                     </li>
                     <li role="presentation" class="">
-                        <a href="/about" >About
-                        </a>
-                    </li>
-                    <li role="presentation" class="">
-                        <a href="http://pugo.io"  target="_blank" >Source
+                        <a href="/about" >关于
                         </a>
                     </li>
                 </ul>
@@ -55,11 +51,12 @@
                         </span>
                             </div>
                             <h3 class="title">
-                                <a href="/2015/8/24/lock-and-sync.html">lock and sync</a>
+                                <a href="/2015/8/24/lock-and-sync.html">lock 和 sync</a>
                             </h3>
                         </header>
                         <aside class="aside clearfix">
-                            <a class="tag label label-info" href="/tags/tag.html">tag</a>
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
                             <a class="stat label label-default pull-right" href="http://lihaoquan.xyz" target="_blank">lihaoquan</a>
                         </aside>
                         <section class="brief"><p>一些复杂的程序中，通常通过不同线程执行不同应用来实现程序的并发。当不同线程要使用同一个变量时，经常会出现一个问题：无法预知变量被不同线程修改的顺序！(这通常被称为资源竞争,指不同线程对同一变量使用的竞争)显然这无法让人容忍，那我们该如何解决这个问题呢？</p>
@@ -73,6 +70,8 @@
 <p><code>sync.Mutex</code> 是一个互斥锁，它的作用是守护在临界区入口来确保同一时间只能有一个线程进入临界区。</p>
 
 <p>假设 info 是一个需要上锁的放在共享内存中的变量。通过包含 <code>Mutex</code> 来实现的一个典型例子如下：</p>
+
+<!--more-->
 <pre><code class="language-go">import  “sync”
 
 type Info struct {
@@ -113,7 +112,22 @@ type Info struct {
         
 <section id="comment">
     
-    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="lock-and-sync" data-title="lock 和 sync - LHQ" data-url="http://localhost/2015/8/24/lock-and-sync"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
 </section>
 
     </div>

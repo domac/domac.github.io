@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>关于TCP重连 - LHQ</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="understand tcp resend"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">LHQ <sup>技术学习与分享</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">8</span>
+                            <span class="day">23</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2015/8/23/understand-tcp-resend.html">关于TCP重连</a>
+                            </h3>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
+                        </aside>
+                        <section class="brief"><h3 id="基础概念">基础概念</h3>
+
+<p><code>TCP可靠性</code>的一个保证机制就是<code>超时重传</code>，而超时重传的核心是重传超时时间的计算。我们分享自己的理解，分两部分：上部分侧重RFC解读，下部分侧重linux实现。</p>
+
+<p>本端发送一个数据包给对端，然后对端返回一个ack。这样，本端就能计算出这个包来回所需的时间，这个时间就是RTT（Round-TripTime），很简单，就是一个时间差。具体讲，它由三部分组成：链路层的传播时间、端点协议栈的处理时间、中间设备的处理时间（如路由器缓存）。主要时间应该耗在中间设备的中转，可见，RTT一定程度上体现了网络的拥塞程度。</p>
+
+<p>重传超时时间RTO（Retransmission TimeOut）是基于RTT（而RTT是动态变化的，所以RTO也得动态调整）计算出的一个定时器超时时间。它的作用就是在发送一个数据包之后，开始计时，如果超时时这个数据包还没有被ack，表明传输中出现问题了则进入超时处理流程（就是重传流程）。</p>
+
+<p>这里插入一点方法论。有些人看网络协议部分的代码时迷糊，其实就是由于没有参考RFC。所以我们是先讲RFC，再看代码。</p>
+
+<p>相关RFC解读</p>
+
+<p>RTO相关的RFC，目前以RFC6298（2011年发布，废弃RFC2988，更新RFC1122）为准。虽然它本身仅仅是追加了一个小需求：将初始化RTO从3秒改为1秒，但是内容上还是完整呈现了RTO相关流程。</p>
+
+<p>以下是我们（计算机学习微信公众号：jsj_xx）对RFC6298的总结和理解：</p>
+
+<!--more-->
+
+<p>1）RTO的初始值得考虑两个均衡：太大，不能及早检测出丢包；太小会增加重传频率。本RFC规定设置RTO初始值为1秒（之前是3秒），具体原因如下：</p>
+
+<p>RTO初始值为3，是在RFC 1122（1989年发布）中定义的，现在的网络比当时的网络要快太多。</p>
+
+<p>97.5%的网络的RTT小于1秒。</p>
+
+<p>三次握手期间的重传概率很低，只有2%。</p>
+
+<p>有2.5%的网络的RTT是大于1秒的，故它们会在三次握手期间重传，但是之后RTO就重新设置为3（保守性体现）了。</p>
+
+<p>不会影响RFC5681，三次握手的重传期间的拥塞窗口还是为1，即网络上仅仅多了一个syn报文而已。可以说，对重传的控制压缩到极点了。</p>
+
+<p>如果支持时间戳选项，则不需要将RTO重置为3了。也就是说，初始化RTO改为1秒不会影响到支持时间戳选项的TCP连接。</p>
+
+<p>初始化RTO的缩小令握手速度加快（指检测网络拥塞的场景），会让性能提升10%到50%。</p>
+
+<p>2）再次阐述RTO的计算过程：</p>
+<pre><code class="language-bash">初始化：
+
+RTO &lt;- 1秒
+
+第一次计算：（R是本次RTT值，K为4）
+
+SRTT &lt;- R
+
+RTTVAR &lt;- R/2
+
+RTO &lt;- SRTT + max (G, K*RTTVAR)
+
+之后的计算：（R’是本次RTT值，K为4，alpha为1/8，beta为1/4）
+
+RTTVAR &lt;- (1 - beta) * RTTVAR + beta * |SRTT -  R'|
+
+SRTT &lt;- (1 - alpha) * SRTT + alpha * R'
+
+RTO &lt;- SRTT + max (G, K*RTTVAR)
+</code></pre>
+
+<p>公式很明显，同时考虑了均值和均值偏差。</p>
+
+<p>4）必须用karn算法：不对重传的报文做RTT计算（因为分不清ack的是哪个重传包），同时采取定时器退避（就是每次重传时，RTO的值都增倍）策略。</p>
+
+<p>5）RTO_MIN必须大于等于1秒，如果小于则向上取整为1秒（保守性体现）。RTO_MAX规定为60秒，其实就是2*MSL，跟TCP的TIME_WAIT状态时的等待是一个意思（RFC1122里定义为240秒，可见也是根据网络加速而调整了）。时钟粒度G，本质是中断的粒度，应小于100ms，但是当今中断粒度（1毫秒）已经很小了，所以此值没有存在必要了，一定说有就是在初始花RTO时用到，但意义已经变了。</p>
+
+<p>RTO_MIN设置好为200毫秒和RTO_MAX设置为120秒两个固定值的原因，不外乎考虑到保守性和通用性（参考<a href="http://osdir.com/ml/linux.network.general/2002-12/msg00055.html）。">http://osdir.com/ml/linux.network.general/2002-12/msg00055.html）。</a></p>
+
+<p>6）时间戳选项在RTT的选取上有很大优势：每个ack其实都可以得出一个RTT。原因就是颠覆了karn算法：能够识别出ack对应的重传包。我们（计算机学习微信公众号：jsj_xx）以后会讲TCP为了提升性能新增的几个重要选项，主要参考RFC1323。</p>
+
+<p>7）一个RTT时间内可以多次计算，但规定至少一次。理论上多了会令求得的RTO更准，但是其实也无益，因为多计算的那些RTO都是有误差的，或者说alpha和beta等参数，甚至公式都需要调整。</p>
+
+<p>8）定时器的处理流程：</p>
+
+<p>发送数据时（包括重传期间），检查是否已经启动，若没有则启动。当该定时器监测的报文被ack，则删除定时器。</p>
+
+<p>如果定时器超时，说明该重传了：重传早先的还没有被ack的segment，同时进行定时器退避将RTO值增倍，最后重启该定时器。</p>
+
+<p>若是三次握手期间的定时器超时，则将RTO重新设置为3秒。</p>
+
+<p>这个流程里需要注意的是，即使重传期间也可能得出一个新的RTT，因为可能重传的包（假定起始序号为seq）和一些新数据被ack了。也就是说，重传的包的seq与当前RTO跟踪的包的seq是两个独立的过程（我们的理解是小于等于）！另外，在多次指数回避之后，可能需要清SRTT/RTTVAR，然后应该走RTO初始化值流程，而不是第一次计算RTO的流程。</p>
+
+<p>通过RFC，我们（计算机学习微信公众号：jsj_xx）给出自己的理解是：</p>
+
+<p>在可靠性要求下，网络出问题是需要重传多次的，每次的超时时间是增倍的，有上限限制。在这个大背景下，能够通过改变超时时间的下限和上限来适应对网络拥塞处理的不同需求：减小上限和下限可以适应高速网络，而通过增加上限和下限可以增强保守性。</p>
+
+<p>解读完RFC，我们再看linux实现（参照最新kernel4.0），就很容易明白了：</p>
+<pre><code class="language-bash">#define TCP_RTO_MAX ((unsigned)(120*HZ))
+#define TCP_RTO_MIN ((unsigned)(HZ/5))
+#define TCP_TIMEOUT_INIT ((unsigned)(1*HZ)) /* RFC6298 2.1 initial RTO value    */
+#define TCP_TIMEOUT_FALLBACK ((unsigned)(3*HZ)) /* RFC 1122 initial RTO value, now
+                   * used as a fallback RTO for the
+                   * initial data transmission if no
+                   * valid RTT sample has been acquired,
+                   * most likely due to retrans in 3WHS.
+                   */
+</code></pre>
+
+<p>我们感觉有几个linux实现与RFC违背的地方：</p>
+
+<p>1）RFC规定是60秒，但是linux的RTO_MAX是120秒。</p>
+
+<p>2）RFC规定的1秒，但是linux是RTO_MIN的倍数，出现200毫秒、400毫秒、800毫秒的小于1秒的RTO值。</p>
+
+<p>如果这些确实不是问题的话（如是，请指正我们，谢谢），我们（计算机学习微信公众号：jsj_xx）的理解如下：</p>
+
+<p>对于linux的实现而言，缩小了RTO_MIN，是激进的表现；而扩大了RTO_MAX是更加保守的表现。综合这两点，就是即照顾了当今网络的高速传输，也照顾了传输的可靠性。</p>
+
+<p>RTO公式</p>
+
+<p>之前的RFC1122仅考虑均值权重，不是很准确。RFC2988（实际是1988 VanJacobson ）开始引入均值偏差mdev（meandeviation），将RTT数值的波动也考虑进去，更加准确了。</p>
+
+<p>我们重新阐释这个公式，每个变量的含义：</p>
+
+<p>m：新得到的RTT</p>
+
+<p>a：srtt，平滑RTT</p>
+
+<p>err：m和a的差</p>
+
+<p>d：mdev，平滑均值偏差</p>
+
+<p>h：偏差权重，定为1/4</p>
+
+<p>g：均值权重，定为1/8</p>
+
+<p>rto：计算结果</p>
+
+<p>原公式如下：</p>
+<pre><code class="language-bash">err=m-a
+
+a=a+g*err
+
+d=d+h(|err|-d)
+
+rto=a+4d
+</code></pre>
+
+<p>代码实现时为规避掉浮点数，需要将分数调整为整数运算。针对上式：令A=8a，D=4d。我们可以推导出：</p>
+<pre><code class="language-bash">err=m-A/8
+
+A+=err
+
+If err&lt;0 err=-err
+
+err -= D/4
+
+D += err
+
+rto = A/8+D
+</code></pre>
+
+<p>此公式详细的介绍在VanJacobson 1988年发表的论文《CongestionAvoidance and Control》，该论文引出这个公式，并最终收入RFC2988。另外，论文里面的推导公式中的sa就是我们这里的A，sv就是我们这里的D。</p>
+
+<p>好了，上部分就结束了，纯属我们自己的理解，如有问题，还望指点。下部分我们结合linux实现继续理解。。。（未完待续）</p>
+
+<p>更多详情:
+<img src="http://mmbiz.qpic.cn/mmbiz/VEH1BVxYkW2RHLZRESvgiaDrjYKuVQozgRmF0Bo7gwqgqXnEiaaPvUUdFXKZ4friaEiazHicHiaTSgzhAxbNibKh67iayA/640?tp=webp&amp;wxfrom=5&amp;wx_lazy=1" alt="enter image description here" /></p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="understand-tcp-resend" data-title="关于TCP重连 - LHQ" data-url="http://localhost/2015/8/23/understand-tcp-resend"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 LHQ.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.9.15 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
