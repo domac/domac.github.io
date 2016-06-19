@@ -3,7 +3,7 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>my mongo shards - 浩泉的技术博客</title>
+    <title>Mongodb分片部署 - 浩泉的技术博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
     <meta name="description" content="my mongo shards"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
@@ -51,7 +51,7 @@
                         </span>
                             </div>
                             <h3 class="title">
-                                <a href="/2016/6/19/my-mongo-shards.html">my mongo shards</a>
+                                <a href="/2016/6/19/my-mongo-shards.html">Mongodb分片部署</a>
                             </h3>
                         </header>
                         <aside class="aside clearfix">
@@ -73,6 +73,8 @@
 </code></pre>
 
 <h3 id="在每台服务器上建立mongodb的软连接">在每台服务器上建立MongoDB的软连接</h3>
+
+<!--more-->
 
 <p>每台机器:</p>
 <pre><code>sudo ln -s /data/services/mongodb-linux-x86_64-3.0.7/bin/mongos /usr/bin/mongos
@@ -218,7 +220,7 @@ db.runCommand({addShard: 'shard3/192.168.139.139:27003,192.168.139.138:27003,192
     
     <div class="row">
         <div class="col-md-10 col-md-offset-1">
-            <div class="ds-thread" data-thread-key="my-mongo-shards" data-title="my mongo shards - 浩泉的技术博客" data-url="http://localhost/2016/6/19/my-mongo-shards"></div>
+            <div class="ds-thread" data-thread-key="my-mongo-shards" data-title="Mongodb分片部署 - 浩泉的技术博客" data-url="http://localhost/2016/6/19/my-mongo-shards"></div>
             <script type="text/javascript">
                 var duoshuoQuery = {short_name:"phillihq"};
                 (function() {
