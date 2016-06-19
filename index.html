@@ -46,6 +46,179 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">6</span>
+                            <span class="day">19</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/6/19/my-mongo-shards.html">my mongo shards</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>参考:</p>
+
+<ul>
+<li><a href="https://segmentfault.com/a/1190000002426743">MongoDB分片部署实践</a></li>
+<li><a href="http://yhv5.com/mongodb-shard_821.html">MongoDB分片集群部署</a></li>
+</ul>
+
+<h3 id="选用服务器">选用服务器:</h3>
+<pre><code>`192.168.139.139 (主)`
+
+`192.168.139.138`
+
+`192.168.139.134`
+</code></pre>
+
+<h3 id="在每台服务器上建立mongodb的软连接">在每台服务器上建立MongoDB的软连接</h3>
+
+<p>每台机器:</p>
+<pre><code>sudo ln -s /data/services/mongodb-linux-x86_64-3.0.7/bin/mongos /usr/bin/mongos
+
+sudo ln -s -f /data/services/mongodb-linux-x86_64-3.0.7/bin/mongos /usr/bin/mongos
+
+sudo ln -s -f /data/services/mongodb-linux-x86_64-3.0.7/bin/mongod /usr/bin/mongod
+
+sudo ln -s -f /data/services/mongodb-linux-x86_64-3.0.7/bin/mongo /usr/bin/mongo
+
+rm -rf conf/ mongos/ shard1 shard2 shard3
+
+mkdir -p conf/data conf/log mongos/log shard{1..3}/data shard{1..3}/log
+</code></pre>
+
+<h3 id="建立配置服器-start-configsvr-sh-并启动">建立配置服器: start_configsvr.sh 并启动</h3>
+
+<p>139:
+<code>
+mongod --configsvr --dbpath /home/steve-1/mongo_shards/conf/data --port 27100 --logpath /home/steve-1/mongo_shards/conf/confdb.log --fork --directoryperdb
+</code></p>
+
+<p>138:
+<code>
+mongod --configsvr --dbpath /home/apps/mongo_shards/conf/data --port 27100 --logpath /home/apps/mongo_shards/conf/confdb.log --fork --directoryperdb
+</code></p>
+
+<p>134:
+<code>
+mongod --configsvr --dbpath /home/steve-3/mongo_shards/conf/data --port 27100 --logpath /home/steve-3/mongo_shards/conf/confdb.log --fork --directoryperdb
+</code></p>
+
+<h3 id="建立分片服务器-start-mongos-sh-并启动">建立分片服务器 start_mongos.sh 并启动</h3>
+<pre><code>139:
+    mongos --configdb 192.168.139.139:27100,192.168.139.138:27100,192.168.139.134:27100 --port 27000 --logpath /home/steve-1/mongo_shards/mongos/mongos.log --fork
+
+138:
+    mongos --configdb 192.168.139.139:27100,192.168.139.138:27100,192.168.139.134:27100 --port 27000 --logpath /home/apps/mongo_shards/mongos/mongos.log --fork
+
+134:
+    mongos --configdb 192.168.139.139:27100,192.168.139.138:27100,192.168.139.134:27100 --port 27000 --logpath /home/steve-3/mongo_shards/mongos/mongos.log --fork
+</code></pre>
+
+<h3 id="建立副本集并设置分片-start-repl-sh">建立副本集并设置分片 start_repl.sh</h3>
+<pre><code>139:
+    mongod --shardsvr --replSet shard1 --port 27001 --dbpath /home/steve-1/mongo_shards/shard1/data --logpath /home/steve-1/mongo_shards/shard1/log/shard1.log --directoryperdb --fork
+
+    mongod --shardsvr --replSet shard2 --port 27002 --dbpath /home/steve-1/mongo_shards/shard2/data --logpath /home/steve-1/mongo_shards/shard2/log/shard2.log --directoryperdb --fork
+
+    mongod --shardsvr --replSet shard3 --port 27003 --dbpath /home/steve-1/mongo_shards/shard3/data --logpath /home/steve-1/mongo_shards/shard3/log/shard3.log --directoryperdb --fork
+
+
+138:
+    mongod --shardsvr --replSet shard1 --port 27001 --dbpath /home/apps/mongo_shards/shard1/data --logpath /home/apps/mongo_shards/shard1/log/shard1.log --directoryperdb --fork
+
+    mongod --shardsvr --replSet shard2 --port 27002 --dbpath /home/steve-3/mongo_shards/shard2/data --logpath /home/apps/mongo_shards/shard2/log/shard2.log --directoryperdb --fork
+
+    mongod --shardsvr --replSet shard3 --port 27003 --dbpath /home/steve-3/mongo_shards/shard3/data --logpath /home/apps/mongo_shards/shard3/log/shard3.log --directoryperdb --fork
+
+
+134:
+    mongod --shardsvr --replSet shard1 --port 27001 --dbpath /home/steve-3/mongo_shards/shard1/data --logpath /home/steve-3/mongo_shards/shard1/log/shard1.log --directoryperdb --fork
+
+    mongod --shardsvr --replSet shard2 --port 27002 --dbpath /home/steve-3/mongo_shards/shard2/data --logpath /home/steve-3/mongo_shards/shard2/log/shard2.log --directoryperdb --fork
+
+    mongod --shardsvr --replSet shard3 --port 27003 --dbpath /home/steve-3/mongo_shards/shard3/data --logpath /home/steve-3/mongo_shards/shard3/log/shard3.log --directoryperdb --fork
+</code></pre>
+
+<h3 id="初始化分片服务器">初始化分片服务器</h3>
+<pre><code>139:
+
+mongo  192.168.139.139:27001
+
+use admin
+
+rs.initiate({_id: 'shard1',members: [{_id: 84, host: '192.168.139.139:27001'},{_id: 89, host: '192.168.139.138:27001'},{_id: 90, host: '192.168.139.134:27001',arbiterOnly: true}]});
+
+mongo  192.168.139.139:27000  —&gt; 却换到mongos
+
+use admin
+
+db.runCommand({addShard: 'shard1/192.168.139.139:27001,192.168.139.138:27001,192.168.139.134:27001'});
+
+138:
+
+mongo  192.168.139.138:27002
+
+use admin
+
+rs.initiate({_id: 'shard2',members: [{_id: 84, host: '192.168.139.139:27002',arbiterOnly: true},{_id: 89, host: '192.168.139.138:27002'},{_id: 90, host: '192.168.139.134:27002'}]});
+
+mongo  192.168.139.138:27000  —&gt; 却换到mongos
+
+use admin
+
+db.runCommand({addShard: 'shard2/192.168.139.139:27002,192.168.139.138:27002,192.168.139.134:27002'});
+
+134:
+
+mongo  192.168.139.134:27003
+
+use admin
+
+rs.initiate({_id: 'shard3',members: [{_id: 84, host: '192.168.139.139:27003'},{_id: 89, host: '192.168.139.138:27003',arbiterOnly: true},{_id: 90, host: '192.168.139.134:27003'}]});
+
+mongo  192.168.139.134:27000  —&gt; 却换到mongos
+
+use admin
+
+db.runCommand({addShard: 'shard3/192.168.139.139:27003,192.168.139.138:27003,192.168.139.134:27003'});
+</code></pre>
+
+<h3 id="建立测试分片数据库">建立测试分片数据库</h3>
+
+<p>顺便登陆其中一个服务器:</p>
+
+<p>下面测试分片：</p>
+
+<p>mongo  192.168.139.138:27000</p>
+
+<p>use admin</p>
+
+<p>db.runCommand( { enablesharding :&ldquo;testdb&rdquo;});</p>
+
+<p>db.runCommand( { shardcollection : &ldquo;testdb.table1&rdquo;,key : {id: 1} } )</p>
+
+<p>mongo  192.168.139.138:27000</p>
+
+<p>use testdb</p>
+
+<p>for (var i = 1; i &lt;= 1000; i++) {db.table1.save({id:i,&ldquo;test1&rdquo;:&ldquo;testval1&rdquo;});}</p>
+
+<p>//查看分片信息</p>
+
+<p>db.table1.stats();</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/19/my-mongo-shards.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">9</span>
                             <span class="day">3</span>
                         </span>
@@ -160,39 +333,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2015/9/1/about-http-timeout.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">8</span>
-                            <span class="day">24</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2015/8/24/lock-and-sync.html">lock 和 sync</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>一些复杂的程序中，通常通过不同线程执行不同应用来实现程序的并发。当不同线程要使用同一个变量时，经常会出现一个问题：无法预知变量被不同线程修改的顺序！(这通常被称为资源竞争,指不同线程对同一变量使用的竞争)显然这无法让人容忍，那我们该如何解决这个问题呢？</p>
-
-<p>经典的做法是一次只能让一个线程对共享变量进行操作。当变量被一个线程改变时(临界区)，我们为它上锁，直到这个线程执行完成并解锁后，其他线程才能访问它。</p>
-
-<p>特别是我们之前章节学习的 map 类型是不存在锁的机制来实现这种效果(出于对性能的考虑),所以 map 类型是非线程安全的.当并行访问一个共享的 map 类型的数据，map 数据将会出错。</p>
-
-<p>在 Go 语言中这种锁的机制是通过 sync 包中 Mutex 来实现的。sync 来源于 &ldquo;synchronized&rdquo; 一词，这意味着线程将有序的对同一变量进行访问。</p>
-
-<p><code>sync.Mutex</code> 是一个互斥锁，它的作用是守护在临界区入口来确保同一时间只能有一个线程进入临界区。</p>
-
-<p>假设 info 是一个需要上锁的放在共享内存中的变量。通过包含 <code>Mutex</code> 来实现的一个典型例子如下：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2015/8/24/lock-and-sync.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
