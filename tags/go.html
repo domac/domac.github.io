@@ -72,21 +72,21 @@
 <p>cd3 | 127.0.0.1  | cd3.example.com | 2180 | 2179</p>
 
 <p>添加前，我们先查看目前的集群信息：</p>
-<pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member list
+<pre><code>$ ./etcdctl -peers 127.0.0.1:2379 member list
 </code></pre>
 
 <p>终端输出：</p>
-<pre><code class="language-sh">bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
+<pre><code>bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
 98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
 e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
 </code></pre>
 
 <p>好，我们尝试往集群中添加约定的新节点</p>
-<pre><code class="language-sh">$ ./etcdctl member add cd3 http://127.0.0.1:2180
+<pre><code>$ ./etcdctl member add cd3 http://127.0.0.1:2180
 </code></pre>
 
 <p>终端输出：</p>
-<pre><code class="language-sh">Added member named cd3 with ID ca3e75fab48dd93c to cluster
+<pre><code>Added member named cd3 with ID ca3e75fab48dd93c to cluster
 
 ETCD_NAME=&quot;cd3&quot;
 ETCD_INITIAL_CLUSTER=&quot;cd2=http://127.0.0.1:2580,cd3=http://127.0.0.1:2180,cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480&quot;
@@ -94,11 +94,11 @@ ETCD_INITIAL_CLUSTER_STATE=&quot;existing&quot;
 </code></pre>
 
 <p>我们再查看下集群当前的信息：</p>
-<pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member list
+<pre><code>$ ./etcdctl -peers 127.0.0.1:2379 member list
 </code></pre>
 
 <p>终端输出：</p>
-<pre><code class="language-sh">98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
+<pre><code>98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
 bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
 e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
 ca3e75fab48dd93c[unstarted]: peerURLs=http://127.0.0.1:2680
@@ -109,13 +109,13 @@ ca3e75fab48dd93c[unstarted]: peerURLs=http://127.0.0.1:2680
 <h3 id="启动节点">启动节点</h3>
 
 <p>我们启动第四个成员节点(记得带上刚刚的创建后获得的环境变量)：</p>
-<pre><code>$ export ETCD_NAME=&quot;infra3&quot;
+<pre><code>$ export ETCD_NAME=&quot;cd3&quot;
 $ export ETCD_INITIAL_CLUSTER=&quot;cd2=http://127.0.0.1:2580,cd3=http://127.0.0.1:2180,cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480&quot;
 $ export ETCD_INITIAL_CLUSTER_STATE=existing
 </code></pre>
 
 <p>然后启动名称为cd3的成员</p>
-<pre><code class="language-sh">./etcd --name cd3 --listen-client-urls http://127.0.0.1:2179 \
+<pre><code>./etcd --name cd3 --listen-client-urls http://127.0.0.1:2179 \
   --advertise-client-urls http://127.0.0.1:2179 \
   --listen-peer-urls http://127.0.0.1:2180 \
   --initial-advertise-peer-urls http://127.0.0.1:2180 \
@@ -127,15 +127,15 @@ $ export ETCD_INITIAL_CLUSTER_STATE=existing
 <h3 id="删除节点">删除节点</h3>
 
 <p>如果我们需要删除刚刚的节点，可以执行以下命令：</p>
-<pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member remove ca3e75fab48dd93c
+<pre><code>$ ./etcdctl -peers 127.0.0.1:2379 member remove ca3e75fab48dd93c
 </code></pre>
 
 <p>再次查看集群信息：</p>
-<pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member list
+<pre><code>$ ./etcdctl -peers 127.0.0.1:2379 member list
 </code></pre>
 
 <p>终端输出：</p>
-<pre><code class="language-sh">98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
+<pre><code>98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
 bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
 e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
 </code></pre>
