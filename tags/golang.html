@@ -57,27 +57,7 @@
                         </header>
                         <section class="brief"><p>上一篇我们搭建了一个应用开发测试的etcd&rdquo;伪集群&rdquo;，集群中包含了三个工作节点，它们分别是：</p>
 
-<table>
-<thead>
-<tr>
-<th>NAME</th>
-<th align="center">ADDRESS</th>
-<th align="right">HOSTNAME</th>
-<th align="right">PEER PORT</th>
-<th align="right">CLIENT PORT</th>
-</tr>
-</thead>
-
-<tbody>
-<tr>
-<td>cd0</td>
-<td align="center">127.0.0.1</td>
-<td align="right">cd0.example.com</td>
-<td align="right">2380</td>
-<td align="right">2379</td>
-</tr>
-</tbody>
-</table>
+<p>cd0 | 127.0.0.1  | cd0.example.com | 2380 | 2379</p>
 
 <p>cd1 | 127.0.0.1  | cd1.example.com | 2480 | 2479</p>
 
@@ -87,27 +67,7 @@
 
 <p>我们先约定好这个新的节点信息为：</p>
 
-<table>
-<thead>
-<tr>
-<th>NAME</th>
-<th align="center">ADDRESS</th>
-<th align="right">HOSTNAME</th>
-<th align="right">PEER PORT</th>
-<th align="right">CLIENT PORT</th>
-</tr>
-</thead>
-
-<tbody>
-<tr>
-<td>cd3</td>
-<td align="center">127.0.0.1</td>
-<td align="right">cd3.example.com</td>
-<td align="right">2180</td>
-<td align="right">2179</td>
-</tr>
-</tbody>
-</table>
+<p>cd3 | 127.0.0.1  | cd3.example.com | 2180 | 2179</p>
 
 <p>添加前，我们先查看目前的集群信息：</p>
 <pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member list
