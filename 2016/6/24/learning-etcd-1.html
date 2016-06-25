@@ -125,24 +125,12 @@
 <td align="right">2380</td>
 <td align="right">2379</td>
 </tr>
-
-<tr>
-<td>cd1</td>
-<td align="center">127.0.0.1</td>
-<td align="right">cd1.example.com</td>
-<td align="right">2480</td>
-<td align="right">2479</td>
-</tr>
-
-<tr>
-<td>cd2</td>
-<td align="center">127.0.0.1</td>
-<td align="right">cd2.example.com</td>
-<td align="right">2580</td>
-<td align="right">2579</td>
-</tr>
 </tbody>
 </table>
+
+<p>cd1 | 127.0.0.1  | cd1.example.com | 2480 | 2479</p>
+
+<p>cd2 | 127.0.0.1  | cd2.example.com | 2580 | 2579</p>
 
 <p>约定以上的名称后，我们可以开始部署我们的etcd测试集群。etcd目前支持配置文件和命令行的实例启动方法，下面的例子采用命令行的启动方式。</p>
 
@@ -181,9 +169,18 @@
 <h3 id="集群常用api">集群常用API</h3>
 
 <ul>
-<li><p>查看集群成员： curl <a href="http://127.0.0.1:2379/v2/members">http://127.0.0.1:2379/v2/members</a></p></li>
+<li><p>查看集群成员的两种方式：</p>
 
-<li><p>查看raft选举出的leader信息:  curl <a href="http://127.0.0.1:2379/v2/stats/leader">http://127.0.0.1:2379/v2/stats/leader</a></p></li>
+<ul>
+<li>API : curl <a href="http://127.0.0.1:2379/v2/members">http://127.0.0.1:2379/v2/members</a></li>
+<li>命令 : ./etcdctl -peers 127.0.0.1:2379 member list</li>
+</ul></li>
+
+<li><p>查看raft选举出的leader信息:</p>
+
+<ul>
+<li>API : curl <a href="http://127.0.0.1:2379/v2/stats/leader">http://127.0.0.1:2379/v2/stats/leader</a></li>
+</ul></li>
 </ul>
 
 <p>正常情况下，第一个命令，终端会输出集群环境中成员的信息：</p>

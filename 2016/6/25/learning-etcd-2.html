@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>etcd学习（二）：动态添加、删除节点 - LHQ的博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="learning etcd 2"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">LHQ的博客 <sup>life should be fun</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">6</span>
+                            <span class="day">25</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/6/25/learning-etcd-2.html">etcd学习（二）：动态添加、删除节点</a>
+                            </h3>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
+                            <a class="tag label label-info" href="/tags/etcd.html">etcd</a>
+                        </aside>
+                        <section class="brief"><p>上一篇我们搭建了一个应用开发测试的etcd&rdquo;伪集群&rdquo;，集群中包含了三个工作节点，它们分别是：</p>
+
+<table>
+<thead>
+<tr>
+<th>NAME</th>
+<th align="center">ADDRESS</th>
+<th align="right">HOSTNAME</th>
+<th align="right">PEER PORT</th>
+<th align="right">CLIENT PORT</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>cd0</td>
+<td align="center">127.0.0.1</td>
+<td align="right">cd0.example.com</td>
+<td align="right">2380</td>
+<td align="right">2379</td>
+</tr>
+</tbody>
+</table>
+
+<p>cd1 | 127.0.0.1  | cd1.example.com | 2480 | 2479</p>
+
+<p>cd2 | 127.0.0.1  | cd2.example.com | 2580 | 2579</p>
+
+<p>在我们日常的开发中，对etcd集群中添加，删除节点是一种很常见的操作。下面我们演示如何往我们目前的节点中添加新的节点和删除它。</p>
+
+<p>我们先约定好这个新的节点信息为：</p>
+
+<table>
+<thead>
+<tr>
+<th>NAME</th>
+<th align="center">ADDRESS</th>
+<th align="right">HOSTNAME</th>
+<th align="right">PEER PORT</th>
+<th align="right">CLIENT PORT</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>cd3</td>
+<td align="center">127.0.0.1</td>
+<td align="right">cd3.example.com</td>
+<td align="right">2180</td>
+<td align="right">2179</td>
+</tr>
+</tbody>
+</table>
+
+<p>添加前，我们先查看目前的集群信息：</p>
+<pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member list
+</code></pre>
+
+<p>终端输出：</p>
+<pre><code class="language-sh">bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
+98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
+e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
+</code></pre>
+
+<p>好，我们尝试往集群中添加约定的新节点</p>
+<pre><code class="language-sh">$ ./etcdctl member add cd3 http://127.0.0.1:2180
+</code></pre>
+
+<p>终端输出：</p>
+<pre><code class="language-sh">Added member named cd3 with ID ca3e75fab48dd93c to cluster
+
+ETCD_NAME=&quot;cd3&quot;
+ETCD_INITIAL_CLUSTER=&quot;cd2=http://127.0.0.1:2580,cd3=http://127.0.0.1:2180,cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480&quot;
+ETCD_INITIAL_CLUSTER_STATE=&quot;existing&quot;
+</code></pre>
+
+<p>我们再查看下集群当前的信息：</p>
+<pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member list
+</code></pre>
+
+<p>终端输出：</p>
+<pre><code class="language-sh">98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
+bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
+e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
+ca3e75fab48dd93c[unstarted]: peerURLs=http://127.0.0.1:2680
+</code></pre>
+
+<p>从终端的信息中，我们发现我们打算添加的节点处于<code>【unstarted】</code>状态，原因很简单，我们添加后，并没有启动它。</p>
+
+<p>启动节点：</p>
+
+<p>我们启动第四个成员节点：</p>
+<pre><code class="language-sh">./etcd --name cd3 --listen-client-urls http://127.0.0.1:2179 \
+  --advertise-client-urls http://127.0.0.1:2179 \
+  --listen-peer-urls http://127.0.0.1:2180 \
+  --initial-advertise-peer-urls http://127.0.0.1:2180 \
+  --initial-cluster-state existing \
+  --initial-cluster cd2=http://127.0.0.1:2580,cd0=http://127.0.0.1:2380,cd3=http://127.0.0.1:2179,cd1=http://127.0.0.1:2480 \
+  --initial-cluster-token etcd-cluster-1
+</code></pre>
+
+<p>如果我们需要删除刚刚的节点，可以执行以下命令：</p>
+<pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member remove ca3e75fab48dd93c
+</code></pre>
+
+<p>再次查看集群信息：</p>
+<pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member list
+</code></pre>
+
+<p>终端输出：</p>
+<pre><code class="language-sh">98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
+bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
+e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
+</code></pre>
+
+<p>这时，节点已经成功删除了</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="learning-etcd-2" data-title="etcd学习（二）：动态添加、删除节点 - LHQ的博客" data-url="http://localhost/2016/6/25/learning-etcd-2"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 LHQ的博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.9.15 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
