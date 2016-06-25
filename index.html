@@ -54,7 +54,7 @@
                                 <a href="/2016/6/25/learning-etcd-2.html">etcd学习（二）：动态添加、删除节点</a>
                             </h3>
                         </header>
-                        <section class="brief"><p>上一篇我们搭建了一个应用开发测试的etcd&rdquo;伪集群&rdquo;，集群中包含了三个工作节点，它们分别是：</p>
+                        <section class="brief"><p>上一篇: <a href="http://lihaoquan.xyz/2016/6/24/learning-etcd-1.html">etcd学习（一）</a> 我们搭建了一个应用开发测试的etcd&rdquo;伪集群&rdquo;，集群中包含了三个工作节点，它们分别是：</p>
 
 <p>cd0 | 127.0.0.1  | cd0.example.com | 2380 | 2379</p>
 
@@ -63,6 +63,8 @@
 <p>cd2 | 127.0.0.1  | cd2.example.com | 2580 | 2579</p>
 
 <p>在我们日常的开发中，对etcd集群中添加，删除节点是一种很常见的操作。下面我们演示如何往我们目前的节点中添加新的节点和删除它。</p>
+
+<h3 id="添加节点">添加节点</h3>
 
 <p>我们先约定好这个新的节点信息为：</p>
 
@@ -103,9 +105,15 @@ ca3e75fab48dd93c[unstarted]: peerURLs=http://127.0.0.1:2680
 
 <p>从终端的信息中，我们发现我们打算添加的节点处于<code>【unstarted】</code>状态，原因很简单，我们添加后，并没有启动它。</p>
 
-<p>启动节点：</p>
+<h3 id="启动节点">启动节点</h3>
 
-<p>我们启动第四个成员节点：</p>
+<p>我们启动第四个成员节点(记得带上刚刚的创建后获得的环境变量)：</p>
+<pre><code>$ export ETCD_NAME=&quot;infra3&quot;
+$ export ETCD_INITIAL_CLUSTER=&quot;cd2=http://127.0.0.1:2580,cd3=http://127.0.0.1:2180,cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480&quot;
+$ export ETCD_INITIAL_CLUSTER_STATE=existing
+</code></pre>
+
+<p>然后启动名称为cd3的成员</p>
 <pre><code class="language-sh">./etcd --name cd3 --listen-client-urls http://127.0.0.1:2179 \
   --advertise-client-urls http://127.0.0.1:2179 \
   --listen-peer-urls http://127.0.0.1:2180 \
@@ -114,6 +122,8 @@ ca3e75fab48dd93c[unstarted]: peerURLs=http://127.0.0.1:2680
   --initial-cluster cd2=http://127.0.0.1:2580,cd0=http://127.0.0.1:2380,cd3=http://127.0.0.1:2179,cd1=http://127.0.0.1:2480 \
   --initial-cluster-token etcd-cluster-1
 </code></pre>
+
+<h3 id="删除节点">删除节点</h3>
 
 <p>如果我们需要删除刚刚的节点，可以执行以下命令：</p>
 <pre><code class="language-sh">$ ./etcdctl -peers 127.0.0.1:2379 member remove ca3e75fab48dd93c
