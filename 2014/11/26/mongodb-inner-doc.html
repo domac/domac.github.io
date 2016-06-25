@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>Page 3 - LHQ的博客</title>
+    <title>MongoDB 查询内嵌文档 - LHQ的博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.xyz is my site"/>
+    <meta name="description" content="mongodb inner doc"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,77 +39,7 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">8</span>
-                            <span class="day">24</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2015/8/24/lock-and-sync.html">lock 和 sync</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>一些复杂的程序中，通常通过不同线程执行不同应用来实现程序的并发。当不同线程要使用同一个变量时，经常会出现一个问题：无法预知变量被不同线程修改的顺序！(这通常被称为资源竞争,指不同线程对同一变量使用的竞争)显然这无法让人容忍，那我们该如何解决这个问题呢？</p>
-
-<p>经典的做法是一次只能让一个线程对共享变量进行操作。当变量被一个线程改变时(临界区)，我们为它上锁，直到这个线程执行完成并解锁后，其他线程才能访问它。</p>
-
-<p>特别是我们之前章节学习的 map 类型是不存在锁的机制来实现这种效果(出于对性能的考虑),所以 map 类型是非线程安全的.当并行访问一个共享的 map 类型的数据，map 数据将会出错。</p>
-
-<p>在 Go 语言中这种锁的机制是通过 sync 包中 Mutex 来实现的。sync 来源于 &ldquo;synchronized&rdquo; 一词，这意味着线程将有序的对同一变量进行访问。</p>
-
-<p><code>sync.Mutex</code> 是一个互斥锁，它的作用是守护在临界区入口来确保同一时间只能有一个线程进入临界区。</p>
-
-<p>假设 info 是一个需要上锁的放在共享内存中的变量。通过包含 <code>Mutex</code> 来实现的一个典型例子如下：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2015/8/24/lock-and-sync.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">8</span>
-                            <span class="day">23</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2015/8/23/understand-tcp-resend.html">关于TCP重连</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><h3 id="基础概念">基础概念</h3>
-
-<p><code>TCP可靠性</code>的一个保证机制就是<code>超时重传</code>，而超时重传的核心是重传超时时间的计算。我们分享自己的理解，分两部分：上部分侧重RFC解读，下部分侧重linux实现。</p>
-
-<p>本端发送一个数据包给对端，然后对端返回一个ack。这样，本端就能计算出这个包来回所需的时间，这个时间就是RTT（Round-TripTime），很简单，就是一个时间差。具体讲，它由三部分组成：链路层的传播时间、端点协议栈的处理时间、中间设备的处理时间（如路由器缓存）。主要时间应该耗在中间设备的中转，可见，RTT一定程度上体现了网络的拥塞程度。</p>
-
-<p>重传超时时间RTO（Retransmission TimeOut）是基于RTT（而RTT是动态变化的，所以RTO也得动态调整）计算出的一个定时器超时时间。它的作用就是在发送一个数据包之后，开始计时，如果超时时这个数据包还没有被ack，表明传输中出现问题了则进入超时处理流程（就是重传流程）。</p>
-
-<p>这里插入一点方法论。有些人看网络协议部分的代码时迷糊，其实就是由于没有参考RFC。所以我们是先讲RFC，再看代码。</p>
-
-<p>相关RFC解读</p>
-
-<p>RTO相关的RFC，目前以RFC6298（2011年发布，废弃RFC2988，更新RFC1122）为准。虽然它本身仅仅是追加了一个小需求：将初始化RTO从3秒改为1秒，但是内容上还是完整呈现了RTO相关流程。</p>
-
-<p>以下是我们（计算机学习微信公众号：jsj_xx）对RFC6298的总结和理解：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2015/8/23/understand-tcp-resend.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
+        <div id="article-single">
             <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
@@ -124,6 +54,10 @@
                                 <a href="/2014/11/26/mongodb-inner-doc.html">MongoDB 查询内嵌文档</a>
                             </h3>
                         </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/mongodb.html">mongodb</a>
+                            <a class="stat label label-default pull-right" href="http://lihaoquan.xyz" target="_blank">lihaoquan</a>
+                        </aside>
                         <section class="brief"><p>今晚看了一些MongoDB的内嵌文档的文章, 总结了下在我们日常开发中有两种方法可以查询内嵌文档 : <code>查询整个文档</code>, 或者只针对<code>键/值对进行查询</code> .</p>
 
 <p>查询这个内嵌文档与普通查询完全相同, 例如, 有如下的文档 :</p>
@@ -183,18 +117,31 @@
 
 <p>$elemMatch将限定条件进行分组, 仅当需要对一个内嵌文档的多个键操作时才会用到.</p>
 </section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2014/11/26/mongodb-inner-doc.html">继续阅读</a>
-                        </aside>
                     </div>
                 </div>
             </article>
-            
-            <div class="article-pager text-center">
-                <a class="btn btn-lg btn-info" href="/posts/2.html">更新的</a>
-                
-            </div>
         </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="mongodb-inner-doc" data-title="MongoDB 查询内嵌文档 - LHQ的博客" data-url="http://localhost/2014/11/26/mongodb-inner-doc"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
     </div>
 </section>
 <footer id="footer">
