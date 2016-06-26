@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>关于golang的sync.Once的实现分析 - LHQ的博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="about sysnc once in go"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">LHQ的博客 <sup>life should be fun</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">5</span>
+                            <span class="day">2</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/5/2/about-sysnc-once-in-go.html">关于golang的sync.Once的实现分析</a>
+                            </h3>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
+                        </aside>
+                        <section class="brief"><p>sync.once可以控制函数只能被调用一次，不能多次重复调用。</p>
+
+<p>我们可以用下面的代码实现一个线程安全的单例模式</p>
+<pre><code>package singleton
+import (
+    &quot;fmt&quot;
+    &quot;sync&quot;
+)
+type object struct {
+    name string
+}
+var once sync.Once
+var obj *object //单例指针
+//公开方法 外包调用
+func Instance() *object {
+    once.Do(getObj)
+    return obj
+}
+func getObj() {
+    if obj == nil {
+        obj = new(object)
+        //可以做其他初始化事件
+    }
+}
+//单例测试
+func (obj *object) Test() {
+    fmt.Println(obj.name)
+}
+</code></pre>
+
+<p>如果我们要自己实现这么一个功能如何做呢？
+1. 定义一个status变量用来描述是否已经执行过了
+2. 使用sync.Mutex 或者sync.Atomic实现线程安全的获取status状态， 根据状态判断是否执行特定的函数</p>
+
+<p>然后看下sync.Once实际是如何实现的</p>
+<pre><code>// Once is an object that will perform exactly one action.
+type Once struct {
+    m    Mutex
+    done uint32
+}
+//使用了双层检查机制 
+func (o *Once) Do(f func()) {
+    if atomic.LoadUint32(&amp;o.done) == 1 {
+        return
+    }
+    // Slow-path.
+    o.m.Lock()
+    defer o.m.Unlock()
+    //这里需要再次重新判断下，因为 atomic.LoadUint32取出状态值到  o.m.Lock() 之间是有可能存在其它gotoutine改变status的状态值的
+    if o.done == 0 {
+        f()
+        atomic.StoreUint32(&amp;o.done, 1)
+    }
+}
+也有网友写出了更简洁的代码,不知道官方为什么没有采用下面的实现方式。
+
+type Once struct {
+    done int32
+}
+func (o *Once) Do(f func()) {
+    if atomic.LoadInt32(&amp;o.done) == 1 {
+        return
+    }
+    // Slow-path.
+    if atomic.CompareAndSwapInt32(&amp;o.done, 0, 1) {
+        f()
+    }
+}
+
+</code></pre>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="about-sysnc-once-in-go" data-title="关于golang的sync.Once的实现分析 - LHQ的博客" data-url="http://localhost/2016/5/2/about-sysnc-once-in-go"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 LHQ的博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.9.15 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
