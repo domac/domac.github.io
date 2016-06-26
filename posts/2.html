@@ -185,7 +185,8 @@ func (o *Once) Do(f func()) {
         atomic.StoreUint32(&amp;o.done, 1)
     }
 }
-也有网友写出了更简洁的代码,不知道官方为什么没有采用下面的实现方式。
+
+另外一种实现形式
 
 type Once struct {
     done int32
