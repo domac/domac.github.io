@@ -48,6 +48,63 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">6</span>
+                            <span class="day">27</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/6/27/learning-etcd-4.html">etcd学习（四）：服务故障恢复</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>在使用etcd集群的过程中，有时会出现少量主机故障，这时我们需要对集群进行维护。然而，在现实情况下，还可能遇到由于严重的设备
+或网络的故障，导致超过半数的节点无法正常工作。</p>
+
+<p>在etcd集群无法提供正常的服务，我们需要用到一些备份和数据恢复的手段。etcd背后的raft，保证了集群的数据的一致性与稳定性。所以我们对etcd的恢复，更多的是恢复etcd的节点服务，并还原用户数据。</p>
+
+<p>首先，从剩余的正常节点中选择一个正常的成员节点， 使用 <code>etcdctl backup</code> 命令备份etcd数据。</p>
+<pre><code>$ ./etcdctl backup --data-dir /var/lib/etcd -backup-dir /tmp/etcd_backup
+$ tar -zcxf backup.etcd.tar.gz /tmp/etcd_backup
+</code></pre>
+
+<p>这个命令会将节点中的用户数据全部写入到指定的备份目录中，但是节点ID,集群ID等信息将会丢失， 并在恢复到目的节点时被重新。这样主要是防止原先的节点意外重新加入新的节点集群而导致数据混乱。</p>
+
+<p>然后将Etcd数据恢复到新的集群的任意一个节点上， 使用 <code>--force-new-cluster</code> 参数启动Etcd服务。这个参数会重置集群ID和集群的所有成员信息，其中节点的监听地址会被重置为localhost:2379,
+表示集群中只有一个节点。</p>
+<pre><code>$ tar -zxvf backup.etcd.tar.gz -C /var/lib/etcd
+$ etcd --data-dir=/var/lib/etcd --force-new-cluster ...
+</code></pre>
+
+<p>启动完成单节点的etcd,可以先对数据的完整性进行验证， 确认无误后再通过Etcd API修改节点的监听地址，让它监听节点的外部IP地址，为增加其他节点做准备。例如：</p>
+
+<p>用etcd命令找到当前节点的ID。</p>
+<pre><code>$ etcdctl member list 
+
+98f0c6bf64240842: name=cd-2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579
+
+</code></pre>
+
+<p>由于etcdctl不具备修改成员节点参数的功能， 下面的操作要使用API来完成。</p>
+<pre><code>$ curl http://127.0.0.1:2579/v2/members/98f0c6bf64240842 -XPUT \
+ -H &quot;Content-Type:application/json&quot; -d '{&quot;peerURLs&quot;:[&quot;http://127.0.0.1:2580&quot;]}'
+</code></pre>
+
+<p>注意，在Etcd文档中， 建议首先将集群恢复到一个临时的目录中，从临时目录启动etcd，验证新的数据正确完整后，停止etcd，在将数据恢复到正常的目录中。</p>
+
+<p>最后，在完成第一个成员节点的启动后，可以通过集群扩展的方法使用 <code>etcdctl member add</code> 命令添加其他成员节点进来。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/27/learning-etcd-4.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">6</span>
                             <span class="day">26</span>
                         </span>
                             </div>

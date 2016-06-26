@@ -4,7 +4,13 @@
     <link>http://localhost/</link>
     <description>lihaoquan.xyz is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Sun, 26 Jun 2016 15:32:50 +0800</pubDate>
+    <pubDate>Sun, 26 Jun 2016 18:04:21 +0800</pubDate>
+    <item>
+      <title>etcd学习（四）：服务故障恢复</title>
+      <link>http://lihaoquan.xyz/2016/6/27/learning-etcd-4.html</link>
+      <description>&lt;p&gt;在使用etcd集群的过程中，有时会出现少量主机故障，这时我们需要对集群进行维护。然而，在现实情况下，还可能遇到由于严重的设备&#xA;或网络的故障，导致超过半数的节点无法正常工作。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;在etcd集群无法提供正常的服务，我们需要用到一些备份和数据恢复的手段。etcd背后的raft，保证了集群的数据的一致性与稳定性。所以我们对etcd的恢复，更多的是恢复etcd的节点服务，并还原用户数据。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;首先，从剩余的正常节点中选择一个正常的成员节点， 使用 &lt;code&gt;etcdctl backup&lt;/code&gt; 命令备份etcd数据。&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt;$ ./etcdctl backup --data-dir /var/lib/etcd -backup-dir /tmp/etcd_backup&#xA;$ tar -zcxf backup.etcd.tar.gz /tmp/etcd_backup&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;这个命令会将节点中的用户数据全部写入到指定的备份目录中，但是节点ID,集群ID等信息将会丢失， 并在恢复到目的节点时被重新。这样主要是防止原先的节点意外重新加入新的节点集群而导致数据混乱。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;然后将Etcd数据恢复到新的集群的任意一个节点上， 使用 &lt;code&gt;--force-new-cluster&lt;/code&gt; 参数启动Etcd服务。这个参数会重置集群ID和集群的所有成员信息，其中节点的监听地址会被重置为localhost:2379,&#xA;表示集群中只有一个节点。&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt;$ tar -zxvf backup.etcd.tar.gz -C /var/lib/etcd&#xA;$ etcd --data-dir=/var/lib/etcd --force-new-cluster ...&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;启动完成单节点的etcd,可以先对数据的完整性进行验证， 确认无误后再通过Etcd API修改节点的监听地址，让它监听节点的外部IP地址，为增加其他节点做准备。例如：&lt;/p&gt;&#xA;&#xA;&lt;p&gt;用etcd命令找到当前节点的ID。&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt;$ etcdctl member list &#xA;&#xA;98f0c6bf64240842: name=cd-2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579&#xA;&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;由于etcdctl不具备修改成员节点参数的功能， 下面的操作要使用API来完成。&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt;$ curl http://127.0.0.1:2579/v2/members/98f0c6bf64240842 -XPUT \&#xA; -H &amp;quot;Content-Type:application/json&amp;quot; -d &#39;{&amp;quot;peerURLs&amp;quot;:[&amp;quot;http://127.0.0.1:2580&amp;quot;]}&#39;&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;注意，在Etcd文档中， 建议首先将集群恢复到一个临时的目录中，从临时目录启动etcd，验证新的数据正确完整后，停止etcd，在将数据恢复到正常的目录中。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;最后，在完成第一个成员节点的启动后，可以通过集群扩展的方法使用 &lt;code&gt;etcdctl member add&lt;/code&gt; 命令添加其他成员节点进来。&lt;/p&gt;&#xA;</description>
+      <pubDate>Mon, 27 Jun 2016 01:39:07 +0000</pubDate>
+    </item>
     <item>
       <title>etcd学习（三）：服务发现</title>
       <link>http://lihaoquan.xyz/2016/6/26/learning-etcd-3.html</link>
