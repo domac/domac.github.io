@@ -3,7 +3,7 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>etcd学习（一） - LHQ的博客</title>
+    <title>etcd学习（一）：搭建etcd集群环境 - LHQ的博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
     <meta name="description" content="learning etcd 1"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
@@ -51,7 +51,7 @@
                         </span>
                             </div>
                             <h3 class="title">
-                                <a href="/2016/6/24/learning-etcd-1.html">etcd学习（一）</a>
+                                <a href="/2016/6/24/learning-etcd-1.html">etcd学习（一）：搭建etcd集群环境</a>
                             </h3>
                         </header>
                         <aside class="aside clearfix">
@@ -137,8 +137,8 @@
 <p>我们启动第一个成员节点：</p>
 <pre><code class="language-sh">$ etcd --name cd0 --initial-advertise-peer-urls http://127.0.0.1:2380 \
   --listen-peer-urls http://127.0.0.1:2380 \
-  --listen-client-urls http://127.0.0.1:2379 \
-  --advertise-client-urls http://127.0.0.1:2379 \
+  --listen-client-urls http://192.168.139.134:2379,http://127.0.0.1:2379 \
+  --advertise-client-urls http://192.168.139.134:2379,http://127.0.0.1:2379 \
   --initial-cluster-token etcd-cluster-1 \
   --initial-cluster cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480,cd2=http://127.0.0.1:2580 \
   --initial-cluster-state new
@@ -147,8 +147,8 @@
 <p>然后启动第二个成员节点</p>
 <pre><code class="language-sh">$ etcd --name cd1 --initial-advertise-peer-urls http://127.0.0.1:2480 \
   --listen-peer-urls http://127.0.0.1:2480 \
-  --listen-client-urls http://127.0.0.1:2479 \
-  --advertise-client-urls http://127.0.0.1:2479 \
+  --listen-client-urls http://192.168.139.134:2479,http://127.0.0.1:2479 \
+  --advertise-client-urls http://192.168.139.134:2479,http://127.0.0.1:2479 \
   --initial-cluster-token etcd-cluster-1 \
   --initial-cluster cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480,cd2=http://127.0.0.1:2580 \
   --initial-cluster-state new
@@ -157,12 +157,16 @@
 <p>我们再启动第三个成员节点</p>
 <pre><code class="language-sh">$ etcd --name cd2 --initial-advertise-peer-urls http://127.0.0.1:2580 \
   --listen-peer-urls http://127.0.0.1:2580 \
-  --listen-client-urls http://127.0.0.1:2579 \
-  --advertise-client-urls http://127.0.0.1:2579 \
+  --listen-client-urls http://192.168.139.134:2579,http://127.0.0.1:2579 \
+  --advertise-client-urls http://192.168.139.134:2579,http://127.0.0.1:2579 \
   --initial-cluster-token etcd-cluster-1 \
   --initial-cluster cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480,cd2=http://127.0.0.1:2580 \
   --initial-cluster-state new
 </code></pre>
+
+<blockquote>
+<p>注：上面的命令中 listen-client-urls、advertise-client-urls 我们分别设置了两个ip地址，其中第一个暴露当前服务器的ip地址出去，主要的目的让“etcd的服务发现客户端”能连接上我们的etcd集群；</p>
+</blockquote>
 
 <p>当三个节点都启动后，我们的测试集群其实就基本搭建完成了。接下来我们通过一些命令查看环境是否正常运行。</p>
 
@@ -238,7 +242,7 @@
     
     <div class="row">
         <div class="col-md-10 col-md-offset-1">
-            <div class="ds-thread" data-thread-key="learning-etcd-1" data-title="etcd学习（一） - LHQ的博客" data-url="http://localhost/2016/6/24/learning-etcd-1"></div>
+            <div class="ds-thread" data-thread-key="learning-etcd-1" data-title="etcd学习（一）：搭建etcd集群环境 - LHQ的博客" data-url="http://localhost/2016/6/24/learning-etcd-1"></div>
             <script type="text/javascript">
                 var duoshuoQuery = {short_name:"phillihq"};
                 (function() {
