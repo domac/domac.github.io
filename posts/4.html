@@ -46,6 +46,43 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">8</span>
+                            <span class="day">23</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2015/8/23/understand-tcp-resend.html">关于TCP重连</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><h3 id="基础概念">基础概念</h3>
+
+<p><code>TCP可靠性</code>的一个保证机制就是<code>超时重传</code>，而超时重传的核心是重传超时时间的计算。我们分享自己的理解，分两部分：上部分侧重RFC解读，下部分侧重linux实现。</p>
+
+<p>本端发送一个数据包给对端，然后对端返回一个ack。这样，本端就能计算出这个包来回所需的时间，这个时间就是RTT（Round-TripTime），很简单，就是一个时间差。具体讲，它由三部分组成：链路层的传播时间、端点协议栈的处理时间、中间设备的处理时间（如路由器缓存）。主要时间应该耗在中间设备的中转，可见，RTT一定程度上体现了网络的拥塞程度。</p>
+
+<p>重传超时时间RTO（Retransmission TimeOut）是基于RTT（而RTT是动态变化的，所以RTO也得动态调整）计算出的一个定时器超时时间。它的作用就是在发送一个数据包之后，开始计时，如果超时时这个数据包还没有被ack，表明传输中出现问题了则进入超时处理流程（就是重传流程）。</p>
+
+<p>这里插入一点方法论。有些人看网络协议部分的代码时迷糊，其实就是由于没有参考RFC。所以我们是先讲RFC，再看代码。</p>
+
+<p>相关RFC解读</p>
+
+<p>RTO相关的RFC，目前以RFC6298（2011年发布，废弃RFC2988，更新RFC1122）为准。虽然它本身仅仅是追加了一个小需求：将初始化RTO从3秒改为1秒，但是内容上还是完整呈现了RTO相关流程。</p>
+
+<p>以下是我们（计算机学习微信公众号：jsj_xx）对RFC6298的总结和理解：</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2015/8/23/understand-tcp-resend.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">11</span>
                             <span class="day">26</span>
                         </span>
