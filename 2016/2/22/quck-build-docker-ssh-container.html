@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>docker - LHQ的博客</title>
+    <title>快速构建支持SSH的Docker容器 - LHQ的博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.xyz is my site"/>
+    <meta name="description" content="quck build docker ssh container"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,62 +39,7 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
-            <h2 class="tag text-center">docker</h2>
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">4</span>
-                            <span class="day">17</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/4/17/docker-custom-bridge.html">docker自定义网桥</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>除了默认的 docker0 网桥，用户也可以指定网桥来连接各个容器。</p>
-
-<p>在启动 Docker 服务的时候，使用 -b BRIDGE或--bridge=BRIDGE 来指定使用的网桥。</p>
-
-<p>如果服务已经运行，那需要先停止服务，并删除旧的网桥。</p>
-<pre><code>$ sudo service docker stop
-$ sudo ip link set dev docker0 down
-$ sudo brctl delbr docker0
-</code></pre>
-
-<p>然后创建一个网桥 bridge0。</p>
-<pre><code>$ sudo brctl addbr bridge0
-$ sudo ip addr add 192.168.5.1/24 dev bridge0
-$ sudo ip link set dev bridge0 up
-</code></pre>
-
-<p>查看确认网桥创建并启动。</p>
-<pre><code>$ ip addr show bridge0
-4: bridge0: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state UP group default
-    link/ether 66:38:d0:0d:76:18 brd ff:ff:ff:ff:ff:ff
-    inet 192.168.5.1/24 scope global bridge0
-       valid_lft forever preferred_lft forever
-</code></pre>
-
-<p>配置 Docker 服务，默认桥接到创建的网桥上。</p>
-<pre><code>$ echo 'DOCKER_OPTS=&quot;-b=bridge0&quot;' &gt;&gt; /etc/default/docker
-$ sudo service docker start
-</code></pre>
-
-<p>启动 Docker 服务。 新建一个容器，可以看到它已经桥接到了 bridge0 上。</p>
-
-<p>可以继续用 brctl show 命令查看桥接的信息。另外，在容器中可以使用 ip addr 和 ip route 命令来查看 IP 地址配置和路由信息。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/4/17/docker-custom-bridge.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
+        <div id="article-single">
             <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
@@ -109,6 +54,11 @@ $ sudo service docker start
                                 <a href="/2016/2/22/quck-build-docker-ssh-container.html">快速构建支持SSH的Docker容器</a>
                             </h3>
                         </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
+                            <a class="tag label label-info" href="/tags/docker.html">docker</a>
+                        </aside>
                         <section class="brief"><p>在构建之前，我们先想一个问题：你需要ssh来干什么？</p>
 
 <blockquote>
@@ -178,41 +128,31 @@ root@fc1:/#  chmod -x run.sh
 
 <p>it work ~~</p>
 </section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/2/22/quck-build-docker-ssh-container.html">继续阅读</a>
-                        </aside>
                     </div>
                 </div>
             </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">1</span>
-                            <span class="day">13</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/1/13/build-web-application-in-docker.html">build web application in docker</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>教程参考： <a href="http://dockone.io/article/1269">http://dockone.io/article/1269</a></p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/1/13/build-web-application-in-docker.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <div class="article-pager text-center">
-                
-                
-            </div>
         </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="quck-build-docker-ssh-container" data-title="快速构建支持SSH的Docker容器 - LHQ的博客" data-url="http://localhost/2016/2/22/quck-build-docker-ssh-container"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
     </div>
 </section>
 <footer id="footer">
