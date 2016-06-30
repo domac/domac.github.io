@@ -69,9 +69,9 @@
 
 <p>本文，省略了镜像，容器的构建、生产id_rsa的步骤，这些可以去谷歌查阅相关资料。</p>
 
-<h3 id="1-找一个普通的ubuntu容器">1. 找一个普通的ubuntu容器</h3>
+<h3 id="1-在容器内安装ssh">1. 在容器内安装SSH</h3>
 
-<p>我们先进入容器内:</p>
+<p>我们这里选择了一个普通的ubuntu容器，名称叫ubdemo，进入容器内:</p>
 <pre><code>sudo docker exec -t -i  ubdemo /bin/bash
 </code></pre>
 
@@ -112,11 +112,15 @@ root@fc1:/#  chmod -x run.sh
 <pre><code>root@fc1:/#  exit
 </code></pre>
 
+<h3 id="2-构建新的镜像">2.构建新的镜像</h3>
+
 <p>OK.. 我们是时候基于这个sshd的容器创建一个新的镜像, 加入这个容器的名字叫 ubdemo</p>
 <pre><code>apps@dockers:~$  sudo docker commit ubdemo  sshd:ubuntu
 </code></pre>
 
 <p>这样我们就创建了一个新的镜像，这个新的镜像是基于我们原始容器安装SSH后构建起来的</p>
+
+<h3 id="3-构建新的容器">3.构建新的容器</h3>
 
 <p>我们可以基于这个镜像运行一个具备ssh的容器了</p>
 <pre><code>apps@dockers:~$ sudo docker run -p 10022:22 -d  sshd:ubuntu  /run.sh
