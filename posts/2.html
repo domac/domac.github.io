@@ -92,7 +92,7 @@ $ mkdir -p /data/apps/mytest/nginx/
 
 <p>创建我们的Dockerfile文件，内容如下：</p>
 <pre><code>FROM ubuntu:14.04
-MAINTAINER quanix quanix@163.com
+MAINTAINER lihaoquan quanix@163.com
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10
 RUN echo &quot;deb http://repo.mongodb.org/apt/ubuntu &quot;$(lsb_release -sc)&quot;/mongodb-org/3.0 multiverse&quot; | tee /etc/apt/sources.list.d/mongodb-org-3.0.list
 RUN apt-get update &amp;&amp; apt-get install -y --force-yes mongodb-org
@@ -271,14 +271,14 @@ EXPOSE 8000
 <p><img src="/media/2016/20160702_goweb_query.png" alt="index" /></p>
 
 <p>有了基本的web应用服务后，我们要着手为它配置负载，反向代理等功能，毕竟这是互联网生产环境的标配，所以下面我们
-继续扩展一下我的<code>架构</code>， 增加nginx的支持吧。</p>
+增加nginx的支持，继续扩展一下我们的<code>架构</code>吧。</p>
 
 <h2 id="构建nginx-镜像">构建Nginx 镜像</h2>
 
 <p>Nginx是一款支持HTTP、HTTPS、SMTP、POP3、IMAP等协议的反向代理服务器,也常用 作负载均衡、HTTP缓存和Web服务器。由于它开源、配置简单以及拥有高并发、高性能、低内 存、稳定性高等诸多优良特性,目前已经成为互联网上应用最广泛的Web服务器之一。
 本案例以Nginx作为前端服务器,主要提供两方面的功能:
 - 提供静态页面的访问服务;
-- node-web-api反向代理服务。</p>
+- goapp_api反向代理服务。</p>
 
 <h3 id="创建自定义配置文件">创建自定义配置文件</h3>
 
@@ -316,7 +316,7 @@ http {
 
 <p>同级目录下，创建Dockerfile</p>
 <pre><code>FROM nginx
-MAINTAINER quanix quanix@163.com
+MAINTAINER lihaoquan quanix@163.com
 COPY nginx.conf /etc/nginx/nginx.conf
 </code></pre>
 
