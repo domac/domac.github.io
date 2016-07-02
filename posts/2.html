@@ -70,17 +70,23 @@ $ mkdir -p /data/apps/mytest/nginx/
 <blockquote>
 <p><em>我们搭建的服务器ip假设为<code>192.168.139.140</code>，下文都以这个地址作为我们服务器地址</em></p>
 
-<p>下面的镜像默认以unbuntu作为根镜像</p>
+<p>下面的镜像默认以ubuntu作为根镜像</p>
 </blockquote>
 
 <h2 id="构建mongodb镜像">构建MongoDB镜像</h2>
 
-<p>MongoDB是一款流行的开放源码的非关系型数据库系统(NoSQL),常用于大数据量、高并 发、弱事务的互联网应用。MongoDB的官网地址是<a href="http://www.mongodb.com/。将MongoDB数据">http://www.mongodb.com/。将MongoDB数据</a> 库系统容器化可以带来以下几个好处。
-- 更容易维护。
-- 启动速度快。
-- 方便与他人进行分享。</p>
+<p>MongoDB是一款流行的开放源码的非关系型数据库系统(NoSQL),常用于大数据量、高并 发、弱事务的互联网应用。MongoDB的官网地址是<a href="http://www.mongodb.com/">http://www.mongodb.com/</a>
+将MongoDB数据 库系统容器化可以带来以下几个好处。</p>
 
-<p>编写Dockerfile</p>
+<ul>
+<li><p>更容易维护。</p></li>
+
+<li><p>启动速度快。</p></li>
+
+<li><p>方便与他人进行分享。</p></li>
+</ul>
+
+<h3 id="编写dockerfile">编写Dockerfile</h3>
 
 <p>进入 /data/apps/mytest/mongodb/</p>
 
@@ -137,7 +143,7 @@ ENTRYPOINT [&quot;/usr/bin/mongod&quot;]
 
 <p>在构建go容器之前，我们先写一个简单的运行例子：</p>
 
-<p>我们进入 /data/apps/mytest/go/</p>
+<p>我们进入 <code>/data/apps/mytest/go/</code></p>
 
 <p>然后创建一个 main.go 的文件，前后敲入以下的内容：</p>
 <pre><code class="language-go">package main
@@ -224,7 +230,7 @@ func main() {
 
 </code></pre>
 
-<h3 id="编写dockerfile">编写Dockerfile</h3>
+<h3 id="编写dockerfile-1">编写Dockerfile</h3>
 
 <p>go服务端程序编写后，在同级目录下创建Dockerfile文件，然后输入以下内容</p>
 <pre><code>FROM golang:onbuild
@@ -237,7 +243,7 @@ EXPOSE 8000
 
 <h3 id="构建镜像-1">构建镜像</h3>
 
-<p>接着，我们开始创建一个web镜像</p>
+<p>接着，我们开始创建一个go web应用镜像</p>
 <pre><code>sudo docker build -t goapp .
 </code></pre>
 
@@ -257,10 +263,15 @@ EXPOSE 8000
 
 <p>如果页面输出 <code>insert!</code>则，表示已经成功插入一条数据。</p>
 
-<p>我们再通过浏览器访问： <code>http://192.168.139.140:8000/book?sn=2</code> 若如下图所示，
+<p>我们再通过浏览器访问： <code>http://192.168.139.140:8000/book?sn=2</code></p>
+
+<p>若如下图所示，
 则我们已经成功通过docker部署了一个gin+mongodb的容器服务。</p>
 
 <p><img src="/media/2016/20160702_goweb_query.png" alt="index" /></p>
+
+<p>有了基本的web应用服务后，我们要着手为它配置负载，反向代理等功能，毕竟这是互联网生产环境的标配，所以下面我们
+继续扩展一下我的<code>架构</code>， 增加nginx的支持吧。</p>
 
 <h2 id="构建nginx-镜像">构建Nginx 镜像</h2>
 
@@ -273,7 +284,7 @@ EXPOSE 8000
 
 <p>进入 <code>/data/apps/mytest/nginx/</code></p>
 
-<p>创建nginx.conf，内容如下：</p>
+<p>创建<code>nginx.conf</code>，内容如下：</p>
 <pre><code>worker_processes 4;
 
 events { worker_connections 1024; }
@@ -301,7 +312,7 @@ http {
 
 <p>我们准备使用这个配置文件来取代nginx的默认配置文件，这需要我们的Dockerfile进行相关配置。</p>
 
-<h3 id="编写dockerfile-1">编写Dockerfile</h3>
+<h3 id="编写dockerfile-2">编写Dockerfile</h3>
 
 <p>同级目录下，创建Dockerfile</p>
 <pre><code>FROM nginx
@@ -309,7 +320,9 @@ MAINTAINER quanix quanix@163.com
 COPY nginx.conf /etc/nginx/nginx.conf
 </code></pre>
 
-<p>上面的Dockerfile，我们把自定义的nginx.conf拷贝到/etc/nginx/nginx.conf，这样ngix就会把我们的配置文件作为默认配置文件。</p>
+<p>上面的Dockerfile，我们把自定义的<code>nginx.conf</code>拷贝到<code>/etc/nginx/nginx.conf</code></p>
+
+<p>这样ngix就会把我们的配置文件作为默认配置文件。</p>
 
 <h3 id="构建镜像-2">构建镜像</h3>
 <pre><code>sudo docker build -t lihaoquan/nginx .
@@ -319,7 +332,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 <pre><code>sudo docker run -d --name nginx_web -p 80:80 lihaoquan/nginx
 </code></pre>
 
-<p>我们将容器内的80端口直接映射到外网</p>
+<p>我们将容器内的<code>80端口</code>直接映射到外网</p>
 
 <h2 id="验证web应用">验证web应用</h2>
 
