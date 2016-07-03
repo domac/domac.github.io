@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>Page 3 - LHQ的博客</title>
+    <title>Docker网络部分知识点归纳 - LHQ的博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.xyz is my site"/>
+    <meta name="description" content="docker network"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,7 +39,7 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
+        <div id="article-single">
             <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
@@ -54,6 +54,9 @@
                                 <a href="/2016/4/18/docker-network.html">Docker网络部分知识点归纳</a>
                             </h3>
                         </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/docker.html">docker</a>
+                        </aside>
                         <section class="brief"><h3 id="网络工具">网络工具</h3>
 
 <ul>
@@ -221,204 +224,31 @@ $ sudo service docker restart
 
 <p>如果我们配置了 --ice=true, 这条转发链会使用ACCEPT策略进行配置， 使用--ice=false, 转发链使用DROP策略进行配置。</p>
 </section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/4/18/docker-network.html">继续阅读</a>
-                        </aside>
                     </div>
                 </div>
             </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">4</span>
-                            <span class="day">17</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/4/17/docker-custom-bridge.html">docker自定义网桥</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>除了默认的 docker0 网桥，用户也可以指定网桥来连接各个容器。</p>
-
-<p>在启动 Docker 服务的时候，使用 -b BRIDGE或--bridge=BRIDGE 来指定使用的网桥。</p>
-
-<p>如果服务已经运行，那需要先停止服务，并删除旧的网桥。</p>
-<pre><code>$ sudo service docker stop
-$ sudo ip link set dev docker0 down
-$ sudo brctl delbr docker0
-</code></pre>
-
-<p>然后创建一个网桥 bridge0。</p>
-<pre><code>$ sudo brctl addbr bridge0
-$ sudo ip addr add 192.168.5.1/24 dev bridge0
-$ sudo ip link set dev bridge0 up
-</code></pre>
-
-<p>查看确认网桥创建并启动。</p>
-<pre><code>$ ip addr show bridge0
-4: bridge0: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state UP group default
-    link/ether 66:38:d0:0d:76:18 brd ff:ff:ff:ff:ff:ff
-    inet 192.168.5.1/24 scope global bridge0
-       valid_lft forever preferred_lft forever
-</code></pre>
-
-<p>配置 Docker 服务，默认桥接到创建的网桥上。</p>
-<pre><code>$ echo 'DOCKER_OPTS=&quot;-b=bridge0&quot;' &gt;&gt; /etc/default/docker
-$ sudo service docker start
-</code></pre>
-
-<p>启动 Docker 服务。 新建一个容器，可以看到它已经桥接到了 bridge0 上。</p>
-
-<p>可以继续用 brctl show 命令查看桥接的信息。另外，在容器中可以使用 ip addr 和 ip route 命令来查看 IP 地址配置和路由信息。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/4/17/docker-custom-bridge.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">2</span>
-                            <span class="day">22</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/2/22/quck-build-docker-ssh-container.html">快速构建支持SSH的Docker容器</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>在构建之前，我们先想一个问题：你需要ssh来干什么？</p>
-
-<blockquote>
-<p>大部分需求是，你要检查日志，做备份，或者重启进程，调整配置，查看服务器情况，</p>
-</blockquote>
-
-<p>虽然目前docker提供很多工具来做这些工作，但，为我们的容器提供SSH支持，也是不错的补充方案。</p>
-
-<p>本文，省略了镜像，容器的构建、生产id_rsa的步骤，这些可以去谷歌查阅相关资料。</p>
-
-<h3 id="1-在容器内安装ssh">1. 在容器内安装SSH</h3>
-
-<p>我们这里选择了一个普通的ubuntu容器，名称叫ubdemo，进入容器内:</p>
-<pre><code>sudo docker exec -t -i  ubdemo /bin/bash
-</code></pre>
-
-<p>进入ubdemo容器后,更新apt-get源</p>
-<pre><code>root@fc1:/# apt-get update
-root@fc1:/# get-get install openssh-server
-</code></pre>
-
-<p>安装后, 创建相关文件夹:</p>
-<pre><code>root@fc1:/# mkdir -p /var/run/sshd
-root@fc1:/# /usr/sbin/sshd -D &amp;
-</code></pre>
-
-<p>查看服务是否启动成功</p>
-<pre><code>root@fc1:/# netstat -tunlp
-</code></pre>
-
-<p>如果发现<code>22</code>端口信息,则服务启动启动</p>
-
-<p>我们在root用户目录下创建<code>.ssh</code>目录, 并复制需要登陆的公钥信息(在宿主机的.ssh/id_rsa.pub中)到authorized_keys中</p>
-<pre><code>root@fc1:/# mkdir root/.ssh
-root@fc1:/# vi /root/.ssh/authorized_keys
-</code></pre>
-
-<p>打开authorized_keys后,把宿主机 <code>.ssh/id_rsa.pub</code> 的内容拷贝进去</p>
-
-<p>创建自动启动SSH服务的脚本 (<em>必须要授权执行的权限</em>)</p>
-<pre><code>root@fc1:/#  vi /run.sh
-root@fc1:/#  chmod -x run.sh
-</code></pre>
-
-<p>run.sh的内容如下:</p>
-<pre><code>#! /bin/bash
-/usr/sbin/sshd -D
-</code></pre>
-
-<p>退出容器</p>
-<pre><code>root@fc1:/#  exit
-</code></pre>
-
-<h3 id="2-构建新的镜像">2.构建新的镜像</h3>
-
-<p>OK.. 我们是时候基于这个sshd的容器创建一个新的镜像, 加入这个容器的名字叫 ubdemo</p>
-<pre><code>apps@dockers:~$  sudo docker commit ubdemo  sshd:ubuntu
-</code></pre>
-
-<p>这样我们就创建了一个新的镜像，这个新的镜像是基于我们原始容器安装SSH后构建起来的</p>
-
-<h3 id="3-构建新的容器">3.构建新的容器</h3>
-
-<p>我们可以基于这个镜像运行一个具备ssh的容器了</p>
-<pre><code>apps@dockers:~$ sudo docker run -p 10022:22 -d  sshd:ubuntu  /run.sh
-</code></pre>
-
-<p>最好我们可以在宿主机ssh登陆这个docker容器了</p>
-<pre><code>ssh root@ip -p 10022  (可以通过sudo docker inspect sshd_ubdemo获取IP)
-</code></pre>
-
-<p>it work ~~</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/2/22/quck-build-docker-ssh-container.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">2</span>
-                            <span class="day">19</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/2/19/my-mongo-shards.html">Mongodb分片部署</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>参考:</p>
-
-<ul>
-<li><a href="https://segmentfault.com/a/1190000002426743">MongoDB分片部署实践</a></li>
-<li><a href="http://yhv5.com/mongodb-shard_821.html">MongoDB分片集群部署</a></li>
-</ul>
-
-<h3 id="选用服务器">选用服务器:</h3>
-<pre><code>`192.168.139.139 (主)`
-
-`192.168.139.138`
-
-`192.168.139.134`
-</code></pre>
-
-<h3 id="在每台服务器上建立mongodb的软连接">在每台服务器上建立MongoDB的软连接</h3>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/2/19/my-mongo-shards.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <div class="article-pager text-center">
-                <a class="btn btn-lg btn-info" href="/posts/2.html">更新的</a>
-                <a class="btn btn-lg btn-info" href="/posts/4.html">以前的</a>
-            </div>
         </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="docker-network" data-title="Docker网络部分知识点归纳 - LHQ的博客" data-url="http://localhost/2016/4/18/docker-network"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
     </div>
 </section>
 <footer id="footer">
