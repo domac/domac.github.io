@@ -336,6 +336,13 @@ COPY nginx.conf /etc/nginx/nginx.conf
 <pre><code>sudo docker run -d --name nginx_web -p 80:80 lihaoquan/nginx
 </code></pre>
 
+<blockquote>
+<p>上面的例子，我们在nginx。conf设置的具体的ip地址<code>192.168.139.140</code>, 如果使用别名的配置，
+那么构建命令需要进行容器连接 ：</p>
+
+<p>$ sudo docker run -d --name nginx_web -p 80:80 --link goapp_api:goapp_api  lihaoquan/nginx</p>
+</blockquote>
+
 <p>我们将容器内的<code>80端口</code>直接映射到外网</p>
 
 <h2 id="验证web应用">验证web应用</h2>
