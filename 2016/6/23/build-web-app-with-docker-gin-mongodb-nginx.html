@@ -344,8 +344,8 @@ COPY nginx.conf /etc/nginx/nginx.conf
 </code></pre>
 
 <blockquote>
-<p>上面的例子，我们在nginx。conf设置的具体的ip地址<code>192.168.139.140</code>, 如果使用别名的配置，
-那么构建命令需要进行容器连接 ：</p>
+<p>上面的例子，我们在nginx.conf设置了具体的ip地址<code>192.168.139.140</code>, 如果希望使用别名，而不是具体IP配置，
+可以先设置别名goapp_api ，然后构建命令需要进行容器连接 ：</p>
 
 <p>$ sudo docker run -d --name nginx_web -p 80:80 --link goapp_api:goapp_api  lihaoquan/nginx</p>
 </blockquote>
