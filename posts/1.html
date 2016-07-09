@@ -46,6 +46,89 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">7</span>
+                            <span class="day">9</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/7/9/learning-k8s-1.html">k8s学习（一）：基本概念</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>Kubernetes是在群集中管理跨多台主机容器化应用的开源系统。它为容器化应用提供了<code>资源调度</code>、<code>部署</code>、<code>服务发现</code>、<code>扩展</code>等功能。</p>
+
+<h3 id="主要功能用途">主要功能用途：</h3>
+
+<ol>
+<li><p>使用Docker对我们的应用进行打包、实例化和运行。</p></li>
+
+<li><p>以集群的方式运行和管理跨主机的容器。</p></li>
+
+<li><p>解决跨主机容器的通讯问题。</p></li>
+
+<li><p>提供自我修复的功能，保证系统运行的健壮性。</p></li>
+</ol>
+
+<h3 id="核心概念">核心概念</h3>
+
+<p>先看下K8s的架构图</p>
+
+<p><img src="/media/2016/20160709_k8s.png" alt="k8s" /></p>
+
+<p>核心组件：</p>
+
+<ul>
+<li><p>Node</p>
+
+<p>节点是Kubernates系统中的一台工作机器，既从属主机。它可以是物理机，也可以是虚拟机。每一个节点都包含了Pod运行所需的必要服务，例如Docker、kubelet和网络
+代理（proxy），节点受Kubernates系统中的主节点控制。</p>
+
+<p>和Pod、Service不一样，节点本身并不属于Kubernates的概念，它是云平台中的虚拟机或实体机。所以当一个节点加入到Kubernates系统中时，它将会创建一个数据结构
+来记录该节点的信息。另外，不是所有节点都能加入到Kubernates系统中，只有那些通过验证的节点才能成为Kubernates节点。</p>
+
+<p>你可以通过下面的命令获取节点运行情况列表：</p>
+<pre><code>$ kubectl get nodes
+
+NAME          LABELS                               STATUS
+172.19.17.99  kubernetes.io/hostname=172.19.17.99  Ready
+</code></pre></li>
+
+<li><p>Pod</p>
+
+<p>Pod是一组并置的应用容器，这些容器是共享磁盘卷的。</p>
+
+<p>Pod是可以被创建，调度，并与Kubernetes管理最小部署单元。Pod可以单独创建。由于Pods没有受管的生命周期，如果他们进程死掉了，他们将不会重新创建。出于这个原因，建议您使用复制控制器（我们将在后面介绍），即使你创造了单独的Pod。</p>
+
+<p>所有在Pod的应用使用相同的网络命名空间，IP地址及端口空间。他们可以找到并互相使用localhost沟通。每个Pod有一个与跨网络的其他物理计算机和容器充分沟通的扁平网络共享命名空间中的IP地址。</p></li>
+
+<li><p>Service</p>
+
+<p>服务为一组Pod提供单一稳定的名称和地址。他们作为基本负载均衡器而存在。是一系列Pod以及这些Pod的访问策略的抽象。</p>
+
+<p>Pod大多数被设计为长期运行的，但具备时效性，一旦单个进程死亡，Pod也跟着退出。如果Pod退出，复制控制器使用新的Pod替换它。每个Pod都有自己专用的IP地址，这使得容器具有相同的端口，即使他们共享相同的主机。但每次Pod由复制控制器启动，Pod将获取一个新的IP地址。</p></li>
+
+<li><p>Replication Controller</p>
+
+<p>复制控制器管理Pod的生命周期。它们保证指定数量的Pod在任何给定的时间都在运行。他们通过创建或删除Pod做到这一点。出于这个原因，建议您使用复制控制器，即使你创造了单独的Pod。</p></li>
+
+<li><p>Label</p>
+
+<p>Label(标签)是一组附加在对象上的键值对。标签常用来从一组对象中选取符合条件的对象，这也是Kubernates中目前为止最重要的节点分组方法。标签的本质是附属在对象上的非系统属性类的元数据，
+即它不是名字、Id以及对象的硬件属性，而是一些附加的键值对。</p></li>
+</ul>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/7/9/learning-k8s-1.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">6</span>
                             <span class="day">27</span>
                         </span>
@@ -526,201 +609,6 @@ e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/6/25/learning-etcd-2.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">6</span>
-                            <span class="day">24</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/6/24/learning-etcd-1.html">etcd学习（一）：搭建etcd集群环境</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><h3 id="概述">概述</h3>
-
-<p>etcd 是一个应用在分布式环境下的 key/value 存储服务。利用 etcd 的特性，应用程序可以在集群中共享信息、配置或作服务发现，etcd 会在集群的各个节点中复制这些数据并保证这些数据始终正确。随着CoreOS和Kubernetes等项目在开源社区日益火热，它们项目中都用到的etcd组件作为一个高可用强一致性的服务发现存储仓库，渐渐为开发人员所关注。</p>
-
-<p>zookeeper是最多与etcd进行比较的工具，ZooKeeper有如下缺点：</p>
-
-<ul>
-<li><p>复杂。ZooKeeper的部署维护复杂，管理员需要掌握一系列的知识和技能；而Paxos强一致性算法也是素来以复杂难懂而闻名于世；另外，ZooKeeper的使用也比较复杂，需要安装客户端，官方只提供了Java和C两种语言的接口。</p></li>
-
-<li><p>Java编写。这里不是对Java有偏见，而是Java本身就偏向于重型应用，它会引入大量的依赖。而运维人员则普遍希望保持强一致、高可用的机器集群尽可能简单，维护起来也不易出错。</p></li>
-
-<li><p>发展缓慢。Apache基金会项目特有的“Apache Way”在开源界饱受争议，其中一大原因就是由于基金会庞大的结构以及松散的管理导致项目发展缓慢。</p></li>
-</ul>
-
-<p>而etcd作为一个后起之秀，其优点也很明显。</p>
-
-<ul>
-<li><p>简单。使用Go语言编写部署简单；使用HTTP作为接口使用简单；使用Raft算法保证强一致性让用户易于理解。
-数据持久化。etcd默认数据一更新就进行持久化。</p></li>
-
-<li><p>安全。etcd支持SSL客户端安全认证。</p></li>
-</ul>
-
-<h3 id="集群搭建">集群搭建</h3>
-
-<p>了解基本概念后，我们可以尝试地搭建一个简单的<code>测试集群</code>，直观感受下etcd的功能。</p>
-
-<p>由于方便大家快速部署，下面的例子我只用同一台服务器进行三个成员节点的开启，生产环境不建议这样，生产环境为了容灾，建议一个节点部署在一台服务器上。</p>
-
-<p>我们的测试环境我们IP就先以127.0.0.1表示。</p>
-
-<h4 id="环境准备说明">环境准备说明：</h4>
-
-<p>运行linux环境：</p>
-
-<blockquote>
-<p>centos 7</p>
-</blockquote>
-
-<p>etcd版本</p>
-
-<blockquote>
-<p>v2.3.6</p>
-</blockquote>
-
-<p>测试集群服务名称</p>
-
-<table>
-<thead>
-<tr>
-<th>NAME</th>
-<th align="center">ADDRESS</th>
-<th align="right">HOSTNAME</th>
-<th align="right">PEER PORT</th>
-<th align="right">CLIENT PORT</th>
-</tr>
-</thead>
-
-<tbody>
-<tr>
-<td>cd0</td>
-<td align="center">127.0.0.1</td>
-<td align="right">cd0.example.com</td>
-<td align="right">2380</td>
-<td align="right">2379</td>
-</tr>
-</tbody>
-</table>
-
-<p>cd1 | 127.0.0.1  | cd1.example.com | 2480 | 2479</p>
-
-<p>cd2 | 127.0.0.1  | cd2.example.com | 2580 | 2579</p>
-
-<p>约定以上的名称后，我们可以开始部署我们的etcd测试集群。etcd目前支持配置文件和命令行的实例启动方法，下面的例子采用命令行的启动方式。</p>
-
-<p>我们启动第一个成员节点：</p>
-<pre><code class="language-sh">$ etcd --name cd0 --initial-advertise-peer-urls http://127.0.0.1:2380 \
-  --listen-peer-urls http://127.0.0.1:2380 \
-  --listen-client-urls http://192.168.139.134:2379,http://127.0.0.1:2379 \
-  --advertise-client-urls http://192.168.139.134:2379,http://127.0.0.1:2379 \
-  --initial-cluster-token etcd-cluster-1 \
-  --initial-cluster cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480,cd2=http://127.0.0.1:2580 \
-  --initial-cluster-state new
-</code></pre>
-
-<p>然后启动第二个成员节点</p>
-<pre><code class="language-sh">$ etcd --name cd1 --initial-advertise-peer-urls http://127.0.0.1:2480 \
-  --listen-peer-urls http://127.0.0.1:2480 \
-  --listen-client-urls http://192.168.139.134:2479,http://127.0.0.1:2479 \
-  --advertise-client-urls http://192.168.139.134:2479,http://127.0.0.1:2479 \
-  --initial-cluster-token etcd-cluster-1 \
-  --initial-cluster cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480,cd2=http://127.0.0.1:2580 \
-  --initial-cluster-state new
-</code></pre>
-
-<p>我们再启动第三个成员节点</p>
-<pre><code class="language-sh">$ etcd --name cd2 --initial-advertise-peer-urls http://127.0.0.1:2580 \
-  --listen-peer-urls http://127.0.0.1:2580 \
-  --listen-client-urls http://192.168.139.134:2579,http://127.0.0.1:2579 \
-  --advertise-client-urls http://192.168.139.134:2579,http://127.0.0.1:2579 \
-  --initial-cluster-token etcd-cluster-1 \
-  --initial-cluster cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480,cd2=http://127.0.0.1:2580 \
-  --initial-cluster-state new
-</code></pre>
-
-<blockquote>
-<p>注：上面的命令中 listen-client-urls、advertise-client-urls 我们分别设置了两个ip地址，其中第一个暴露当前服务器的ip地址出去，主要的目的让“etcd的服务发现客户端”能连接上我们的etcd集群；</p>
-</blockquote>
-
-<p>当三个节点都启动后，我们的测试集群其实就基本搭建完成了。接下来我们通过一些命令查看环境是否正常运行。</p>
-
-<h3 id="集群常用api">集群常用API</h3>
-
-<ul>
-<li><p>查看集群成员的两种方式：</p>
-
-<ul>
-<li>API : curl <a href="http://127.0.0.1:2379/v2/members">http://127.0.0.1:2379/v2/members</a></li>
-<li>命令 : ./etcdctl -peers 127.0.0.1:2379 member list</li>
-</ul></li>
-
-<li><p>查看raft选举出的leader信息:</p>
-
-<ul>
-<li>API : curl <a href="http://127.0.0.1:2379/v2/stats/leader">http://127.0.0.1:2379/v2/stats/leader</a></li>
-</ul></li>
-</ul>
-
-<p>正常情况下，第一个命令，终端会输出集群环境中成员的信息：</p>
-<pre><code class="language-sh">{&quot;members&quot;:[{&quot;id&quot;:&quot;98f0c6bf64240842&quot;,&quot;name&quot;:&quot;cd2&quot;,&quot;peerURLs&quot;:[&quot;http://127.0.0.1:2580&quot;],&quot;clientURLs&quot;:[&quot;http://127.0.0.1:2579&quot;]},{&quot;id&quot;:&quot;bf9071f4639c75cc&quot;,&quot;name&quot;:&quot;cd0&quot;,&quot;peerURLs&quot;:[&quot;http://127.0.0.1:2380&quot;],&quot;clientURLs&quot;:[&quot;http://127.0.0.1:2379&quot;]},{&quot;id&quot;:&quot;e3ba87c3b4858ef1&quot;,&quot;name&quot;:&quot;cd1&quot;,&quot;peerURLs&quot;:[&quot;http://127.0.0.1:2480&quot;],&quot;clientURLs&quot;:[&quot;http://127.0.0.1:2479&quot;]}]}
-</code></pre>
-
-<p>第二个名称，终端会输出leader节点的信息</p>
-<pre><code class="language-sh">{&quot;leader&quot;:&quot;bf9071f4639c75cc&quot;,&quot;followers&quot;:{&quot;98f0c6bf64240842&quot;:{&quot;latency&quot;:{&quot;current&quot;:0.001508,&quot;average&quot;:0.003802833109017467,&quot;standardDeviation&quot;:0.036522391987331815,&quot;minimum&quot;:0.00063,&quot;maximum&quot;:2.904841},&quot;counts&quot;:{&quot;fail&quot;:5,&quot;success&quot;:7430}},&quot;e3ba87c3b4858ef1&quot;:{&quot;latency&quot;:{&quot;current&quot;:0.001107,&quot;average&quot;:0.004358879754601237,&quot;standardDeviation&quot;:0.03430699645209604,&quot;minimum&quot;:0.000638,&quot;maximum&quot;:3.188562},&quot;counts&quot;:{&quot;fail&quot;:0,&quot;success&quot;:8965}}}}
-</code></pre>
-
-<p>至此，我们的etcd测试集群正常搭建完成。见下图：</p>
-
-<p><img src="/media/20160624_etcd_back.png" alt="nsq" /></p>
-
-<h3 id="etcd的数据">Etcd的数据</h3>
-
-<p>etcd为我们提供了KV的服务目录存储，所以我们可以通过命令设置value</p>
-<pre><code class="language-sh">  $ ./etcdctl set /mysite lihaoquan.xyz
-</code></pre>
-
-<p>获取value的方式同样简单：</p>
-<pre><code class="language-sh"> $ ./etcdctl get /mysite
-
- &gt; lihaoquan.xyz
-</code></pre>
-
-<p>这个例子中我们设置了一个key为 <code>/mysite</code> ，value为 <code>lihaoquan.xyz</code>的数据。</p>
-
-<p>etcd的数据默认会存放在我们的命令工作目录中，我们会发现数据所在的目录，会被分为两个文件夹中：</p>
-
-<p><code>snap</code>: 存放快照数据,etcd防止WAL文件过多而设置的快照，存储etcd数据状态。</p>
-
-<p><code>wal</code>: 存放预写式日志,最大的作用是记录了整个数据变化的全部历程。在etcd中，所有数据的修改在提交前，都要先写入到WAL中。使用WAL进行数据的存储使得etcd拥有两个重要功能。</p>
-
-<ul>
-<li><p>故障快速恢复： 当你的数据遭到破坏时，就可以通过执行所有WAL中记录的修改操作，快速从最原始的数据恢复到数据损坏前的状态。</p></li>
-
-<li><p>数据回滚（undo）/重做（redo）：因为所有的修改操作都被记录在WAL中，需要回滚或重做，只需要方向或正向执行日志中的操作即可</p></li>
-</ul>
-
-<p>既然有了WAL实时存储了所有的变更，为什么还需要snapshot呢？随着使用量的增加，WAL存储的数据会暴增，为了防止磁盘很快就爆满，etcd默认每10000条记录做一次snapshot，经过snapshot以后的WAL文件就可以删除。而通过API可以查询的历史etcd操作默认为1000条。</p>
-
-<p>首次启动时，etcd会把启动的配置信息存储到data-dir参数指定的数据目录中。配置信息包括本地节点的ID、集群ID和初始时集群信息。用户需要避免etcd从一个过期的数据目录中重新启动，因为使用过期的数据目录启动的节点会与集群中的其他节点产生不一致（如：之前已经记录并同意Leader节点存储某个信息，重启后又向Leader节点申请这个信息）。所以，为了最大化集群的安全性，一旦有任何数据损坏或丢失的可能性，你就应该把这个节点从集群中移除，然后加入一个不带数据目录的新节点。</p>
-
-<h3 id="总结">总结</h3>
-
-<p>这里我们已经对etcd有了大概的认识了，方便我们往后的开发实践。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/24/learning-etcd-1.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
