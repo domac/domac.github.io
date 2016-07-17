@@ -97,6 +97,10 @@
 
 <p>这三个web的程序我是基于Gin构建的，因为Gin简单高效，它一直作为我web服务的首选之一。</p>
 
+<blockquote>
+<p>我们用于部署的服务器地址约定为 192.168.139.140</p>
+</blockquote>
+
 <p>以下是源码：</p>
 
 <p>web应用：app-0</p>
@@ -151,10 +155,16 @@ func main() {
 </code></pre>
 
 <p>编写完三个web应用代码后，我们分别对它们进行启动</p>
+<pre><code>此时我们可以在浏览器输入 
 
-<blockquote>
-<p>此时我们可以在浏览器输入 <a href="http://192.168.139.140:8081">http://192.168.139.140:8081</a> , <a href="http://192.168.139.140:8082">http://192.168.139.140:8082</a> , <a href="http://192.168.139.140:8083">http://192.168.139.140:8083</a> 建议app是否正常启动</p>
-</blockquote>
+http://192.168.139.140:8081 
+
+http://192.168.139.140:8082  
+
+http://192.168.139.140:8083 
+
+观察app是否正常启动
+</code></pre>
 
 <p>三个web app 服务都正常启动后，我们接下来就开始最重要的工作了。</p>
 
@@ -182,7 +192,7 @@ func main() {
 
 <h4 id="4-配置backend">4.配置backend</h4>
 
-<p>配置配置backend， 我们直接通过etcd的命令工具进行：</p>
+<p>配置backend， 我们直接通过etcd的命令工具进行：</p>
 <pre><code> $ etcdctl set /vulcand/backends/b1/backend '{&quot;Type&quot;: &quot;http&quot;}'
 </code></pre>
 
@@ -214,7 +224,7 @@ func main() {
 
 <p><img src="/media/2016/2016_vulcand_res3.png" alt="nsq" /></p>
 
-<p>至此，一个简单的可运行的例子就搭建起来，当然vulcand的用法远不与此，我们可以结合官方文档提供更复杂的功能。</p>
+<p>至此，一个简单的可运行的例子就搭建起来，当然vulcand的用法远不于这样，我们可以结合官方文档提供更复杂的功能。</p>
 </section>
                     </div>
                 </div>
