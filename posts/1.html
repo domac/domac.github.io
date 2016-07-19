@@ -47,6 +47,31 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">7</span>
+                            <span class="day">19</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/7/19/go-book.html">go学习笔记，一本不错的技术资料</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>之前一直看雨痕老师github的pdf版本笔记，最近出了实体书，推荐支持一下</p>
+
+<p><img src="/media/2016/20160719_gobook.jpg" alt="gobook" /></p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/7/19/go-book.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">7</span>
                             <span class="day">17</span>
                         </span>
                             </div>
@@ -365,330 +390,6 @@ $ etcd --data-dir=/var/lib/etcd --force-new-cluster ...
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/6/27/learning-etcd-4.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">6</span>
-                            <span class="day">26</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/6/26/learning-etcd-3.html">etcd学习（三）：服务发现</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><h3 id="什么是服务发现">什么是服务发现</h3>
-
-<p><a href="http://chattool.sinaapp.com/?p=1386&amp;from=groupmessage&amp;isappinstalled=0">etcd：从应用场景到实现原理的全方位解读</a>这篇文章，作者对<code>服务发现</code>的定义为：</p>
-
-<p>服务发现要解决的也是分布式系统中最常见的问题之一，即在同一个分布式集群中的进程或服务，要如何才能找到对方并建立连接。本质上来说，服务发现就是想要了解集群中是否有进程在监听udp或tcp端口，并且通过名字就可以查找和连接。要解决服务发现的问题，需要有下面三大支柱，缺一不可。</p>
-
-<ol>
-<li>一个强一致性、高可用的服务存储目录。基于Raft算法的etcd天生就是这样一个强一致性高可用的服务存储目录。</li>
-<li>一种注册服务和监控服务健康状态的机制。用户可以在etcd中注册服务，并且对注册的服务设置key TTL，定时保持服务的心跳以达到监控健康状态的效果。</li>
-<li>一种查找和连接服务的机制。通过在etcd指定的主题下注册的服务也能在对应的主题下查找到。为了确保连接，我们可以在每个服务机器上都部署一个Proxy模式的etcd，这样就可以确保能访问etcd集群的服务都能互相连接。</li>
-</ol>
-
-<h3 id="etcd服务发现使用场景">etcd服务发现使用场景</h3>
-
-<p>我们来看服务发现对应的具体场景：</p>
-
-<ul>
-<li><p><code>微服务协同工作架构中，服务动态添加。</code> 随着Docker容器的流行，多种微服务共同协作，构成一个相对功能强大的架构的案例越来越多。透明化的动态添加这些服务的需求也日益强烈。通过服务发现机制，在etcd中注册某个服务名字的目录，在该目录下存储可用的服务节点的IP。在使用服务的过程中，只要从服务目录下查找可用的服务节点去使用即可。</p>
-
-<p>微服务协同架构如下图</p>
-
-<p><img src="/media/2016/20160626_etcd_ms.jpg" alt="microservice" /></p></li>
-
-<li><p><code>paaS平台中应用多实例与实例故障重启透明化。</code> PaaS平台中的应用一般都有多个实例，通过域名，不仅可以透明的对这多个实例进行访问，而且还可以做到负载均衡。但是应用的某个实例随时都有可能故障重启，这时就需要动态的配置域名解析（路由）中的信息。通过etcd的服务发现功能就可以轻松解决这个动态配置的问题。</p>
-
-<p>云平台多实例透明化如下图</p>
-
-<p><img src="/media/2016/20160626_etcd_paas.jpg" alt="paas" /></p></li>
-</ul>
-
-<h3 id="使用go做一个简单的服务发现例子">使用go做一个简单的服务发现例子</h3>
-
-<h4 id="编写master">编写master：</h4>
-<pre><code class="language-go">package etcd_service_discovery
-
-import (
-    &quot;fmt&quot;
-    &quot;github.com/coreos/etcd/client&quot;
-    &quot;golang.org/x/net/context&quot;
-    &quot;log&quot;
-    &quot;strings&quot;
-    &quot;sync&quot;
-    &quot;time&quot;
-)
-
-var kRoot = &quot;service&quot;
-
-type Master struct {
-    sync.RWMutex
-    kapi   client.KeysAPI
-    key    string
-    nodes  map[string]string
-    active bool
-}
-
-func NewMaster(serviceName string, endpoints []string) (*Master, error) {
-    cfg := client.Config{
-        Endpoints:               endpoints,
-        HeaderTimeoutPerRequest: time.Second * 2,
-    }
-    c, err := client.New(cfg)
-    if err != nil {
-        return nil, err
-    }
-    master := &amp;Master{
-        kapi:   client.NewKeysAPI(c),
-        key:    fmt.Sprintf(&quot;%s/%s/&quot;, kRoot, serviceName),
-        nodes:  make(map[string]string),
-        active: true,
-    }
-    master.fetch()
-
-    /// `fetch` Timer may work well too?
-    go master.watch()
-
-    return master, err
-}
-
-func (m *Master) GetNodesStrictly() map[string]string {
-    //log.Println(&quot;strictly active -&gt;&quot;, m.active)
-    if !m.active {
-        return nil
-    }
-    return m.GetNodes()
-}
-
-func (m *Master) GetNodes() map[string]string {
-    m.RLock()
-    defer m.RUnlock()
-    return m.nodes
-}
-
-func (m *Master) addNode(node, extInfo string) {
-    m.Lock()
-    defer m.Unlock()
-    node = strings.TrimLeft(node, m.key)
-    m.nodes[node] = extInfo
-}
-
-func (m *Master) delNode(node string) {
-    m.Lock()
-    defer m.Unlock()
-    node = strings.TrimLeft(node, m.key)
-    delete(m.nodes, node)
-}
-
-func (m *Master) watch() {
-    watcher := m.kapi.Watcher(m.key, &amp;client.WatcherOptions{
-        Recursive: true,
-    })
-    for {
-        resp, err := watcher.Next(context.Background())
-        if err != nil {
-            log.Println(err)
-            m.active = false
-            continue
-        }
-        m.active = true
-        //log.Println(&quot;loop active -&gt;&quot;, m.active)
-        switch resp.Action {
-        case &quot;set&quot;, &quot;update&quot;:
-            m.addNode(resp.Node.Key, resp.Node.Value)
-            break
-        case &quot;expire&quot;, &quot;delete&quot;:
-            m.delNode(resp.Node.Key)
-            break
-        default:
-            log.Println(&quot;watchme!!!&quot;, &quot;resp -&gt;&quot;, resp)
-        }
-    }
-}
-
-func (m *Master) fetch() error {
-    resp, err := m.kapi.Get(context.Background(), m.key, nil)
-    if err != nil {
-        return err
-    }
-    if resp.Node.Dir {
-        for _, v := range resp.Node.Nodes {
-            m.addNode(v.Key, v.Value)
-        }
-    }
-    return err
-}
-
-</code></pre>
-
-<h4 id="编写worker">编写worker：</h4>
-<pre><code class="language-go">package etcd_service_discovery
-
-import (
-    &quot;fmt&quot;
-    &quot;time&quot;
-
-    &quot;github.com/coreos/etcd/client&quot;
-    &quot;golang.org/x/net/context&quot;
-)
-
-var kHeartBeatInterval = time.Second * 2
-var kTTL = time.Second * 5
-
-type Worker struct {
-    kapi    client.KeysAPI
-    key     string
-    extInfo string
-    active  bool
-    stop    bool
-}
-
-func NewWorker(serviceName string, node string, extInfo string, endpoints []string) (*Worker, error) {
-    cfg := client.Config{
-        Endpoints:               endpoints,
-        HeaderTimeoutPerRequest: time.Second * 2,
-    }
-    c, err := client.New(cfg)
-    if err != nil {
-        return nil, err
-    }
-    worker := &amp;Worker{
-        kapi:    client.NewKeysAPI(c),
-        key:     fmt.Sprintf(&quot;%s/%s/%s&quot;, kRoot, serviceName, node),
-        extInfo: extInfo,
-        active:  false,
-        stop:    false,
-    }
-    return worker, nil
-}
-
-func (w *Worker) Register() {
-    w.heartbeat()
-    go w.heartbeatPeriod()
-}
-
-func (w *Worker) Unregister() {
-    w.stop = true
-    /// no need to wait result
-}
-
-func (w *Worker) IsActive() bool {
-    return w.active
-}
-
-func (w *Worker) IsStop() bool {
-    return w.stop
-}
-
-func (w *Worker) heartbeatPeriod() {
-    for !w.stop {
-        w.heartbeat()
-        time.Sleep(kHeartBeatInterval)
-    }
-}
-
-func (w *Worker) heartbeat() error {
-    _, err := w.kapi.Set(context.Background(), w.key, w.extInfo, &amp;client.SetOptions{
-        TTL: kTTL,
-    })
-    w.active = err == nil
-    return err
-}
-
-</code></pre>
-
-<h4 id="编写测试程序">编写测试程序：</h4>
-
-<p>master端：</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;log&quot;
-    &quot;time&quot;
-
-    sd &quot;your_project_path/etcd_service_discovery&quot;
-)
-
-func main() {
-    m, err := sd.NewMaster(&quot;sd-test&quot;, []string{
-        &quot;http://192.168.139.134:2379&quot;,
-        &quot;http://192.168.139.134:2479&quot;,
-        &quot;http://192.168.139.134:2579&quot;,
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    for {
-        log.Println(&quot;all -&gt;&quot;, m.GetNodes())
-        log.Println(&quot;all(strictly) -&gt;&quot;, m.GetNodesStrictly())
-        time.Sleep(time.Second * 2)
-    }
-}
-
-</code></pre>
-
-<p>worker端：</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;flag&quot;
-    &quot;fmt&quot;
-    sd &quot;your_project_path/etcd_service_discovery&quot;
-    &quot;log&quot;
-    &quot;time&quot;
-)
-
-func main() {
-    name := flag.String(&quot;name&quot;, fmt.Sprintf(&quot;%d&quot;, time.Now().Unix()), &quot;des&quot;)
-    extInfo := &quot;lhq-demo...&quot;
-
-    flag.Parse()
-    w, err := sd.NewWorker(&quot;sd-test&quot;, *name, extInfo, []string{
-        &quot;http://192.168.139.134:2379&quot;,
-        &quot;http://192.168.139.134:2479&quot;,
-        &quot;http://192.168.139.134:2579&quot;,
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-    w.Register()
-    log.Println(&quot;name -&gt;&quot;, *name, &quot;extInfo -&gt;&quot;, extInfo)
-
-    go func() {
-        time.Sleep(time.Second * 20)
-        w.Unregister()
-    }()
-
-    for {
-        log.Println(&quot;isActive -&gt;&quot;, w.IsActive())
-        log.Println(&quot;isStop -&gt;&quot;, w.IsStop())
-        time.Sleep(time.Second * 2)
-        //服务退出
-        if w.IsStop() {
-            return
-        }
-    }
-}
-
-</code></pre>
-
-<h3 id="总结">总结</h3>
-
-<p>日常开发集群管理功能中，如果要设计可以动态调整集群大小.
-那么首先就要支持服务发现, 就是说当一个新的节点启动时,可以将自己的信息注册给master, 让master把它加入到集群里, 关闭之后也可以把自己从集群中删除。etcd提供了很好的服务注册与发现的基础功，我们采用etcd来做服务发现时，可以把精力用于服务本身的业务处理上。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/26/learning-etcd-3.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

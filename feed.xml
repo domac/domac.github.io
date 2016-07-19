@@ -4,7 +4,13 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Sun, 17 Jul 2016 13:16:12 +0800</pubDate>
+    <pubDate>Tue, 19 Jul 2016 22:59:14 +0800</pubDate>
+    <item>
+      <title>go学习笔记，一本不错的技术资料</title>
+      <link>http://lihaoquan.me/2016/7/19/go-book.html</link>
+      <description>&lt;p&gt;之前一直看雨痕老师github的pdf版本笔记，最近出了实体书，推荐支持一下&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;/media/2016/20160719_gobook.jpg&#34; alt=&#34;gobook&#34; /&gt;&lt;/p&gt;&#xA;</description>
+      <pubDate>Tue, 19 Jul 2016 22:55:12 +0000</pubDate>
+    </item>
     <item>
       <title>Vulcand使用实践</title>
       <link>http://lihaoquan.me/2016/7/17/using-vulcand.html</link>
