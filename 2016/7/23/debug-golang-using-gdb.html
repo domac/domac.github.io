@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>使用GDB工具调试Go程序 - LHQ的博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="debug golang using gdb"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">LHQ的博客 <sup>life should be fun</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">7</span>
+                            <span class="day">23</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/7/23/debug-golang-using-gdb.html">使用GDB工具调试Go程序</a>
+                            </h3>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
+                        </aside>
+                        <section class="brief"><p>对于程序的调试相信程序员并不陌生，不过对于大部分Java和Python的程序员来说，大部分都是依赖IDE进行的。而且目前类似Eclipse和IntelliJ等工具都提供了很方便的调试工具。</p>
+
+<p>不过除了通过IDE，我们其实还可以通过GDB这个工具来辅助我们的代码调试。以看到一些内部的运行机理，对于学习还是挺有好处的。
+GDB是一个由GNU开源组织发布的、UNIX/LINUX操作系统下的、基于命令行的、功能强大的程序调试工具。</p>
+
+<p>详细的GDB命令参数可以参考这篇文章 <a href="http://www.cnblogs.com/ggjucheng/archive/2011/12/14/2288004.html">点击这里</a></p>
+
+<p>这里我主要介绍下如果使用gdb来debug我们的go代码， 我们先写一段简单的代码(命名为main.go)，如下：</p>
+<pre><code class="language-go">
+package main
+
+import (
+    &quot;fmt&quot;
+)
+
+type Person struct {
+    name string
+    age  uint
+}
+
+func (p *Person) Say() {
+    fmt.Printf(&quot;%s who is %d years old is saying&quot;, p.name, p.age)
+}
+
+func main() {
+    b := &quot;my name is lihaoquan&quot;
+    a := []string{&quot;abc&quot;, &quot;def&quot;}
+    p := &amp;Person{
+        name: &quot;Tom&quot;,
+        age:  20,
+    }
+    fmt.Println(b)
+    fmt.Println(a)
+    p.Say()
+}
+
+</code></pre>
+
+<p>上面的代码，我们定义了一个字符串变量，一个slice变量，一个包含接收方法的结构体。</p>
+
+<p>在调试前，我们先进行程序的编译，并且关闭<code>内联优化</code></p>
+<pre><code>$ go build -gcflags=&quot;-N -l&quot; -o test main.go
+</code></pre>
+
+<p>生成静态链接文件 test 后，我们便可以使用gdb对它进行debug.</p>
+<pre><code>$ gdb test
+
+(gdb) _
+</code></pre>
+
+<p>这时，我们尝试使用命令 r 来运行调试 ：</p>
+<pre><code>my name is lihaoquan
+[abc def]
+Tom who is 20 years old is saying[Inferior 1 (process 2455) exited normally]
+</code></pre>
+
+<p>我们发现，我们使用 r 命令的时候，程序已经执行完毕了，我们并没有进入到调试的环境。</p>
+
+<p>原因是我们并没有设置断点</p>
+
+<p>我们回到gdb的命令行中，并设置具体的断点+行号</p>
+<pre><code>(gdb) b 17
+</code></pre>
+
+<p>这是gdb会输出具体的行号位置信息</p>
+<pre><code>Breakpoint 1 at 0x2242: file /Users/lihaoquan/../../main.go, line 17.
+</code></pre>
+
+<p>我们在执行 r, 让调试器运行到我们的断点位置</p>
+<pre><code>17        b := &quot;my name is lihaoquan&quot;
+</code></pre>
+
+<p>好了， 我们的debug已经ok, 接下来我们可以使用 n 来让程序继续走下去</p>
+<pre><code>(gdb) n
+18        a := []string{&quot;abc&quot;, &quot;def&quot;}
+(gdb) n
+21            age:  20,
+(gdb) n
+20            name: &quot;Tom&quot;,
+(gdb) n
+21            age:  20,
+(gdb) n
+19        p := &amp;Person{
+(gdb) n
+23        fmt.Println(b)
+(gdb) n
+my name is lihaoquan
+24        fmt.Println(a)
+</code></pre>
+
+<p>如果我们想对某个变量进行调试输出，可以使用参数 p ， p 的意思是 print</p>
+<pre><code>(gdb) p b
+$1 = 0x11c1f0 &quot;my name is lihaoquan&quot;
+</code></pre>
+
+<p>最后，我们可以使用上述的几个基本命令参数调试我们其他的变量。对应其它更复杂的程序，其实原理都是一样的。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="debug-golang-using-gdb" data-title="使用GDB工具调试Go程序 - LHQ的博客" data-url="http://localhost/2016/7/23/debug-golang-using-gdb"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 LHQ的博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.9.15 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
