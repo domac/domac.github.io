@@ -51,7 +51,7 @@
                         </span>
                             </div>
                             <h3 class="title">
-                                <a href="/2016/8/2/learning-etcd-5.html">etcd学习（四）：使用Docker搭建etcd3的本地测试集群</a>
+                                <a href="/2016/8/2/learning-etcd-5.html">etcd学习（五）：使用Docker搭建etcd3的本地测试集群</a>
                             </h3>
                         </header>
                         <section class="brief"><p>最近Coreos发布了Etcd3, 为了尝试Etcd3的新特性，我们可以在测试的服务器搭建一个基于v3的集群，为了让我们的devops更加容器化，下面我举例一下如何通过Docker非常快速地搭建Etcd3的集群。</p>
@@ -113,6 +113,8 @@ sudo docker run -d -p 4201:4201 -p 2580:2580 -p 2579:2579 --net=host --name etcd
 {&quot;members&quot;:[{&quot;id&quot;:&quot;744924ed0b37b9b1&quot;,&quot;name&quot;:&quot;etcd2&quot;,&quot;peerURLs&quot;:[&quot;http://localhost:2580&quot;],&quot;clientURLs&quot;:[&quot;http://localhost:2579&quot;,&quot;http://localhost:4201&quot;]},{&quot;id&quot;:&quot;77fb14b13d7590f7&quot;,&quot;name&quot;:&quot;etcd0&quot;,&quot;peerURLs&quot;:[&quot;http://localhost:2380&quot;],&quot;clientURLs&quot;:[&quot;http://localhost:2379&quot;,&quot;http://localhost:4001&quot;]},{&quot;id&quot;:&quot;e1110983ed7857fe&quot;,&quot;name&quot;:&quot;etcd1&quot;,&quot;peerURLs&quot;:[&quot;http://localhost:2480&quot;],&quot;clientURLs&quot;:[&quot;http://localhost:2479&quot;,&quot;http://localhost:4101&quot;]}]}
 
 $ curl http://localhost:2379/v2/leader
+
+{&quot;leader&quot;:&quot;77fb14b13d7590f7&quot;,&quot;followers&quot;:{&quot;744924ed0b37b9b1&quot;:{&quot;latency&quot;:{&quot;current&quot;:0.001336,&quot;average&quot;:0.0032470802752293582,&quot;standardDeviation&quot;:0.003517680948114851,&quot;minimum&quot;:0.000564,&quot;maximum&quot;:0.048446},&quot;counts&quot;:{&quot;fail&quot;:10,&quot;success&quot;:872}},&quot;e1110983ed7857fe&quot;:{&quot;latency&quot;:{&quot;current&quot;:0.000998,&quot;average&quot;:0.0040166746987951715,&quot;standardDeviation&quot;:0.00940817295440312,&quot;minimum&quot;:0.000553,&quot;maximum&quot;:0.145399},&quot;counts&quot;:{&quot;fail&quot;:0,&quot;success&quot;:913}}}}
 </code></pre>
 
 <p>如果，需要做得更灵活，可以把上述的脚本进行改进：</p>
