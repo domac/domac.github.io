@@ -47,6 +47,137 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">8</span>
+                            <span class="day">2</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/8/2/learning-etcd-5.html">etcd学习（四）：使用Docker搭建etcd3的本地测试集群</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>最近Coreos发布了Etcd3, 为了尝试Etcd3的新特性，我们可以在测试的服务器搭建一个基于v3的集群，为了让我们的devops更加容器化，下面我举例一下如何通过Docker非常快速地搭建Etcd3的集群。</p>
+
+<p>我使用的etcd的镜像来自 <a href="https://quay.io/repository/coreos/etcd">https://quay.io/repository/coreos/etcd</a> ，想搭建其它版本的同学可以选择不同的tag来获取不同的etcd版本。</p>
+
+<h3 id="一-拉取镜像">一、拉取镜像</h3>
+
+<p>本例子中，我使用的是3.0.4版本的Etcd</p>
+<pre><code>$ sudo docker pull quay.io/coreos/etcd:v3.0.4
+</code></pre>
+
+<p>命令执行完毕后，我们看下是否拉取成功</p>
+<pre><code>$ sudo docker images
+
+
+REPOSITORY            TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+quay.io/coreos/etcd   v3.0.4              76436bdf2956        5 days ago          43.31 MB
+</code></pre>
+
+<p>OK， 镜像已经有了，我们就可以基于镜像构建我们的集群容器</p>
+
+<h3 id="二-构建容器">二、构建容器</h3>
+
+<p>下面是我的一个本地脚本</p>
+<pre><code>sudo docker run -d -p 4001:4001 -p 2380:2380 -p 2379:2379 --net=host --name etcd0 quay.io/coreos/etcd:v3.0.4 /usr/local/bin/etcd \
+ -name etcd0 \
+ -advertise-client-urls http://localhost:2379,http://localhost:4001 \
+ -listen-client-urls http://localhost:2379,http://localhost:4001 \
+ -initial-advertise-peer-urls http://localhost:2380 \
+ -listen-peer-urls http://localhost:2380 \
+ -initial-cluster-token etcd-cluster-1 \
+ -initial-cluster etcd0=http://localhost:2380,etcd1=http://localhost:2480,etcd2=http://localhost:2580
+
+sudo docker run -d -p 4101:4101 -p 2480:2480 -p 2479:2479 --net=host --name etcd1 quay.io/coreos/etcd:v3.0.4 /usr/local/bin/etcd \
+ -name etcd1 \
+ -advertise-client-urls http://localhost:2479,http://localhost:4101 \
+ -listen-client-urls http://localhost:2479,http://localhost:4101 \
+ -initial-advertise-peer-urls http://localhost:2480 \
+ -listen-peer-urls http://localhost:2480 \
+ -initial-cluster-token etcd-cluster-1 \
+ -initial-cluster etcd0=http://localhost:2380,etcd1=http://localhost:2480,etcd2=http://localhost:2580
+
+sudo docker run -d -p 4201:4201 -p 2580:2580 -p 2579:2579 --net=host --name etcd2 quay.io/coreos/etcd:v3.0.4 /usr/local/bin/etcd \
+ -name etcd2 \
+ -advertise-client-urls http://localhost:2579,http://localhost:4201 \
+ -listen-client-urls http://localhost:2579,http://localhost:4201 \
+ -initial-advertise-peer-urls http://localhost:2580 \
+ -listen-peer-urls http://localhost:2580 \
+ -initial-cluster-token etcd-cluster-1 \
+ -initial-cluster etcd0=http://localhost:2380,etcd1=http://localhost:2480,etcd2=http://localhost:2580
+</code></pre>
+
+<p>分别执行后，我们的三节点集群就可以构建起来了。十分的方便快捷</p>
+
+<p>我们在终端检查下集群是否运行正常：</p>
+<pre><code>$ curl http://localhost:2379/v2/members
+
+{&quot;members&quot;:[{&quot;id&quot;:&quot;744924ed0b37b9b1&quot;,&quot;name&quot;:&quot;etcd2&quot;,&quot;peerURLs&quot;:[&quot;http://localhost:2580&quot;],&quot;clientURLs&quot;:[&quot;http://localhost:2579&quot;,&quot;http://localhost:4201&quot;]},{&quot;id&quot;:&quot;77fb14b13d7590f7&quot;,&quot;name&quot;:&quot;etcd0&quot;,&quot;peerURLs&quot;:[&quot;http://localhost:2380&quot;],&quot;clientURLs&quot;:[&quot;http://localhost:2379&quot;,&quot;http://localhost:4001&quot;]},{&quot;id&quot;:&quot;e1110983ed7857fe&quot;,&quot;name&quot;:&quot;etcd1&quot;,&quot;peerURLs&quot;:[&quot;http://localhost:2480&quot;],&quot;clientURLs&quot;:[&quot;http://localhost:2479&quot;,&quot;http://localhost:4101&quot;]}]}
+
+$ curl http://localhost:2379/v2/leader
+</code></pre>
+
+<p>如果，需要做得更灵活，可以把上述的脚本进行改进：</p>
+<pre><code># For each machine
+ETCD_VERSION=v3.0.0
+TOKEN=my-etcd-token
+CLUSTER_STATE=new
+NAME_1=etcd-node-0
+NAME_2=etcd-node-1
+NAME_3=etcd-node-2
+HOST_1=192.168.139.140
+HOST_2=192.168.139.140
+HOST_3=192.168.139.140
+CLUSTER=${NAME_1}=http://${HOST_1}:2380,${NAME_2}=http://${HOST_2}:2380,${NAME_3}=http://${HOST_3}:2380
+
+# For node 1
+THIS_NAME=${NAME_1}
+THIS_IP=${HOST_1}
+sudo docker run --net=host --name etcd quay.io/coreos/etcd:${ETCD_VERSION} \
+    /usr/local/bin/etcd \
+    --data-dir=data.etcd --name ${THIS_NAME} \
+    --initial-advertise-peer-urls http://${THIS_IP}:2380 --listen-peer-urls http://${THIS_IP}:2380 \
+    --advertise-client-urls http://${THIS_IP}:2379 --listen-client-urls http://${THIS_IP}:2379 \
+    --initial-cluster ${CLUSTER} \
+    --initial-cluster-state ${CLUSTER_STATE} --initial-cluster-token ${TOKEN}
+
+# For node 2
+THIS_NAME=${NAME_2}
+THIS_IP=${HOST_2}
+sudo docker run --net=host --name etcd quay.io/coreos/etcd:${ETCD_VERSION} \
+    /usr/local/bin/etcd \
+    --data-dir=data.etcd --name ${THIS_NAME} \
+    --initial-advertise-peer-urls http://${THIS_IP}:2380 --listen-peer-urls http://${THIS_IP}:2380 \
+    --advertise-client-urls http://${THIS_IP}:2379 --listen-client-urls http://${THIS_IP}:2379 \
+    --initial-cluster ${CLUSTER} \
+    --initial-cluster-state ${CLUSTER_STATE} --initial-cluster-token ${TOKEN}
+
+# For node 3
+THIS_NAME=${NAME_3}
+THIS_IP=${HOST_3}
+sudo docker run --net=host --name etcd quay.io/coreos/etcd:${ETCD_VERSION} \
+    /usr/local/bin/etcd \
+    --data-dir=data.etcd --name ${THIS_NAME} \
+    --initial-advertise-peer-urls http://${THIS_IP}:2380 --listen-peer-urls http://${THIS_IP}:2380 \
+    --advertise-client-urls http://${THIS_IP}:2379 --listen-client-urls http://${THIS_IP}:2379 \
+    --initial-cluster ${CLUSTER} \
+    --initial-cluster-state ${CLUSTER_STATE} --initial-cluster-token ${TOKEN}
+</code></pre>
+
+<p>以上就是Etcd3在docker的搭建方法，测试集群搭建后，我们就可以基于它调试我们的应用程序的功能了，具体的方式就不在这里列出了</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/8/2/learning-etcd-5.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">7</span>
                             <span class="day">17</span>
                         </span>

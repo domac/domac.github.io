@@ -46,6 +46,99 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">5</span>
+                            <span class="day">2</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/5/2/about-sysnc-once-in-go.html">关于golang的sync.Once的实现分析</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>sync.once可以控制函数只能被调用一次，不能多次重复调用。</p>
+
+<p>我们可以用下面的代码实现一个线程安全的单例模式</p>
+<pre><code>package singleton
+import (
+    &quot;fmt&quot;
+    &quot;sync&quot;
+)
+type object struct {
+    name string
+}
+var once sync.Once
+var obj *object //单例指针
+//公开方法 外包调用
+func Instance() *object {
+    once.Do(getObj)
+    return obj
+}
+func getObj() {
+    if obj == nil {
+        obj = new(object)
+        //可以做其他初始化事件
+    }
+}
+//单例测试
+func (obj *object) Test() {
+    fmt.Println(obj.name)
+}
+</code></pre>
+
+<p>如果我们要自己实现这么一个功能如何做呢？
+1. 定义一个status变量用来描述是否已经执行过了
+2. 使用sync.Mutex 或者sync.Atomic实现线程安全的获取status状态， 根据状态判断是否执行特定的函数</p>
+
+<p>然后看下sync.Once实际是如何实现的</p>
+<pre><code>// Once is an object that will perform exactly one action.
+type Once struct {
+    m    Mutex
+    done uint32
+}
+//使用了双层检查机制 
+func (o *Once) Do(f func()) {
+    if atomic.LoadUint32(&amp;o.done) == 1 {
+        return
+    }
+    // Slow-path.
+    o.m.Lock()
+    defer o.m.Unlock()
+    //这里需要再次重新判断下，因为 atomic.LoadUint32取出状态值到  o.m.Lock() 之间是有可能存在其它gotoutine改变status的状态值的
+    if o.done == 0 {
+        f()
+        atomic.StoreUint32(&amp;o.done, 1)
+    }
+}
+
+另外一种实现形式
+
+type Once struct {
+    done int32
+}
+func (o *Once) Do(f func()) {
+    if atomic.LoadInt32(&amp;o.done) == 1 {
+        return
+    }
+    // Slow-path.
+    if atomic.CompareAndSwapInt32(&amp;o.done, 0, 1) {
+        f()
+    }
+}
+
+</code></pre>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/5/2/about-sysnc-once-in-go.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">4</span>
                             <span class="day">18</span>
                         </span>
@@ -371,44 +464,6 @@ root@fc1:/#  chmod -x run.sh
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/2/22/quck-build-docker-ssh-container.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">2</span>
-                            <span class="day">19</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/2/19/my-mongo-shards.html">Mongodb分片部署</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>参考:</p>
-
-<ul>
-<li><a href="https://segmentfault.com/a/1190000002426743">MongoDB分片部署实践</a></li>
-<li><a href="http://yhv5.com/mongodb-shard_821.html">MongoDB分片集群部署</a></li>
-</ul>
-
-<h3 id="选用服务器">选用服务器:</h3>
-<pre><code>`192.168.139.139 (主)`
-
-`192.168.139.138`
-
-`192.168.139.134`
-</code></pre>
-
-<h3 id="在每台服务器上建立mongodb的软连接">在每台服务器上建立MongoDB的软连接</h3>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/2/19/my-mongo-shards.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
