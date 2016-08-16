@@ -4,11 +4,11 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Tue, 16 Aug 2016 22:42:29 +0800</pubDate>
+    <pubDate>Tue, 16 Aug 2016 22:45:17 +0800</pubDate>
     <item>
-      <title>problem using vscode in go17</title>
+      <title>升级Go1.7后，vscode无法代码补全的解决方法</title>
       <link>http://lihaoquan.me/2016/8/16/problem-using-vscode-in-go17.html</link>
-      <description>&lt;p&gt;升级Go1.7后，vscode无法代码补全的解决方法&lt;/p&gt;&#xA;&#xA;&lt;p&gt;今天Go1.7正式发布了。下午在公司立刻在开发环境和测试环境都把原来1.5.3的版本升级到1.7&lt;/p&gt;&#xA;&#xA;&lt;p&gt;尝试执行了之前的项目，运行一切ok,而且默认隐式开启了GO15VENDOREXPERIMENT的功能，一些godep管理的项目也正常运行。本以为万事大吉，晚上回家后，打开vscode敲代码的时候，发现了vscode的代码补全功能不能工作了。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;一开始，怀疑是gocode的版本太旧了。于是升级了下。单问题依旧还在。经过不断探究，发现了问题的原因：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt; 升级go版本后，但gocode的后台进程并不能感知版本的变化，还是以为环境是go.15的，这个时候需要我们“重启”一下gocode&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;于是，可以在终端重启我们的gocode&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt;  $ gocode close&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;回到vscode的环境中，发现代码补全正常工作了&lt;/p&gt;&#xA;</description>
+      <description>&lt;p&gt;今天Go1.7正式发布了。下午在公司立刻在开发环境和测试环境都把原来1.5.3的版本升级到1.7&lt;/p&gt;&#xA;&#xA;&lt;p&gt;尝试执行了之前的项目，运行一切ok,而且默认隐式开启了GO15VENDOREXPERIMENT的功能，一些godep管理的项目也正常运行。本以为万事大吉，晚上回家后，打开vscode敲代码的时候，发现了vscode的代码补全功能不能工作了。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;一开始，怀疑是gocode的版本太旧了。于是升级了下。单问题依旧还在。经过不断探究，发现了问题的原因：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt; 升级go版本后，但gocode的后台进程并不能感知版本的变化，还是以为环境是go.15的，这个时候需要我们“重启”一下gocode&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;于是，可以在终端重启我们的gocode&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt;  $ gocode close&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;回到vscode的环境中，发现代码补全正常工作了&lt;/p&gt;&#xA;</description>
       <pubDate>Tue, 16 Aug 2016 22:34:04 +0000</pubDate>
     </item>
     <item>
