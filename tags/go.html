@@ -47,6 +47,43 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">8</span>
+                            <span class="day">16</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/8/16/problem-using-vscode-in-go17.html">problem using vscode in go17</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>升级Go1.7后，vscode无法代码补全的解决方法</p>
+
+<p>今天Go1.7正式发布了。下午在公司立刻在开发环境和测试环境都把原来1.5.3的版本升级到1.7</p>
+
+<p>尝试执行了之前的项目，运行一切ok,而且默认隐式开启了GO15VENDOREXPERIMENT的功能，一些godep管理的项目也正常运行。本以为万事大吉，晚上回家后，打开vscode敲代码的时候，发现了vscode的代码补全功能不能工作了。</p>
+
+<p>一开始，怀疑是gocode的版本太旧了。于是升级了下。单问题依旧还在。经过不断探究，发现了问题的原因：</p>
+<pre><code> 升级go版本后，但gocode的后台进程并不能感知版本的变化，还是以为环境是go.15的，这个时候需要我们“重启”一下gocode
+</code></pre>
+
+<p>于是，可以在终端重启我们的gocode</p>
+<pre><code>  $ gocode close
+</code></pre>
+
+<p>回到vscode的环境中，发现代码补全正常工作了</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/8/16/problem-using-vscode-in-go17.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">7</span>
                             <span class="day">23</span>
                         </span>
