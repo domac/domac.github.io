@@ -4,7 +4,13 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Sat, 27 Aug 2016 18:38:59 +0800</pubDate>
+    <pubDate>Mon, 29 Aug 2016 21:47:50 +0800</pubDate>
+    <item>
+      <title>深圳Gopher Meetup小记</title>
+      <link>http://lihaoquan.me/2016/8/29/sz-gopher-meetup.html</link>
+      <description>&lt;p&gt;&lt;img src=&#34;/media/2016/szgopher.jpg&#34; alt=&#34;sz_gopher&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;星期天下午到深圳参加了Gopher Meetup, 这次聚会上认识了不少爱好者，其中很多都是一线大牛。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;1.本次聚会第一个topic是谢大跟我们介绍了很多关于Go基金会的愿景。接下来是晓黎的《人工智能在资产管理方面的应用》。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;不过这个topic感觉没什么说上到Go上，更多的是一些项目的采集-整理的架构。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;2.陈非的kingshard，之前我研究，拜读过源码，所以对这个topic比较深刻，陈非主要是分享在开发这个开源项目中的缘由吧。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;3.杨文的小恩爱的Go历程这个我很受感悟，因为也与自己用Go来做东西的历程很多共鸣。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;4.接下来是悟空的分享，说实在悟空的分享很详尽。而且很多通讯领域的经验分享也是很赞。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;5.最后是李亚川的Pholcus了，亚川在分享中，展示了部分源码的实现方案，不过，这些源码感觉很难串联起来。不过，这问题不大。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;想学习幽灵蛛的思路，可以参考他开源的Pholcus：&lt;a href=&#34;https://github.com/henrylee2cn/pholcus&#34;&gt;https://github.com/henrylee2cn/pholcus&lt;/a&gt;&lt;/p&gt;&#xA;</description>
+      <pubDate>Mon, 29 Aug 2016 21:31:26 +0000</pubDate>
+    </item>
     <item>
       <title>升级Go1.7后，vscode无法代码补全的解决方法</title>
       <link>http://lihaoquan.me/2016/8/16/problem-using-vscode-in-go17.html</link>
