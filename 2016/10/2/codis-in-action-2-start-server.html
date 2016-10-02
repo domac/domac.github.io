@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>redis - LHQ的博客</title>
+    <title>codis实践（一）：自定义参数与环境方式搭建 - LHQ的博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.me is my site"/>
+    <meta name="description" content="codis-in-action-2-start-server"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,8 +39,7 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
-            <h2 class="tag text-center">redis</h2>
+        <div id="article-single">
             <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
@@ -55,6 +54,11 @@
                                 <a href="/2016/10/2/codis-in-action-2-start-server.html">codis实践（一）：自定义参数与环境方式搭建</a>
                             </h3>
                         </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
+                            <a class="tag label label-info" href="/tags/redis.html">redis</a>
+                        </aside>
                         <section class="brief"><p>上一节， 我们通过运行了一个名称为“codis-test”的codis的demo方案，本节，我们尝试通过官方的相关命令组件，运行自己的自定义环境。</p>
 
 <p>还是跟上一节一样，我这边继续选用etcd作为我的配置管理工具。</p>
@@ -184,57 +188,31 @@ proxy_addr = &quot;0.0.0.0:19000&quot;
 
 <p><img src="/media/2016/codis/codis_b4.png" alt="codis_b4" /></p>
 </section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/2/codis-in-action-2-start-server.html">继续阅读</a>
-                        </aside>
                     </div>
                 </div>
             </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
-                            <span class="day">2</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/10/2/codis-in-action-1-basic-demo.html">codis实践（一）：基本概念与demo环境搭建</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><h2 id="背景">背景</h2>
-
-<p><code>Redis</code> 在 <code>3.0</code> 的时候,推出了一个集群解决方案: redis-cluster. 能让我们通过官方的方式构建我们的redis集群, 但在之前, 我们
-生产环境跑的基本是redis 2.x 版本的实例, 如果需要进行集群管理, 以 唯品会 为例，很多同事采用的方案都是twitter的Twemproxy。</p>
-
-<p><code>Twemproxy</code> 本身是一个静态的分布式方案，进行扩容、缩容的时候对我们devops的要求很高，而且很难得做到平滑的扩容、缩容。而且没有用于集群管理的
-Dashboard，这样十分不便。</p>
-
-<p>为了解决这些痛点，豌豆荚开源了它们的 <code>Codis</code>, 很感谢作者们带来了这么好的工具，不管是使用或者学习CAP相关开发，codis都是很好的参考。
-关于codis的开发历程，可以google搜下 《Codis作者黄东旭细说分布式Redis架构设计和踩过的那些坑们》
-这边文章。 里面作者从CAP三个层次介绍codis的优点。（ps: 作为一名喜欢go开发的人，选择codis也很正常。哈）</p>
-
-<blockquote>
-<p>Codis 官方项目地址 ： <a href="https://github.com/CodisLabs/codis">https://github.com/CodisLabs/codis</a></p>
-</blockquote>
-
-<p>为了更深入学习codis，从本篇博客开始我会陆续陆续一些实践的总结和思路 :)</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/2/codis-in-action-1-basic-demo.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <div class="article-pager text-center">
-                
-                
-            </div>
         </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="codis-in-action-2-start-server" data-title="codis实践（一）：自定义参数与环境方式搭建 - LHQ的博客" data-url="http://localhost/2016/10/2/codis-in-action-2-start-server"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
     </div>
 </section>
 <footer id="footer">
