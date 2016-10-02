@@ -47,6 +47,63 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">6</span>
+                            <span class="day">27</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/6/27/learning-etcd-4.html">etcd学习（四）：服务故障恢复</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>在使用etcd集群的过程中，有时会出现少量主机故障，这时我们需要对集群进行维护。然而，在现实情况下，还可能遇到由于严重的设备
+或网络的故障，导致超过半数的节点无法正常工作。</p>
+
+<p>在etcd集群无法提供正常的服务，我们需要用到一些备份和数据恢复的手段。etcd背后的raft，保证了集群的数据的一致性与稳定性。所以我们对etcd的恢复，更多的是恢复etcd的节点服务，并还原用户数据。</p>
+
+<p>首先，从剩余的正常节点中选择一个正常的成员节点， 使用 <code>etcdctl backup</code> 命令备份etcd数据。</p>
+<pre><code>$ ./etcdctl backup --data-dir /var/lib/etcd -backup-dir /tmp/etcd_backup
+$ tar -zcxf backup.etcd.tar.gz /tmp/etcd_backup
+</code></pre>
+
+<p>这个命令会将节点中的用户数据全部写入到指定的备份目录中，但是节点ID,集群ID等信息将会丢失， 并在恢复到目的节点时被重新。这样主要是防止原先的节点意外重新加入新的节点集群而导致数据混乱。</p>
+
+<p>然后将Etcd数据恢复到新的集群的任意一个节点上， 使用 <code>--force-new-cluster</code> 参数启动Etcd服务。这个参数会重置集群ID和集群的所有成员信息，其中节点的监听地址会被重置为localhost:2379,
+表示集群中只有一个节点。</p>
+<pre><code>$ tar -zxvf backup.etcd.tar.gz -C /var/lib/etcd
+$ etcd --data-dir=/var/lib/etcd --force-new-cluster ...
+</code></pre>
+
+<p>启动完成单节点的etcd,可以先对数据的完整性进行验证， 确认无误后再通过Etcd API修改节点的监听地址，让它监听节点的外部IP地址，为增加其他节点做准备。例如：</p>
+
+<p>用etcd命令找到当前节点的ID。</p>
+<pre><code>$ etcdctl member list 
+
+98f0c6bf64240842: name=cd-2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579
+
+</code></pre>
+
+<p>由于etcdctl不具备修改成员节点参数的功能， 下面的操作要使用API来完成。</p>
+<pre><code>$ curl http://127.0.0.1:2579/v2/members/98f0c6bf64240842 -XPUT \
+ -H &quot;Content-Type:application/json&quot; -d '{&quot;peerURLs&quot;:[&quot;http://127.0.0.1:2580&quot;]}'
+</code></pre>
+
+<p>注意，在Etcd文档中， 建议首先将集群恢复到一个临时的目录中，从临时目录启动etcd，验证新的数据正确完整后，停止etcd，在将数据恢复到正常的目录中。</p>
+
+<p>最后，在完成第一个成员节点的启动后，可以通过集群扩展的方法使用 <code>etcdctl member add</code> 命令添加其他成员节点进来。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/27/learning-etcd-4.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">6</span>
                             <span class="day">26</span>
                         </span>
                             </div>
@@ -664,332 +721,6 @@ e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/6/24/learning-etcd-1.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">6</span>
-                            <span class="day">23</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/6/23/build-web-app-with-docker-gin-mongodb-nginx.html">用Docker定制Golang&#43;Gin&#43;Mongodb&#43;Nginx的开发环境</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>本文是我日常搭建Docker开发环境的很常用的方式，通过docker搭建一个web的开发环境，能让我们直观了解Docker的工作方式。
-本文的例子，为了方便演示，我都是搭建在同一台主机上的，但日常生产环境中比较多的情况是跨主机跨容器交互，我们需要
-用到代理镜像的手段解决跨宿主机的通讯，
-具体可以参考 官方的 <a href="https://docs.docker.com/engine/admin/ambassador_pattern_linking/">ambassador</a> 配置方式。</p>
-
-<p>在搭建之前，我们先设置一些目录存放我们的Dockerfile, 约定参考如下：</p>
-<pre><code>$ mkdir -p /data/apps/mytest/mongodb/
-
-$ mkdir -p /data/apps/mytest/go/
-
-$ mkdir -p /data/apps/mytest/nginx/
-</code></pre>
-
-<blockquote>
-<p><em>我们搭建的服务器ip假设为<code>192.168.139.140</code>，下文都以这个地址作为我们服务器地址</em></p>
-
-<p>下面的镜像默认以ubuntu作为根镜像</p>
-</blockquote>
-
-<h2 id="构建mongodb镜像">构建MongoDB镜像</h2>
-
-<p>MongoDB是一款流行的开放源码的非关系型数据库系统(NoSQL),常用于大数据量、高并 发、弱事务的互联网应用。MongoDB的官网地址是<a href="http://www.mongodb.com/">http://www.mongodb.com/</a>
-将MongoDB数据 库系统容器化可以带来以下几个好处。</p>
-
-<ul>
-<li><p>更容易维护。</p></li>
-
-<li><p>启动速度快。</p></li>
-
-<li><p>方便与他人进行分享。</p></li>
-</ul>
-
-<h3 id="编写dockerfile">编写Dockerfile</h3>
-
-<p>进入 /data/apps/mytest/mongodb/</p>
-
-<p>创建我们的Dockerfile文件，内容如下：</p>
-<pre><code>FROM ubuntu:14.04
-MAINTAINER lihaoquan quanix@163.com
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10
-RUN echo &quot;deb http://repo.mongodb.org/apt/ubuntu &quot;$(lsb_release -sc)&quot;/mongodb-org/3.0 multiverse&quot; | tee /etc/apt/sources.list.d/mongodb-org-3.0.list
-RUN apt-get update &amp;&amp; apt-get install -y --force-yes mongodb-org
-RUN apt-get update &amp;&amp; apt-get install -y --force-yes mongodb-org=3.0.1 mongodb-org-server=3.0.1 mongodb-org-shell=3.0.1 mongodb-org-mongos=3.0.1 mongodb-org-tools=3.0.1
-RUN mkdir -p /data/db
-EXPOSE 27017
-ENTRYPOINT [&quot;/usr/bin/mongod&quot;]
-</code></pre>
-
-<h3 id="构建镜像">构建镜像</h3>
-
-<p>有了Dockerfile之后,进入Dockerfile文件所在的目录,然后使用build命令来构建镜像:</p>
-
-<p>具体命令参考如下：</p>
-<pre><code>sudo docker build --tag lihaoquan/mongodb3 .
-</code></pre>
-
-<h3 id="构建容器">构建容器</h3>
-
-<p>镜像都建立成功后，我们可以基于镜像构建我们的容器：</p>
-<pre><code>sudo docker run -p 27017:27017 --name mongodb_instance -d lihaoquan/mongodb3
-</code></pre>
-
-<p>这时，我们可以运行 sudo docker ps -a 看我们的容器是否运行起来了。</p>
-
-<p>我们就测试下mongodb的服务是否ok：</p>
-
-<p>我们找一个安装有mongo客户端，然后尝试连接下我们的服务</p>
-<pre><code>mongo -port 21017 --host:192.168.139.140
-</code></pre>
-
-<p>如果顺利连接上，证明我们我们mongodb容器服务已经正常对外提供服务了。</p>
-
-<p>接下来我们可以动手编写一个简单的go服务端并连接我们的mongodb服务，为用户提供查询服务。</p>
-
-<h2 id="构建golang镜像">构建golang镜像</h2>
-
-<p>Gin是基于Go的web开发框架，它具有类似Martini风格的API接口，如果你需要一个高性能的访问速度，
-选择它无非是最好的选择。看过Beego、Martini的代码，感觉还是gin符合我的口味。</p>
-
-<p>Gin相关资料：</p>
-
-<blockquote>
-<p><a href="https://gin-gonic.github.io/gin/">gin 官网</a></p>
-
-<p><a href="http://colobu.com/2016/03/23/Go-HTTP-request-router-and-web-framework-benchmark/">go http路由框架性能比较</a></p>
-</blockquote>
-
-<p>在构建go容器之前，我们先写一个简单的运行例子：</p>
-
-<p>我们进入 <code>/data/apps/mytest/go/</code></p>
-
-<p>然后创建一个 main.go 的文件，前后敲入以下的内容：</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;fmt&quot;
-    &quot;github.com/gin-gonic/gin&quot;
-    &quot;gopkg.in/mgo.v2&quot;
-    &quot;gopkg.in/mgo.v2/bson&quot;
-    &quot;net/http&quot;
-)
-
-type Book struct {
-    Name string
-    Sn   string
-}
-
-//测试查询
-func TestFindBook(c *gin.Context) {
-    sn, _ := c.GetQuery(&quot;sn&quot;)
-    if sn == &quot;&quot; {
-        sn = &quot;1&quot;
-    }
-    session, err := mgo.Dial(&quot;mongo_server&quot;)
-    if err != nil {
-        panic(err)
-    } else {
-        println(&quot;连接成功&quot;)
-    }
-    collections := session.DB(&quot;test&quot;).C(&quot;book&quot;)
-    book := Book{}
-    err = collections.Find(bson.M{&quot;sn&quot;: sn}).One(&amp;book)
-    if err != nil {
-    }
-    c.String(http.StatusOK, fmt.Sprintf(&quot;find book : %s&quot;, book.Name))
-}
-
-func TestInsertBook(c *gin.Context) {
-    sn, _ := c.GetQuery(&quot;sn&quot;)
-    name, _ := c.GetQuery(&quot;name&quot;)
-    res := &quot;no insert&quot;
-    if sn != &quot;&quot; &amp;&amp; name != &quot;&quot; {
-        session, err := mgo.Dial(&quot;mongo_server&quot;)
-        if err != nil {
-            panic(err)
-        } else {
-            println(&quot;连接成功&quot;)
-        }
-        collections := session.DB(&quot;test&quot;).C(&quot;book&quot;)
-
-        book := &amp;Book{
-            Name: name,
-            Sn:   sn,
-        }
-        err = collections.Insert(book)
-        if err != nil {
-            res = &quot;no insert&quot;
-        }
-        res = &quot;insert!&quot;
-    }
-    c.String(http.StatusOK, res)
-}
-
-func RegisterRoutes(r *gin.Engine) {
-    r.GET(&quot;/&quot;, func(c *gin.Context) {
-        c.String(http.StatusOK, &quot;hello docker !&quot;)
-    })
-
-    r.GET(&quot;/book&quot;, func(c *gin.Context) {
-        TestFindBook(c)
-    })
-
-    r.GET(&quot;/insert&quot;, func(c *gin.Context) {
-        TestInsertBook(c)
-    })
-}
-
-func main() {
-    r := gin.New()
-    RegisterRoutes(r)
-    r.Run(&quot;:8000&quot;)
-    select {}
-}
-
-</code></pre>
-
-<h3 id="编写dockerfile-1">编写Dockerfile</h3>
-
-<p>go服务端程序编写后，在同级目录下创建Dockerfile文件，然后输入以下内容</p>
-<pre><code>FROM golang:onbuild
-EXPOSE 8000
-</code></pre>
-
-<p>可以发现，这个Dockerfile非常简单，golang:onbuild为我们提供基础镜像，并进行相关命令封装。</p>
-
-<p><em><code>golang:onbuild</code> 会为我们省略了很多的设置步骤，包括ADD、WORKDIR、CMD等设置命令，我们只需要按照规范在项目目录下放置main.go即可。</em></p>
-
-<h3 id="构建镜像-1">构建镜像</h3>
-
-<p>接着，我们开始创建一个go web应用镜像</p>
-<pre><code>sudo docker build -t goapp .
-</code></pre>
-
-<h3 id="构建容器-1">构建容器</h3>
-
-<p>最后，基于这个镜像，我们构建我们的容器，并暴露指定的端口和链接到我们的mongodb容器上：</p>
-<pre><code>sudo docker run -d --name goapp_api -p 8000:8000 --link mongodb_instance:mongo_server goapp
-</code></pre>
-
-<p>我们在浏览器上访问 : <code>http://192.168.139.140:8000</code></p>
-
-<p><img src="/media/2016/20160702_goweb_index.png" alt="index" /></p>
-
-<p>OK, web服务已经搭建起来了。我们现在可以插入一些数据来测试我们web服务的存储功能：</p>
-
-<p>我们在浏览器输入 : <code>http://192.168.139.140:8000/insert?name=golang in action&amp;sn=2</code></p>
-
-<p>如果页面输出 <code>insert!</code>则，表示已经成功插入一条数据。</p>
-
-<p>我们再通过浏览器访问： <code>http://192.168.139.140:8000/book?sn=2</code></p>
-
-<p>若如下图所示，
-则我们已经成功通过docker部署了一个gin+mongodb的容器服务。</p>
-
-<p><img src="/media/2016/20160702_goweb_query.png" alt="index" /></p>
-
-<p>有了基本的web应用服务后，我们要着手为它配置负载，反向代理等功能，毕竟这是互联网生产环境的标配，所以下面我们
-增加nginx的支持，继续扩展一下我们的<code>架构</code>吧。</p>
-
-<h2 id="构建nginx-镜像">构建Nginx 镜像</h2>
-
-<p>Nginx是一款支持HTTP、HTTPS、SMTP、POP3、IMAP等协议的反向代理服务器,也常用 作负载均衡、HTTP缓存和Web服务器。由于它开源、配置简单以及拥有高并发、高性能、低内 存、稳定性高等诸多优良特性,目前已经成为互联网上应用最广泛的Web服务器之一。
-本案例以Nginx作为前端服务器,主要提供两方面的功能:</p>
-
-<ul>
-<li><p>提供静态页面的访问服务;</p></li>
-
-<li><p>goapp_api反向代理服务。</p></li>
-</ul>
-
-<h3 id="创建自定义配置文件">创建自定义配置文件</h3>
-
-<p>进入 <code>/data/apps/mytest/nginx/</code></p>
-
-<p>创建<code>nginx.conf</code>，内容如下：</p>
-<pre><code>worker_processes 4;
-
-events { worker_connections 1024; }
-
-http {
-
-        upstream go-app {
-              server 192.168.139.140:8000;
-        }
-         
-        server {
-              listen 80;
-         
-              location / {
-                proxy_pass http://go-app;
-                proxy_http_version 1.1;
-                proxy_set_header Upgrade $http_upgrade;
-                proxy_set_header Connection 'upgrade';
-                proxy_set_header Host $host;
-                proxy_cache_bypass $http_upgrade;
-              }
-        }
-}
-</code></pre>
-
-<p>我们准备使用这个配置文件来取代nginx的默认配置文件，这需要我们的Dockerfile进行相关配置。</p>
-
-<h3 id="编写dockerfile-2">编写Dockerfile</h3>
-
-<p>同级目录下，创建Dockerfile</p>
-<pre><code>FROM nginx
-MAINTAINER lihaoquan quanix@163.com
-COPY nginx.conf /etc/nginx/nginx.conf
-</code></pre>
-
-<p>上面的Dockerfile，我们把自定义的<code>nginx.conf</code>拷贝到<code>/etc/nginx/nginx.conf</code></p>
-
-<p>这样ngix就会把我们的配置文件作为默认配置文件。</p>
-
-<h3 id="构建镜像-2">构建镜像</h3>
-<pre><code>sudo docker build -t lihaoquan/nginx .
-</code></pre>
-
-<h3 id="构建容器-2">构建容器</h3>
-<pre><code>sudo docker run -d --name nginx_web -p 80:80 lihaoquan/nginx
-</code></pre>
-
-<blockquote>
-<p>上面的例子，我们在nginx.conf设置了具体的ip地址<code>192.168.139.140</code>, 如果希望使用别名，而不是具体IP配置，
-可以先设置别名goapp_api ，然后构建命令需要进行容器连接 ：</p>
-
-<p>$ sudo docker run -d --name nginx_web -p 80:80 --link goapp_api:goapp_api  lihaoquan/nginx</p>
-</blockquote>
-
-<p>我们将容器内的<code>80端口</code>直接映射到外网</p>
-
-<h2 id="验证web应用">验证web应用</h2>
-
-<p>我们在浏览器输入：<code>http://192.168.139.140/book?sn=2</code> 来看我们的查询服务是否已经通过nginx代理：</p>
-
-<p>如果能展示下图的输出：</p>
-
-<p><img src="/media/2016/20160702_nginx.png" alt="index" /></p>
-
-<p>证明，我们的nginx的代理服务已经生效了。</p>
-
-<h3 id="总结">总结</h3>
-
-<p>使用同样的方法,我们也可以配置 docker + nodejs + mongodb + nginx的配置，具体的方法，大家可以动手试试。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/23/build-web-app-with-docker-gin-mongodb-nginx.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
