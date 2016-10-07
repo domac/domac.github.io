@@ -66,6 +66,8 @@ GDB是一个由GNU开源组织发布的、UNIX/LINUX操作系统下的、基于�
 <p>详细的GDB命令参数可以参考这篇文章 <a href="http://www.cnblogs.com/ggjucheng/archive/2011/12/14/2288004.html">点击这里</a></p>
 
 <p>这里我主要介绍下如果使用gdb来debug我们的go代码， 我们先写一段简单的代码(命名为main.go)，如下：</p>
+
+<!--more-->
 <pre><code class="language-go">
 package main
 
@@ -154,6 +156,355 @@ $1 = 0x11c1f0 &quot;my name is lihaoquan&quot;
 </code></pre>
 
 <p>最后，我们可以使用上述的几个基本命令参数调试我们其他的变量。对应其它更复杂的程序，其实原理都是一样的。</p>
+
+<hr />
+
+<p>接下来，这边参考《go学习笔记》的知识点，简单介绍一下如何使用gdb来入门学习go的源码。</p>
+
+<p>还是一个简单的代码段</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;fmt&quot;
+)
+
+func main() {
+    fmt.Println(&quot;hello world&quot;)
+}
+
+</code></pre>
+
+<p>接着我们需要编译它，在我们进行代码调试的时候，尽量使用 <code>-gcflags=&quot;-N -l&quot;</code> 参数来关闭编译器的代码优化和函数内联，因为这些优化，会规避了一些小函数和局部变量，
+这样不利于我们观察debug信息。</p>
+<pre><code>go build -gcflags=&quot;-N -l&quot; -o test
+</code></pre>
+
+<blockquote>
+<p>如果我们在平台使用交叉编译， 需要设置GOOS环境变量</p>
+</blockquote>
+<pre><code>$ gdb test
+
+GNU gdb (GDB) 7.10.1
+Copyright (C) 2015 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later &lt;http://gnu.org/licenses/gpl.html&gt;
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type &quot;show copying&quot;
+and &quot;show warranty&quot; for details.
+This GDB was configured as &quot;x86_64-apple-darwin15.2.0&quot;.
+Type &quot;show configuration&quot; for configuration details.
+For bug reporting instructions, please see:
+&lt;http://www.gnu.org/software/gdb/bugs/&gt;.
+Find the GDB manual and other documentation resources online at:
+&lt;http://www.gnu.org/software/gdb/documentation/&gt;.
+For help, type &quot;help&quot;.
+Type &quot;apropos word&quot; to search for commands related to &quot;word&quot;...
+Reading symbols from test...done.
+warning: Unsupported auto-load script at offset 0 in section .debug_gdb_scripts
+of file /Users/lihaoquan/GoProjects/Playground/src/study2016/gosc/basic/test.
+Use `info auto-load python-scripts [REGEXP]' to list them.
+(gdb)
+</code></pre>
+
+<p>接着，我们使用 info files 查看链接文件信息</p>
+<pre><code>(gdb) info files
+Symbols from &quot;/Users/lihaoquan/GoProjects/src/gosc/basic/test&quot;.
+Local exec file:
+    `/Users/lihaoquan/GoProjects/src/gosc/basic/test', file type mach-o-x86-64.
+    Entry point: 0x51ef0
+    0x0000000000002000 - 0x000000000007c730 is .text
+    0x000000000007c740 - 0x00000000000af434 is __TEXT.__rodata
+    0x00000000000af434 - 0x00000000000afee8 is __TEXT.__typelink
+    0x00000000000afee8 - 0x00000000000aff28 is __TEXT.__itablink
+    0x00000000000aff28 - 0x00000000000aff28 is __TEXT.__gosymtab
+    0x00000000000aff40 - 0x00000000000f355e is __TEXT.__gopclntab
+    0x00000000000f355e - 0x00000000000f355e is __TEXT.__symbol_stub1
+    0x00000000000f4000 - 0x00000000000f4000 is __DATA.__nl_symbol_ptr
+    0x00000000000f4000 - 0x00000000000f6048 is __DATA.__noptrdata
+    0x00000000000f6060 - 0x00000000000f7860 is .data
+    0x00000000000f7860 - 0x0000000000112150 is .bss
+    0x0000000000112160 - 0x0000000000116da0 is __DATA.__noptrbss
+(gdb)
+</code></pre>
+
+<p>我们可以看到我们的代码的Entry point在内存地址 <code>0x51ef0</code> 中，我们使用gdb访问它：</p>
+<pre><code>db)
+(gdb) b *0x51ef0
+Breakpoint 1 at 0x51ef0: file /usr/local/go/src/runtime/rt0_darwin_amd64.s, line 8.
+</code></pre>
+
+<p>这时候， gdb告诉咱们， 它已经找到真正入口，就在rt0_darwin_amd64.s中，而且具体位置是第8行。</p>
+
+<p>我们翻开go的源码，来看下rt0_darwin_amd64.s的内容</p>
+<pre><code>// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+#include &quot;textflag.h&quot;
+
+TEXT _rt0_amd64_darwin(SB),NOSPLIT,$-8
+    LEAQ    8(SP), SI // argv
+    MOVQ    0(SP), DI // argc
+    MOVQ    $main(SB), AX
+    JMP    AX
+
+// When linking with -shared, this symbol is called when the shared library
+// is loaded.
+TEXT _rt0_amd64_darwin_lib(SB),NOSPLIT,$0x48
+    MOVQ    BX, 0x18(SP)
+    MOVQ    BP, 0x20(SP)
+    MOVQ    R12, 0x28(SP)
+    MOVQ    R13, 0x30(SP)
+    MOVQ    R14, 0x38(SP)
+    MOVQ    R15, 0x40(SP)
+
+    MOVQ    DI, _rt0_amd64_darwin_lib_argc&lt;&gt;(SB)
+    MOVQ    SI, _rt0_amd64_darwin_lib_argv&lt;&gt;(SB)
+
+    // Synchronous initialization.
+    MOVQ    $runtime·libpreinit(SB), AX
+    CALL    AX
+
+    // Create a new thread to do the runtime initialization and return.
+    MOVQ    _cgo_sys_thread_create(SB), AX
+    TESTQ    AX, AX
+    JZ    nocgo
+    MOVQ    $_rt0_amd64_darwin_lib_go(SB), DI
+    MOVQ    $0, SI
+    CALL    AX
+    JMP    restore
+
+nocgo:
+    MOVQ    $8388608, 0(SP)                    // stacksize
+    MOVQ    $_rt0_amd64_darwin_lib_go(SB), AX
+    MOVQ    AX, 8(SP)                          // fn
+    MOVQ    $0, 16(SP)                         // fnarg
+    MOVQ    $runtime·newosproc0(SB), AX
+    CALL    AX
+
+restore:
+    MOVQ    0x18(SP), BX
+    MOVQ    0x20(SP), BP
+    MOVQ    0x28(SP), R12
+    MOVQ    0x30(SP), R13
+    MOVQ    0x38(SP), R14
+    MOVQ    0x40(SP), R15
+    RET
+
+TEXT _rt0_amd64_darwin_lib_go(SB),NOSPLIT,$0
+    MOVQ    _rt0_amd64_darwin_lib_argc&lt;&gt;(SB), DI
+    MOVQ    _rt0_amd64_darwin_lib_argv&lt;&gt;(SB), SI
+    MOVQ    $runtime·rt0_go(SB), AX
+    JMP    AX
+
+DATA _rt0_amd64_darwin_lib_argc&lt;&gt;(SB)/8, $0
+GLOBL _rt0_amd64_darwin_lib_argc&lt;&gt;(SB),NOPTR, $8
+DATA _rt0_amd64_darwin_lib_argv&lt;&gt;(SB)/8, $0
+GLOBL _rt0_amd64_darwin_lib_argv&lt;&gt;(SB),NOPTR, $8
+
+TEXT main(SB),NOSPLIT,$-8
+    MOVQ    $runtime·rt0_go(SB), AX
+    JMP    AX
+
+</code></pre>
+
+<p>从源码看到，从第8行开始，汇编程序会执行 <code>MOVQ  $main(SB), AX</code>，也就是</p>
+<pre><code>...
+
+TEXT main(SB),NOSPLIT,$-8
+    MOVQ    $runtime·rt0_go(SB), AX
+    JMP    AX
+</code></pre>
+
+<p>这个代码段，程序会进一步调用 <code>$runtime·rt0_go</code> , 我们再使用gdb进入$runtime·rt0_go了解下：</p>
+
+<blockquote>
+<p>源码文件中的“·” 符号编译后会变成正常的“.”</p>
+</blockquote>
+<pre><code>(gdb) b runtime.rt0_go
+Breakpoint 2 at 0x4e630: file /usr/local/go/src/runtime/asm_amd64.s, line 12.
+</code></pre>
+
+<p>asm_amd64.s的源码片段如下：</p>
+<pre><code>TEXT runtime·rt0_go(SB),NOSPLIT,$0
+    // copy arguments forward on an even stack
+    MOVQ    DI, AX        // argc
+    MOVQ    SI, BX        // argv
+    SUBQ    $(4*8+7), SP        // 2args 2auto
+    ANDQ    $~15, SP
+    MOVQ    AX, 16(SP)
+    MOVQ    BX, 24(SP)
+    
+    // create istack out of the given (operating system) stack.
+    // _cgo_init may update stackguard.
+    MOVQ    $runtime·g0(SB), DI
+    LEAQ    (-64*1024+104)(SP), BX
+    MOVQ    BX, g_stackguard0(DI)
+    MOVQ    BX, g_stackguard1(DI)
+    MOVQ    BX, (g_stack+stack_lo)(DI)
+    MOVQ    SP, (g_stack+stack_hi)(DI)
+
+    // find out information about the processor we're on
+    MOVQ    $0, AX
+    CPUID
+    MOVQ    AX, SI
+    CMPQ    AX, $0
+    JE    nocpuinfo
+
+    // Figure out how to serialize RDTSC.
+    // On Intel processors LFENCE is enough. AMD requires MFENCE.
+    // Don't know about the rest, so let's do MFENCE.
+    CMPL    BX, $0x756E6547  // &quot;Genu&quot;
+    JNE    notintel
+    CMPL    DX, $0x49656E69  // &quot;ineI&quot;
+    JNE    notintel
+    CMPL    CX, $0x6C65746E  // &quot;ntel&quot;
+    JNE    notintel
+    MOVB    $1, runtime·lfenceBeforeRdtsc(SB)
+notintel:
+
+    // Load EAX=1 cpuid flags
+    MOVQ    $1, AX
+    CPUID
+    MOVL    CX, runtime·cpuid_ecx(SB)
+    MOVL    DX, runtime·cpuid_edx(SB)
+
+    // Load EAX=7/ECX=0 cpuid flags
+    CMPQ    SI, $7
+    JLT    no7
+    MOVL    $7, AX
+    MOVL    $0, CX
+    CPUID
+    MOVL    BX, runtime·cpuid_ebx7(SB)
+no7:
+    // Detect AVX and AVX2 as per 14.7.1  Detection of AVX2 chapter of [1]
+    // [1] 64-ia-32-architectures-software-developer-manual-325462.pdf
+    // http://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-manual-325462.pdf
+    MOVL    runtime·cpuid_ecx(SB), CX
+    ANDL    $0x18000000, CX // check for OSXSAVE and AVX bits
+    CMPL    CX, $0x18000000
+    JNE     noavx
+    MOVL    $0, CX
+    // For XGETBV, OSXSAVE bit is required and sufficient
+    XGETBV
+    ANDL    $6, AX
+    CMPL    AX, $6 // Check for OS support of YMM registers
+    JNE     noavx
+    MOVB    $1, runtime·support_avx(SB)
+    TESTL   $(1&lt;&lt;5), runtime·cpuid_ebx7(SB) // check for AVX2 bit
+    JEQ     noavx2
+    MOVB    $1, runtime·support_avx2(SB)
+    JMP     nocpuinfo
+noavx:
+    MOVB    $0, runtime·support_avx(SB)
+noavx2:
+    MOVB    $0, runtime·support_avx2(SB)
+nocpuinfo:    
+    
+    // if there is an _cgo_init, call it.
+    MOVQ    _cgo_init(SB), AX
+    TESTQ    AX, AX
+    JZ    needtls
+    // g0 already in DI
+    MOVQ    DI, CX    // Win64 uses CX for first parameter
+    MOVQ    $setg_gcc&lt;&gt;(SB), SI
+    CALL    AX
+
+    // update stackguard after _cgo_init
+    MOVQ    $runtime·g0(SB), CX
+    MOVQ    (g_stack+stack_lo)(CX), AX
+    ADDQ    $const__StackGuard, AX
+    MOVQ    AX, g_stackguard0(CX)
+    MOVQ    AX, g_stackguard1(CX)
+
+#ifndef GOOS_windows
+    JMP ok
+#endif
+needtls:
+#ifdef GOOS_plan9
+    // skip TLS setup on Plan 9
+    JMP ok
+#endif
+#ifdef GOOS_solaris
+    // skip TLS setup on Solaris
+    JMP ok
+#endif
+
+    LEAQ    runtime·m0+m_tls(SB), DI
+    CALL    runtime·settls(SB)
+
+    // store through it, to make sure it works
+    get_tls(BX)
+    MOVQ    $0x123, g(BX)
+    MOVQ    runtime·m0+m_tls(SB), AX
+    CMPQ    AX, $0x123
+    JEQ 2(PC)
+    MOVL    AX, 0    // abort
+ok:
+    // set the per-goroutine and per-mach &quot;registers&quot;
+    get_tls(BX)
+    LEAQ    runtime·g0(SB), CX
+    MOVQ    CX, g(BX)
+    LEAQ    runtime·m0(SB), AX
+
+    // save m-&gt;g0 = g0
+    MOVQ    CX, m_g0(AX)
+    // save m0 to g0-&gt;m
+    MOVQ    AX, g_m(CX)
+
+    CLD                // convention is D is always left cleared
+    CALL    runtime·check(SB)
+
+    MOVL    16(SP), AX        // copy argc
+    MOVL    AX, 0(SP)
+    MOVQ    24(SP), AX        // copy argv
+    MOVQ    AX, 8(SP)
+    CALL    runtime·args(SB)
+    CALL    runtime·osinit(SB)
+    CALL    runtime·schedinit(SB)
+
+    // create a new goroutine to start program
+    MOVQ    $runtime·mainPC(SB), AX        // entry
+    PUSHQ    AX
+    PUSHQ    $0            // arg size
+    CALL    runtime·newproc(SB)
+    POPQ    AX
+    POPQ    AX
+
+    // start this M
+    CALL    runtime·mstart(SB)
+
+    MOVL    $0xf1, 0xf1  // crash
+    RET
+
+DATA    runtime·mainPC+0(SB)/8,$runtime·main(SB)
+GLOBL    runtime·mainPC(SB),RODATA,$8
+</code></pre>
+
+<p>这个程序基本完成引导的工作，最终去运行 <code>runtime·main(SB)</code> 。后续的内容我们再使用gdb debug一下：</p>
+<pre><code>(gdb) b runtime.main
+Breakpoint 3 at 0x28470: file /usr/local/go/src/runtime/proc.go, line 106.
+</code></pre>
+
+<p>上面我们使用gdb基本可以查看到整个go的引导过程。当然啦，除了引导的部分，go程序还有初始化的部分。这个我们可以再去根据上面演示的线索查找
+方法去研究，《Go学习笔记》给出了我们查看初始化源码的几个tips:</p>
+
+<ul>
+<li><p>runtime.args</p></li>
+
+<li><p>runtime.osinit</p></li>
+
+<li><p>runtime.schedinit</p></li>
+</ul>
+
+<p>我们有情趣的话，可以配合gdb去debug下，这有助于我们了解初始化的过程</p>
+
+<p>结论：</p>
+
+<ul>
+<li><p>所有的init函数都在同一个goroutine内执行</p></li>
+
+<li><p>所有的init函数结束后才会执行 main.main 函数</p></li>
+</ul>
 </section>
                     </div>
                 </div>
