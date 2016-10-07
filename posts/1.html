@@ -47,6 +47,74 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">10</span>
+                            <span class="day">7</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2016/10/7/go-slice-byte-convert.html">golang里slice与[]byte的零拷贝转换</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>slice在Go的运行时库中就是一个C语言动态数组的实现，在$GOROOT/src/pkg/runtime/runtime.h中可以看到它的定义：</p>
+<pre><code class="language-c">struct Slice
+{   
+    byte*    array;        // actual data
+    uintgo    len;        // number of elements
+    uintgo    cap;        // allocated number of elements
+};
+</code></pre>
+
+<p>所以要实现一个“zero-copy”的转换，我们需要借助unsafe.Pointer的帮助</p>
+<pre><code class="language-go">func stringToBytes(s string) []byte {
+    x := (*[2]uintptr)(unsafe.Pointer(&amp;s))
+    h := [3]uintptr{x[0], x[1], x[1]}
+    return *(*[]byte)(unsafe.Pointer(&amp;h))
+}
+
+func bytesToString(b []byte) string {
+    return *(*string)(unsafe.Pointer(&amp;b))
+}
+
+func main() {
+    s := strings.Repeat(&quot;abc&quot;, 3)
+    b := stringToBytes(s)
+    s2 := bytesToString(b)
+
+    fmt.Println(b, s2)
+}
+</code></pre>
+
+<p>还可以这样：</p>
+<pre><code class="language-go">var ptr unsafe.Pointer
+var s1 = struct {
+    addr uintptr
+    len int
+    cap int
+}{ptr, length, length}
+s := *(*[]byte)(unsafe.Pointer(&amp;s1))
+</code></pre>
+
+<p>或者使用reflect.SliceHeader的方式来构造slice，比较推荐这种做法：</p>
+<pre><code class="language-go">var o []byte
+sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&amp;o)))
+sliceHeader.Cap = length
+sliceHeader.Len = length
+sliceHeader.Data = uintptr(ptr)
+</code></pre>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/7/go-slice-byte-convert.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
                             <span class="day">2</span>
                         </span>
                             </div>
@@ -138,41 +206,6 @@ Dashboard，这样十分不便。</p>
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/8/29/sz-gopher-meetup.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">8</span>
-                            <span class="day">16</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/8/16/problem-using-vscode-in-go17.html">升级Go1.7后，vscode无法代码补全的解决方法</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>今天Go1.7正式发布了。下午在公司立刻在开发环境和测试环境都把原来1.5.3的版本升级到1.7</p>
-
-<p>尝试执行了之前的项目，运行一切ok,而且默认隐式开启了GO15VENDOREXPERIMENT的功能，一些godep管理的项目也正常运行。本以为万事大吉，晚上回家后，打开vscode敲代码的时候，发现了vscode的代码补全功能不能工作了。</p>
-
-<p>一开始，怀疑是gocode的版本太旧了。于是升级了下。单问题依旧还在。经过不断探究，发现了问题的原因：</p>
-<pre><code> 升级go版本后，但gocode的后台进程并不能感知版本的变化，还是以为环境是go.15的，这个时候需要我们“重启”一下gocode
-</code></pre>
-
-<p>于是，可以在终端重启我们的gocode</p>
-<pre><code>  $ gocode close
-</code></pre>
-
-<p>回到vscode的环境中，发现代码补全正常工作了</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/8/16/problem-using-vscode-in-go17.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
