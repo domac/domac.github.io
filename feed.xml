@@ -4,13 +4,7 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Fri, 07 Oct 2016 14:49:58 +0800</pubDate>
-    <item>
-      <title>golang里slice与[]byte的零拷贝转换</title>
-      <link>http://lihaoquan.me/2016/10/7/go-slice-byte-convert.html</link>
-      <description>&lt;p&gt;slice在Go的运行时库中就是一个C语言动态数组的实现，在$GOROOT/src/pkg/runtime/runtime.h中可以看到它的定义：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-c&#34;&gt;struct Slice&#xA;{   &#xA;    byte*    array;        // actual data&#xA;    uintgo    len;        // number of elements&#xA;    uintgo    cap;        // allocated number of elements&#xA;};&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;所以要实现一个“zero-copy”的转换，我们需要借助unsafe.Pointer的帮助&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;func stringToBytes(s string) []byte {&#xA;    x := (*[2]uintptr)(unsafe.Pointer(&amp;amp;s))&#xA;    h := [3]uintptr{x[0], x[1], x[1]}&#xA;    return *(*[]byte)(unsafe.Pointer(&amp;amp;h))&#xA;}&#xA;&#xA;func bytesToString(b []byte) string {&#xA;    return *(*string)(unsafe.Pointer(&amp;amp;b))&#xA;}&#xA;&#xA;func main() {&#xA;    s := strings.Repeat(&amp;quot;abc&amp;quot;, 3)&#xA;    b := stringToBytes(s)&#xA;    s2 := bytesToString(b)&#xA;&#xA;    fmt.Println(b, s2)&#xA;}&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;还可以这样：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;var ptr unsafe.Pointer&#xA;var s1 = struct {&#xA;    addr uintptr&#xA;    len int&#xA;    cap int&#xA;}{ptr, length, length}&#xA;s := *(*[]byte)(unsafe.Pointer(&amp;amp;s1))&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;或者使用reflect.SliceHeader的方式来构造slice，比较推荐这种做法：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;var o []byte&#xA;sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&amp;amp;o)))&#xA;sliceHeader.Cap = length&#xA;sliceHeader.Len = length&#xA;sliceHeader.Data = uintptr(ptr)&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;</description>
-      <pubDate>Fri, 07 Oct 2016 14:44:22 +0000</pubDate>
-    </item>
+    <pubDate>Fri, 07 Oct 2016 14:51:14 +0800</pubDate>
     <item>
       <title>codis实践（二）：自定义参数与环境方式搭建</title>
       <link>http://lihaoquan.me/2016/10/2/codis-in-action-2-start-server.html</link>
@@ -142,6 +136,12 @@
       <link>http://lihaoquan.me/2016/1/13/build-web-application-in-docker.html</link>
       <description>&lt;p&gt;教程参考： &lt;a href=&#34;http://dockone.io/article/1269&#34;&gt;http://dockone.io/article/1269&lt;/a&gt;&lt;/p&gt;&#xA;</description>
       <pubDate>Wed, 13 Jan 2016 12:23:49 +0000</pubDate>
+    </item>
+    <item>
+      <title>golang里slice与[]byte的零拷贝转换</title>
+      <link>http://lihaoquan.me/2015/10/10/go-slice-byte-convert.html</link>
+      <description>&lt;p&gt;slice在Go的运行时库中就是一个C语言动态数组的实现，在$GOROOT/src/pkg/runtime/runtime.h中可以看到它的定义：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-c&#34;&gt;struct Slice&#xA;{   &#xA;    byte*    array;        // actual data&#xA;    uintgo    len;        // number of elements&#xA;    uintgo    cap;        // allocated number of elements&#xA;};&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;所以要实现一个“zero-copy”的转换，我们需要借助unsafe.Pointer的帮助&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;func stringToBytes(s string) []byte {&#xA;    x := (*[2]uintptr)(unsafe.Pointer(&amp;amp;s))&#xA;    h := [3]uintptr{x[0], x[1], x[1]}&#xA;    return *(*[]byte)(unsafe.Pointer(&amp;amp;h))&#xA;}&#xA;&#xA;func bytesToString(b []byte) string {&#xA;    return *(*string)(unsafe.Pointer(&amp;amp;b))&#xA;}&#xA;&#xA;func main() {&#xA;    s := strings.Repeat(&amp;quot;abc&amp;quot;, 3)&#xA;    b := stringToBytes(s)&#xA;    s2 := bytesToString(b)&#xA;&#xA;    fmt.Println(b, s2)&#xA;}&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;还可以这样：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;var ptr unsafe.Pointer&#xA;var s1 = struct {&#xA;    addr uintptr&#xA;    len int&#xA;    cap int&#xA;}{ptr, length, length}&#xA;s := *(*[]byte)(unsafe.Pointer(&amp;amp;s1))&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;或者使用reflect.SliceHeader的方式来构造slice，比较推荐这种做法：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-go&#34;&gt;var o []byte&#xA;sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&amp;amp;o)))&#xA;sliceHeader.Cap = length&#xA;sliceHeader.Len = length&#xA;sliceHeader.Data = uintptr(ptr)&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;</description>
+      <pubDate>Sat, 10 Oct 2015 14:44:22 +0000</pubDate>
     </item>
     <item>
       <title>关于 keepalived</title>

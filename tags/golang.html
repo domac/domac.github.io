@@ -48,74 +48,6 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">10</span>
-                            <span class="day">7</span>
-                        </span>
-                            </div>
-                            <h3 class="title">
-                                <a href="/2016/10/7/go-slice-byte-convert.html">golang里slice与[]byte的零拷贝转换</a>
-                            </h3>
-                        </header>
-                        <section class="brief"><p>slice在Go的运行时库中就是一个C语言动态数组的实现，在$GOROOT/src/pkg/runtime/runtime.h中可以看到它的定义：</p>
-<pre><code class="language-c">struct Slice
-{   
-    byte*    array;        // actual data
-    uintgo    len;        // number of elements
-    uintgo    cap;        // allocated number of elements
-};
-</code></pre>
-
-<p>所以要实现一个“zero-copy”的转换，我们需要借助unsafe.Pointer的帮助</p>
-<pre><code class="language-go">func stringToBytes(s string) []byte {
-    x := (*[2]uintptr)(unsafe.Pointer(&amp;s))
-    h := [3]uintptr{x[0], x[1], x[1]}
-    return *(*[]byte)(unsafe.Pointer(&amp;h))
-}
-
-func bytesToString(b []byte) string {
-    return *(*string)(unsafe.Pointer(&amp;b))
-}
-
-func main() {
-    s := strings.Repeat(&quot;abc&quot;, 3)
-    b := stringToBytes(s)
-    s2 := bytesToString(b)
-
-    fmt.Println(b, s2)
-}
-</code></pre>
-
-<p>还可以这样：</p>
-<pre><code class="language-go">var ptr unsafe.Pointer
-var s1 = struct {
-    addr uintptr
-    len int
-    cap int
-}{ptr, length, length}
-s := *(*[]byte)(unsafe.Pointer(&amp;s1))
-</code></pre>
-
-<p>或者使用reflect.SliceHeader的方式来构造slice，比较推荐这种做法：</p>
-<pre><code class="language-go">var o []byte
-sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&amp;o)))
-sliceHeader.Cap = length
-sliceHeader.Len = length
-sliceHeader.Data = uintptr(ptr)
-</code></pre>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/7/go-slice-byte-convert.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
                             <span class="day">2</span>
                         </span>
                             </div>
@@ -1833,6 +1765,74 @@ root@fc1:/#  chmod -x run.sh
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/2/22/quck-build-docker-ssh-container.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
+                            <span class="day">10</span>
+                        </span>
+                            </div>
+                            <h3 class="title">
+                                <a href="/2015/10/10/go-slice-byte-convert.html">golang里slice与[]byte的零拷贝转换</a>
+                            </h3>
+                        </header>
+                        <section class="brief"><p>slice在Go的运行时库中就是一个C语言动态数组的实现，在$GOROOT/src/pkg/runtime/runtime.h中可以看到它的定义：</p>
+<pre><code class="language-c">struct Slice
+{   
+    byte*    array;        // actual data
+    uintgo    len;        // number of elements
+    uintgo    cap;        // allocated number of elements
+};
+</code></pre>
+
+<p>所以要实现一个“zero-copy”的转换，我们需要借助unsafe.Pointer的帮助</p>
+<pre><code class="language-go">func stringToBytes(s string) []byte {
+    x := (*[2]uintptr)(unsafe.Pointer(&amp;s))
+    h := [3]uintptr{x[0], x[1], x[1]}
+    return *(*[]byte)(unsafe.Pointer(&amp;h))
+}
+
+func bytesToString(b []byte) string {
+    return *(*string)(unsafe.Pointer(&amp;b))
+}
+
+func main() {
+    s := strings.Repeat(&quot;abc&quot;, 3)
+    b := stringToBytes(s)
+    s2 := bytesToString(b)
+
+    fmt.Println(b, s2)
+}
+</code></pre>
+
+<p>还可以这样：</p>
+<pre><code class="language-go">var ptr unsafe.Pointer
+var s1 = struct {
+    addr uintptr
+    len int
+    cap int
+}{ptr, length, length}
+s := *(*[]byte)(unsafe.Pointer(&amp;s1))
+</code></pre>
+
+<p>或者使用reflect.SliceHeader的方式来构造slice，比较推荐这种做法：</p>
+<pre><code class="language-go">var o []byte
+sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&amp;o)))
+sliceHeader.Cap = length
+sliceHeader.Len = length
+sliceHeader.Data = uintptr(ptr)
+</code></pre>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2015/10/10/go-slice-byte-convert.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
