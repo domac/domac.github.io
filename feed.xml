@@ -4,7 +4,7 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Sun, 09 Oct 2016 00:10:16 +0800</pubDate>
+    <pubDate>Mon, 10 Oct 2016 13:53:17 +0800</pubDate>
     <item>
       <title>codis实践（二）：自定义参数与环境方式搭建</title>
       <link>http://lihaoquan.me/2016/10/2/codis-in-action-2-start-server.html</link>
@@ -183,7 +183,7 @@
     <item>
       <title>上海Gopher China 2015</title>
       <link>http://lihaoquan.me/2015/4/26/gopher-china-2015.html</link>
-      <description>&lt;p&gt;四月参加了上海GopherChina大会, 能与一众大牛与朋友面对面交流十分开心啊, 这里简单记录一下&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;/media/2016/gopherchina_01.jpg&#34; alt=&#34;sh_gopher_1&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;/media/2016/gopherchina_02.jpg&#34; alt=&#34;sh_gopher_2&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;/media/2016/gopherchina_03.jpg&#34; alt=&#34;sh_gopher_3&#34; /&gt;&lt;/p&gt;&#xA;</description>
+      <description>&lt;p&gt;四月参加了上海GopherChina大会, 能与一众大牛与朋友面对面交流十分开心啊, 这里简单记录一下&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;/media/2016/shgo.jpg&#34; alt=&#34;sh_gopher_1&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;/media/2016/gopherchina_02.jpg&#34; alt=&#34;sh_gopher_2&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;/media/2016/gopherchina_03.jpg&#34; alt=&#34;sh_gopher_3&#34; /&gt;&lt;/p&gt;&#xA;</description>
       <pubDate>Sun, 26 Apr 2015 23:01:54 +0000</pubDate>
     </item>
     <item>
