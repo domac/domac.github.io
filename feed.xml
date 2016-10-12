@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?><rss version="2.0">
   <channel>
-    <title>LHQ的博客</title>
+    <title>domac的博客</title>
     <link>http://localhost/</link>
     <description>lihaoquan.me is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Mon, 10 Oct 2016 13:53:17 +0800</pubDate>
+    <pubDate>Wed, 12 Oct 2016 23:53:41 +0800</pubDate>
     <item>
       <title>codis实践（二）：自定义参数与环境方式搭建</title>
       <link>http://lihaoquan.me/2016/10/2/codis-in-action-2-start-server.html</link>
