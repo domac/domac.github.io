@@ -77,6 +77,8 @@
 
 <p>Go 的rand包：<code>math/rand</code> 和 <code>crypo/rand</code>， 前者是一种伪随机数生成方式，后者是真正意义上的随机数生成方式。</p>
 
+<!--more-->
+
 <h3 id="math-rand">math/rand</h3>
 
 <p>go源码包是这样描述的：</p>
@@ -89,11 +91,17 @@ The default Source is safe for concurrent use by multiple goroutines.
 For random numbers suitable for security-sensitive work, see the crypto/rand package.</p>
 </blockquote>
 
-<p>math/rand比crypo/rand提供了更丰富的api:
- - 提供能以不同数字格式（float33，float64，int32，int64，&hellip;)返回的均匀分布的随机值的方法。
- - 根据非均匀（正态分布和指数分布）float64值分布返回的方法。
- - 能生成zipf分布值
- - 可生成置换切片的方法</p>
+<p>math/rand比crypo/rand提供了更丰富的api:</p>
+
+<ul>
+<li><p>提供能以不同数字格式（float33，float64，int32，int64，&hellip;)返回的均匀分布的随机值的方法。</p></li>
+
+<li><p>根据非均匀（正态分布和指数分布）float64值分布返回的方法。</p></li>
+
+<li><p>能生成zipf分布值</p></li>
+
+<li><p>可生成置换切片的方法</p></li>
+</ul>
 
 <p>math/rand 另外一个特点是它比 crypo/rand 快</p>
 
