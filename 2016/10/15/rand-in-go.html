@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>Page 1 - domac的博客</title>
+    <title>聊聊golang的rand - domac的博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.me is my site"/>
+    <meta name="description" content="rand in go"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,7 +39,7 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
+        <div id="article-single">
             <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
@@ -54,6 +54,10 @@
                                 <a href="/2016/10/15/rand-in-go.html">聊聊golang的rand</a>
                             </h5>
                         </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/golang.html">golang</a>
+                        </aside>
                         <section class="brief"><p>使用golang生成随机数的时候，官方提供了两种方式，分别是 <code>math/rand</code> 和 <code>crypo/rand</code> ，那么它们两者之间究竟有什么
 不同呢？如果通过它们来生成我们的随机数呢？下面我们一起来聊聊golang的随机数生成方式。</p>
 
@@ -121,121 +125,31 @@ For random numbers suitable for security-sensitive work, see the crypto/rand pac
 <a href="https://github.com/Pallinder/go-randomdata">go-randomdata</a></p>
 </blockquote>
 </section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/15/rand-in-go.html">继续阅读</a>
-                        </aside>
                     </div>
                 </div>
             </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
-                            <span class="day">2</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/10/2/codis-in-action-2-start-server.html">codis实践（二）：自定义参数与环境方式搭建</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>上一节， 我们通过运行了一个名称为“codis-test”的codis的demo方案，本节，我们尝试通过官方的相关命令组件，运行自己的自定义环境。</p>
-
-<p>还是跟上一节一样，我这边继续选用etcd作为我的配置管理工具。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/2/codis-in-action-2-start-server.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
-                            <span class="day">2</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/10/2/codis-in-action-1-basic-demo.html">codis实践（一）：基本概念与demo环境搭建</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="背景">背景</h2>
-
-<p><code>Redis</code> 在 <code>3.0</code> 的时候,推出了一个集群解决方案: redis-cluster. 能让我们通过官方的方式构建我们的redis集群, 但在之前, 我们
-生产环境跑的基本是redis 2.x 版本的实例, 如果需要进行集群管理, 以 唯品会 为例，很多同事采用的方案都是twitter的Twemproxy。</p>
-
-<p><code>Twemproxy</code> 本身是一个静态的分布式方案，进行扩容、缩容的时候对我们devops的要求很高，而且很难得做到平滑的扩容、缩容。而且没有用于集群管理的
-Dashboard，这样十分不便。</p>
-
-<p>为了解决这些痛点，豌豆荚开源了它们的 <code>Codis</code>, 很感谢作者们带来了这么好的工具，不管是使用或者学习CAP相关开发，codis都是很好的参考。
-关于codis的开发历程，可以google搜下 《Codis作者黄东旭细说分布式Redis架构设计和踩过的那些坑们》
-这边文章。 里面作者从CAP三个层次介绍codis的优点。（ps: 作为一名喜欢go开发的人，选择codis也很正常。哈）</p>
-
-<blockquote>
-<p>Codis 官方项目地址 ： <a href="https://github.com/CodisLabs/codis">https://github.com/CodisLabs/codis</a></p>
-</blockquote>
-
-<p>为了更深入学习codis，从本篇博客开始我会陆续陆续一些实践的总结和思路 :)</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/2/codis-in-action-1-basic-demo.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">8</span>
-                            <span class="day">29</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/8/29/sz-gopher-meetup.html">深圳Gopher Meetup小记</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p><img src="/media/2016/szgopher.jpg" alt="sz_gopher" /></p>
-
-<p>星期天下午到深圳参加了Gopher Meetup, 这次聚会上认识了不少爱好者，其中很多都是一线大牛。</p>
-
-<p>1.本次聚会第一个topic是谢大跟我们介绍了很多关于Go基金会的愿景。接下来是晓黎的《人工智能在资产管理方面的应用》。</p>
-
-<p>不过这个topic感觉没什么说上到Go上，更多的是一些项目的采集-整理的架构。</p>
-
-<p>2.陈非的kingshard，之前我研究，拜读过源码，所以对这个topic比较深刻，陈非主要是分享在开发这个开源项目中的缘由吧。</p>
-
-<p>3.杨文的小恩爱的Go历程这个我很受感悟，因为也与自己用Go来做东西的历程很多共鸣。</p>
-
-<p>4.接下来是悟空的分享，说实在悟空的分享很详尽。而且很多通讯领域的经验分享也是很赞。</p>
-
-<p>5.最后是李亚川的Pholcus了，亚川在分享中，展示了部分源码的实现方案，不过，这些源码感觉很难串联起来。不过，这问题不大。</p>
-
-<p>想学习幽灵蛛的思路，可以参考他开源的Pholcus：<a href="https://github.com/henrylee2cn/pholcus">https://github.com/henrylee2cn/pholcus</a></p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/8/29/sz-gopher-meetup.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <div class="article-pager text-center">
-                
-                <a class="btn btn-lg btn-info" href="/posts/2.html">后一页</a>
-            </div>
         </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="rand-in-go" data-title="聊聊golang的rand - domac的博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
     </div>
 </section>
 <footer id="footer">

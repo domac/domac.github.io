@@ -47,6 +47,70 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">9</span>
+                            <span class="day">3</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2015/9/3/about-keepalived.html">关于 keepalived</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>今天看了一些关于keepalived的资料,在这里复习总结一下:
+官网的介绍:
+  <a href="http://www.keepalived.org/">http://www.keepalived.org/</a></p>
+
+<p>Keeplived是Linux下的一个轻量级高可用解决方案, 专门用来监控集群系统中的各个服务节点的状态.其中,它的一个关键概念就是VRRP(Virtual Router Redundancy Protocol) 虚拟路由冗余协议, VRRP的目的是为了解决静态路由出现的单点故障问题.</p>
+
+<blockquote>
+<p>背景: 在现实的网络环境中, 主机之间的通讯都是通过配置静态路由(默认网关)完成的, 所以路由会成为单点瓶颈.所以引入VRRP</p>
+</blockquote>
+
+<p>用途: <code>服务器状态检测</code>, <code>故障隔离</code>, <code>HA cluster</code></p>
+
+<p>手段: VRRP可用将两台或者多台物理路由器设备虚拟成一个虚拟路由(通过虚拟IP对外提供服务), 并且多个物理理由协同工作,保证同一时刻只有一个物理路由作为主物理路由(用过选举)</p>
+
+<p>keepalived工作在TCP/IP参考模型的第三,第四和第五层,也就是网络层,传输层和应用层.运行机制如下:
+1. 在网络层 (IP, ICMP, ARP, RARP)
+2. 传输层 (TCP, UDP)
+3. 应用层(FTP, TELNET, SMTP, DNS)</p>
+
+<p>VRRP 工作流程:
+1.初始化
+&gt;路由器启动时，如果路由器的优先级是255(最高优先级，路由器拥有路由器地址)，要发送VRRP通告信息，并发送广播ARP信息通告路由器IP地址对应的MAC地址为路由虚拟MAC，设置通告信息定时器准备定时发送VRRP通告信息，转为MASTER状态；否则进入BACKUP状态，设置定时器检查定时检查是否收到MASTER的通告信息。</p>
+
+<p>2.Master
+&gt;设置定时通告定时器；
+        用VRRP虚拟MAC地址响应路由器IP地址的ARP请求；
+        转发目的MAC是VRRP虚拟MAC的数据包；
+        如果是虚拟路由器IP的拥有者，将接受目的地址是虚拟路由器IP的数据包，否则丢弃；
+        当收到shutdown的事件时删除定时通告定时器，发送优先权级为0的通告包，转初始化状态；
+        如果定时通告定时器超时时，发送VRRP通告信息；
+        收到VRRP通告信息时，如果优先权为0，发送VRRP通告信息；否则判断数据的优先级是否高于本机，或相等而且实际IP地址大于本地实际IP，设置定时通告定时器，复位主机超时定时器，转BACKUP状态；否则的话，丢弃该通告包；</p>
+
+<p>3.Backup
+&gt;设置主机超时定时器；
+        不能响应针对虚拟路由器IP的ARP请求信息；
+        丢弃所有目的MAC地址是虚拟路由器MAC地址的数据包；
+        不接受目的是虚拟路由器IP的所有数据包；
+        当收到shutdown的事件时删除主机超时定时器，转初始化状态；
+        主机超时定时器超时的时候，发送VRRP通告信息，广播ARP地址信息，转MASTER状态；
+        收到VRRP通告信息时，如果优先权为0，表示进入MASTER选举；否则判断数据的优先级是否高于本机，如果高的话承认MASTER有效，复位主机超时定时器；否则的话，丢弃该通告包；</p>
+
+<p>安装与配置可用参考这篇文章 : <a href="http://freeloda.blog.51cto.com/2033581/1280962">http://freeloda.blog.51cto.com/2033581/1280962</a></p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2015/9/3/about-keepalived.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">9</span>
                             <span class="day">1</span>
                         </span>
                             </div>
@@ -129,43 +193,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2015/8/24/lock-and-sync.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">8</span>
-                            <span class="day">23</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2015/8/23/understand-tcp-resend.html">关于TCP重连</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h3 id="基础概念">基础概念</h3>
-
-<p><code>TCP可靠性</code>的一个保证机制就是<code>超时重传</code>，而超时重传的核心是重传超时时间的计算。我们分享自己的理解，分两部分：上部分侧重RFC解读，下部分侧重linux实现。</p>
-
-<p>本端发送一个数据包给对端，然后对端返回一个ack。这样，本端就能计算出这个包来回所需的时间，这个时间就是RTT（Round-TripTime），很简单，就是一个时间差。具体讲，它由三部分组成：链路层的传播时间、端点协议栈的处理时间、中间设备的处理时间（如路由器缓存）。主要时间应该耗在中间设备的中转，可见，RTT一定程度上体现了网络的拥塞程度。</p>
-
-<p>重传超时时间RTO（Retransmission TimeOut）是基于RTT（而RTT是动态变化的，所以RTO也得动态调整）计算出的一个定时器超时时间。它的作用就是在发送一个数据包之后，开始计时，如果超时时这个数据包还没有被ack，表明传输中出现问题了则进入超时处理流程（就是重传流程）。</p>
-
-<p>这里插入一点方法论。有些人看网络协议部分的代码时迷糊，其实就是由于没有参考RFC。所以我们是先讲RFC，再看代码。</p>
-
-<p>相关RFC解读</p>
-
-<p>RTO相关的RFC，目前以RFC6298（2011年发布，废弃RFC2988，更新RFC1122）为准。虽然它本身仅仅是追加了一个小需求：将初始化RTO从3秒改为1秒，但是内容上还是完整呈现了RTO相关流程。</p>
-
-<p>以下是我们（计算机学习微信公众号：jsj_xx）对RFC6298的总结和理解：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2015/8/23/understand-tcp-resend.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
