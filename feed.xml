@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?><rss version="2.0">
   <channel>
-    <title>domac的博客</title>
+    <title>domac博客</title>
     <link>http://localhost/</link>
     <description>lihaoquan.me is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Sat, 15 Oct 2016 14:36:26 +0800</pubDate>
+    <pubDate>Sat, 15 Oct 2016 14:37:56 +0800</pubDate>
     <item>
       <title>聊聊golang的rand</title>
       <link>http://lihaoquan.me/2016/10/15/rand-in-go.html</link>
