@@ -48,6 +48,114 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">10</span>
+                            <span class="day">26</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/10/26/vscode-godef-problem-with-net.html">VSCODE中godef无法跳转到定义的问题</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p><a href="原文链接：http://targetliu.com/vscode-can-not-go-to-def/">原文链接：http://targetliu.com/vscode-can-not-go-to-def/</a></p>
+
+<blockquote>
+<p>之前研究GOLANG时一直用LiteIDE，不得不说，LiteIDE的确不错，但是总感觉缺乏美感，是一款很中规中矩的编辑器。网上看到大家对VSCODE评价不错，尝试后发现的确不错，布局简洁、插件化、支持中文，通过VSCODE GO扩展能够很舒服的写GO的代码。</p>
+</blockquote>
+
+<h2 id="问题描述">问题描述</h2>
+
+<p>不过在实际使用过程中发现 net 包无法正常跳转到定义，如下段代码 ResolveTCPAddr就无法正常跳转</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;net&quot;
+)
+
+func main() {
+    _, err := net.ResolveTCPAddr(&quot;tcp&quot;, &quot;:4040&quot;)
+}
+</code></pre>
+
+<p>由于VSCODE GO中跳转到定义使用的是godef，遂通过godef的debug模式查看问题原因：</p>
+<pre><code>godef -debug -f main.go net.ResolveTCPAddr
+</code></pre>
+
+<p>运行结果如下：</p>
+<pre><code>2016/08/02 01:17:30 exprType tuple:false pkg: *ast.SelectorExpr net.ListenTCP [
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.Ident net [
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.ImportSpec &quot;net&quot; [
+2016/08/02 01:17:30 ] -&gt; 0x0, Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;}
+2016/08/02 01:17:30 ] -&gt; 0xc820157860, Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;}
+2016/08/02 01:17:30 member Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;} 'ListenTCP' {
+2016/08/02 01:17:30     /usr/local/go/src/net/cgo_android.go:10:8: cannot find identifier for package &quot;C&quot;: cannot find package &quot;C&quot; in any of:
+    /usr/local/go/src/vendor/C (vendor tree)
+    /usr/local/go/src/C (from $GOROOT)
+    /Users/targetliu/dev/govendor/src/C (from $GOPATH)
+    /Users/targetliu/dev/golang/src/C
+2016/08/02 01:17:30 } -&gt; &lt;nil&gt;
+2016/08/02 01:17:30 ] -&gt; 0x0, Type{bad &quot;&quot; &lt;nil&gt; }
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.SelectorExpr net.ListenTCP [
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.Ident net [
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.ImportSpec &quot;net&quot; [
+2016/08/02 01:17:30 ] -&gt; 0x0, Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;}
+2016/08/02 01:17:30 ] -&gt; 0xc820157860, Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;}
+2016/08/02 01:17:30 member Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;} 'ListenTCP' {
+2016/08/02 01:17:30     /usr/local/go/src/net/cgo_android.go:10:8: cannot find identifier for package &quot;C&quot;: cannot find package &quot;C&quot; in any of:
+    /usr/local/go/src/vendor/C (vendor tree)
+    /usr/local/go/src/C (from $GOROOT)
+    /Users/targetliu/dev/govendor/src/C (from $GOPATH)
+    /Users/targetliu/dev/golang/src/C
+2016/08/02 01:17:30 } -&gt; &lt;nil&gt;
+2016/08/02 01:17:30 ] -&gt; 0x0, Type{bad &quot;&quot; &lt;nil&gt; }
+godef: no declaration found for net.ListenTCP
+</code></pre>
+
+<p>注意到这一句:</p>
+<pre><code>cannot find identifier for package &quot;C&quot;: cannot find package &quot;C&quot; in any of:
+</code></pre>
+
+<p>原来是 net 包里 import C ，然而C并不是一个具体真实存在的包，所以godef无法进行分析，导致找不到定义。</p>
+
+<p>godef的GitHub上作者也发现了同样的问题：<a href="https://github.com/rogpeppe/godef/issues/41">Issue:net.LookupIP fails #41</a></p>
+
+<h2 id="解决方案">解决方案</h2>
+
+<p>在godef的GitHub上看到有人提交了针对这个问题的解决方案：master - Special treatment for &ldquo;C&rdquo; package. #44</p>
+
+<p>根据这个提交，可以尝试使用如下方法解决：</p>
+
+<p>找到并打开godef的 <code>go/parser/parser.go</code> 这个文件</p>
+
+<p>在 1970行 左右添加(代码中+号部分，可以通过搜索定位)：</p>
+<pre><code>if declIdent == nil {
+              filename := p.fset.Position(path.Pos()).Filename
+              name, err := p.pathToName(litToString(path), filepath.Dir(filename))
+ +            if litToString(path) == &quot;C&quot; {
+ +                name = &quot;C&quot;
+ +            }
+              if name == &quot;&quot; {
+                  p.error(path.Pos(), fmt.Sprintf(&quot;cannot find identifier for package %q: %v&quot;, litToString(path), err))
+              } else {
+
+</code></pre>
+
+<p>重新编译godef</p>
+
+<p>如果遇到同样问题的同学不妨试一试以上方式，至少对于我来说，问题得到了解决。也希望作者能尽快修复这个问题。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/26/vscode-godef-problem-with-net.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
                             <span class="day">15</span>
                         </span>
                             </div>
