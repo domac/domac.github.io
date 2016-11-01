@@ -40,7 +40,7 @@
 <section id="main">
     <div class="container">
         <div id="article-list">
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -54,18 +54,7 @@
                                 <a href="/2015/8/24/lock-and-sync.html">lock 和 sync</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>一些复杂的程序中，通常通过不同线程执行不同应用来实现程序的并发。当不同线程要使用同一个变量时，经常会出现一个问题：无法预知变量被不同线程修改的顺序！(这通常被称为资源竞争,指不同线程对同一变量使用的竞争)显然这无法让人容忍，那我们该如何解决这个问题呢？</p>
-
-<p>经典的做法是一次只能让一个线程对共享变量进行操作。当变量被一个线程改变时(临界区)，我们为它上锁，直到这个线程执行完成并解锁后，其他线程才能访问它。</p>
-
-<p>特别是我们之前章节学习的 map 类型是不存在锁的机制来实现这种效果(出于对性能的考虑),所以 map 类型是非线程安全的.当并行访问一个共享的 map 类型的数据，map 数据将会出错。</p>
-
-<p>在 Go 语言中这种锁的机制是通过 sync 包中 Mutex 来实现的。sync 来源于 &ldquo;synchronized&rdquo; 一词，这意味着线程将有序的对同一变量进行访问。</p>
-
-<p><code>sync.Mutex</code> 是一个互斥锁，它的作用是守护在临界区入口来确保同一时间只能有一个线程进入临界区。</p>
-
-<p>假设 info 是一个需要上锁的放在共享内存中的变量。通过包含 <code>Mutex</code> 来实现的一个典型例子如下：</p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2015/8/24/lock-and-sync.html">继续阅读</a>
                         </aside>
@@ -73,7 +62,7 @@
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -87,22 +76,7 @@
                                 <a href="/2015/8/23/understand-tcp-resend.html">关于TCP重连</a>
                             </h5>
                         </header>
-                        <section class="brief"><h3 id="基础概念">基础概念</h3>
-
-<p><code>TCP可靠性</code>的一个保证机制就是<code>超时重传</code>，而超时重传的核心是重传超时时间的计算。我们分享自己的理解，分两部分：上部分侧重RFC解读，下部分侧重linux实现。</p>
-
-<p>本端发送一个数据包给对端，然后对端返回一个ack。这样，本端就能计算出这个包来回所需的时间，这个时间就是RTT（Round-TripTime），很简单，就是一个时间差。具体讲，它由三部分组成：链路层的传播时间、端点协议栈的处理时间、中间设备的处理时间（如路由器缓存）。主要时间应该耗在中间设备的中转，可见，RTT一定程度上体现了网络的拥塞程度。</p>
-
-<p>重传超时时间RTO（Retransmission TimeOut）是基于RTT（而RTT是动态变化的，所以RTO也得动态调整）计算出的一个定时器超时时间。它的作用就是在发送一个数据包之后，开始计时，如果超时时这个数据包还没有被ack，表明传输中出现问题了则进入超时处理流程（就是重传流程）。</p>
-
-<p>这里插入一点方法论。有些人看网络协议部分的代码时迷糊，其实就是由于没有参考RFC。所以我们是先讲RFC，再看代码。</p>
-
-<p>相关RFC解读</p>
-
-<p>RTO相关的RFC，目前以RFC6298（2011年发布，废弃RFC2988，更新RFC1122）为准。虽然它本身仅仅是追加了一个小需求：将初始化RTO从3秒改为1秒，但是内容上还是完整呈现了RTO相关流程。</p>
-
-<p>以下是我们（计算机学习微信公众号：jsj_xx）对RFC6298的总结和理解：</p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2015/8/23/understand-tcp-resend.html">继续阅读</a>
                         </aside>
@@ -110,7 +84,7 @@
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -124,153 +98,7 @@
                                 <a href="/2015/5/3/set-my-ss.html">Shadowsocks安装与环境设置</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>Shadowsocks安装与环境设置</p>
-
-<blockquote>
-<p>Shadowsocks是我们常用的代理工具，它使用socks5协议，而终端很多工具目前只支持http和https等协议, 正因为如此,我们在
-使用shadowsocks的时候,最为开发人员的我们,需要让我们的终端也支持翻墙功能.</p>
-</blockquote>
-
-<p>对于shadowsocks的服务,可以自己搭建shadowsocks server 或者 购买网上的服务, 服务正常启动后,我们先配置我们的开发环境.</p>
-
-<h3 id="mac-端环境配置">Mac 端环境配置</h3>
-
-<p>我目前使用的是Mac OSX 10.11, 所以需要在Mac下安装 <code>polipo</code></p>
-<pre><code>$ brew install polipo
-</code></pre>
-
-<p>然后创建配置文件 <code>~/Library/LaunchAgents/homebrew.mxcl.polipo.plist</code> 如下</p>
-<pre><code class="language-html">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
-&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;
-&lt;plist version=&quot;1.0&quot;&gt;
-  &lt;dict&gt;
-    &lt;key&gt;Label&lt;/key&gt;
-    &lt;string&gt;homebrew.mxcl.polipo&lt;/string&gt;
-    &lt;key&gt;RunAtLoad&lt;/key&gt;
-    &lt;true/&gt;
-    &lt;key&gt;KeepAlive&lt;/key&gt;
-    &lt;true/&gt;
-    &lt;key&gt;ProgramArguments&lt;/key&gt;
-    &lt;array&gt;
-      &lt;string&gt;/usr/local/opt/polipo/bin/polipo&lt;/string&gt;
-      &lt;string&gt;socksParentProxy=localhost:1080&lt;/string&gt;
-    &lt;/array&gt;
-    &lt;!-- Set `ulimit -n 20480`. The default OS X limit is 256, that's
-        not enough for Polipo (displays 'too many files open' errors).
-        It seems like you have no reason to lower this limit
-        (and unlikely will want to raise it). --&gt;
-    &lt;key&gt;SoftResourceLimits&lt;/key&gt;
-    &lt;dict&gt;
-      &lt;key&gt;NumberOfFiles&lt;/key&gt;
-      &lt;integer&gt;20480&lt;/integer&gt;
-    &lt;/dict&gt;
-  &lt;/dict&gt;
-&lt;/plist&gt;
-</code></pre>
-
-<p>文件保存后, 我们需要载入它,以便服务能随着机器重启时自启动</p>
-<pre><code>launchctl load ~/Library/LaunchAgents/homebrew.mxcl.polipo.plist
-</code></pre>
-
-<p>好了, 这时,我们的终端还不能使用ss的, 我们需要再进行一些环境变量的配置</p>
-<pre><code>$ export https_proxy=http://localhost:8123
-
-$ export http_proxy=http://localhost:8123
-</code></pre>
-
-<p>ok, 我们在终端上运行命令</p>
-<pre><code class="language-sh">$ curl ip.gs
-
-当前 IP：xx.xx.xx.xx 来自：中国香港 xxx.net
-</code></pre>
-
-<p>或</p>
-<pre><code class="language-sh">curl -i --verbose https://www.facebook.com
-</code></pre>
-
-<p>如果能正常返回&rdquo;内容&rdquo;, 则证明我们终端的协议转换成功,能正常使用了</p>
-
-<h3 id="linux-端环境配置">Linux 端环境配置</h3>
-
-<p>由于大部分开发者会在自己的mac上运行虚拟机来部署Linux的操作系统, 所以我们也希望除了Mac终端能翻墙外,我们虚拟机上的Linux
-也能翻墙. 不过一般的方法都是更改网络策略,使用网桥的方式.</p>
-
-<p>我觉得这种方式不够好,甚至影响了虚拟机上的一个依赖网络的服务的功能.所以为了网虚拟机上的linux操作系统也支持shadowsock,我们要
-进行环境安装.</p>
-
-<p>下面我以我的ubuntu为例</p>
-<pre><code>$ apt-get install python-pip
-
-$ pip install shadowsocks
-</code></pre>
-
-<p>成功安装后, 编辑shadowsocks配置文件</p>
-<pre><code>vim /etc/shadowsocks.json
-</code></pre>
-
-<p>填写代理信息：</p>
-<pre><code class="language-json">{
-    &quot;server&quot;:&quot;xxx.xxx.xxx.net&quot;,
-    &quot;server_port&quot;:8388,
-    &quot;local_address&quot;: &quot;127.0.0.1&quot;,
-    &quot;local_port&quot;:1080,
-    &quot;password&quot;:&quot;12345678987654321&quot;,
-    &quot;timeout&quot;:300,
-    &quot;method&quot;:&quot;rc4-md5&quot;,
-    &quot;fast_open&quot;: false
-}
-</code></pre>
-
-<p>设置后,重启shadowsocks</p>
-<pre><code class="language-sh">$ sslocal -c /etc/shadowsocks.json -d stop
-
-$ sslocal -c /etc/shadowsocks.json -d start
-</code></pre>
-
-<p>接下来跟mac一样,安装polipo</p>
-<pre><code class="language-sh">$ sudo apt-get install polipo
-</code></pre>
-
-<p>如下打开配置文件：</p>
-<pre><code class="language-sh">$ sudo vim /etc/polipo/config
-</code></pre>
-
-<p>加入以下内容</p>
-<pre><code>proxy:socksParentProxy = &quot;localhost:1080&quot;
-socksProxyType = socks5
-logFile=/var/log/polipologLevel=4
-</code></pre>
-
-<p>保存后,重启polipo服务  :)</p>
-<pre><code class="language-sh">$ sudo service polipo stop
-
-$ sudo service polipo start
-</code></pre>
-
-<p>然后跟我们的mac一样设置http proxy的环境配置</p>
-<pre><code>$ export https_proxy=http://localhost:8123
-
-$ export http_proxy=http://localhost:8123
-</code></pre>
-
-<p>好了,这是我们可以使用命令验证服务是否正常</p>
-<pre><code class="language-sh">$ curl ip.gs
-
-当前 IP：xx.xx.xx.xx 来自：中国香港 xxx.net
-</code></pre>
-
-<p>或</p>
-<pre><code class="language-sh">curl -i --verbose https://www.facebook.com
-</code></pre>
-
-<h3 id="最后">最后</h3>
-
-<p>如果我们想暂停我们终端的代理服务, 可以重新情况我们的代理环境配置, 如下:</p>
-<pre><code>$ export https_proxy=
-
-$ export http_proxy=
-</code></pre>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2015/5/3/set-my-ss.html">继续阅读</a>
                         </aside>
@@ -278,7 +106,7 @@ $ export http_proxy=
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -292,14 +120,7 @@ $ export http_proxy=
                                 <a href="/2015/4/26/gopher-china-2015.html">上海Gopher China 2015</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>四月参加了上海GopherChina大会, 能与一众大牛与朋友面对面交流十分开心啊, 这里简单记录一下</p>
-
-<p><img src="/media/2016/shgo.jpg" alt="sh_gopher_1" /></p>
-
-<p><img src="/media/2016/gopherchina_02.jpg" alt="sh_gopher_2" /></p>
-
-<p><img src="/media/2016/gopherchina_03.jpg" alt="sh_gopher_3" /></p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2015/4/26/gopher-china-2015.html">继续阅读</a>
                         </aside>

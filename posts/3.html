@@ -40,7 +40,7 @@
 <section id="main">
     <div class="container">
         <div id="article-list">
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -54,10 +54,7 @@
                                 <a href="/2016/7/19/go-book.html">go学习笔记，一本不错的技术资料</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>之前一直看雨痕老师github的pdf版本笔记，最近出了实体书，推荐支持一下</p>
-
-<p><img src="/media/2016/20160719_gobook.jpg" alt="gobook" /></p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/7/19/go-book.html">继续阅读</a>
                         </aside>
@@ -65,7 +62,7 @@
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -79,173 +76,7 @@
                                 <a href="/2016/7/17/using-vulcand.html">Vulcand使用实践</a>
                             </h5>
                         </header>
-                        <section class="brief"><h2 id="背景">背景</h2>
-
-<p>最近一直想通过Etcd的集群配置能力去构建一个应用动态负载均衡的项目，一开始想到的是使用目前广泛使用的Confd+Etcd的方案。
-在学习实践中发现复杂度一点都不低，如果初学者想通过Etcd去做一些工具，我感觉不够简单。</p>
-
-<p>后来，我在etcd的官网了解了一个同样基于Etcd的开源工具 <strong><code>Vulcand</code></strong> 。作为一个专用的工具，它的使用比Confd更加简单。</p>
-
-<p>进步一说，Vulcand还能为我们的服务提供<code>零停机</code>的web更新。</p>
-
-<h2 id="vulcand-是什么">Vulcand 是什么</h2>
-
-<blockquote>
-<p>想详细了解可以进入官方项目页面 ： <a href="https://github.com/vulcand/vulcand">github.com/vulcand/vulcand</a></p>
-</blockquote>
-
-<p><strong><code>Vulcand</code></strong> 是一个专门为HTTP API管理与微服务而开发的 <code>反向代理</code> 服务， 它底层基于 Netflix 的 <a href="https://github.com/Netflix/Hystrix">Hystrix</a></p>
-
-<p>它的功能特性分别为：</p>
-
-<ul>
-<li>使用Etcd作为配置后端</li>
-<li>提供API和命令行的交互方式</li>
-<li>支持插件式的中间件服务</li>
-<li>支持实时监控和弹性部署</li>
-</ul>
-
-<p>功能架构如下图：</p>
-
-<p><img src="/media/2016/20160717_vulcand_base.png" alt="nsq" /></p>
-
-<p><em>TL;DR</em></p>
-
-<h2 id="环境准备">环境准备</h2>
-
-<p>好了，基本了解Vulcand，我们可以创建三个用于模拟应用负载的简单web程序。</p>
-
-<p>这三个web的程序我是基于Gin构建的，因为Gin简单高效，它一直作为我web服务的首选之一。</p>
-
-<blockquote>
-<p>我们用于部署的服务器地址约定为 192.168.139.140</p>
-</blockquote>
-
-<p>以下是源码：</p>
-
-<p>web应用：app-0</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;github.com/gin-gonic/gin&quot;
-)
-
-func main() {
-    r := gin.Default()
-    r.GET(&quot;/&quot;, func(c *gin.Context) {
-        c.String(200, &quot;hello devops 0&quot;)
-    })
-    r.Run(&quot;:8081&quot;)
-}
-
-</code></pre>
-
-<p>web应用：app-1</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;github.com/gin-gonic/gin&quot;
-)
-
-func main() {
-    r := gin.Default()
-    r.GET(&quot;/&quot;, func(c *gin.Context) {
-        c.String(200, &quot;hello devops 1&quot;)
-    })
-    r.Run(&quot;:8082&quot;)
-}
-
-</code></pre>
-
-<p>web应用：app-2</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;github.com/gin-gonic/gin&quot;
-)
-
-func main() {
-    r := gin.Default()
-    r.GET(&quot;/&quot;, func(c *gin.Context) {
-        c.String(200, &quot;hello devops 3&quot;)
-    })
-    r.Run(&quot;:8083&quot;)
-}
-
-</code></pre>
-
-<p>编写完三个web应用代码后，我们分别对它们进行启动</p>
-<pre><code>此时我们可以在浏览器输入 
-
-http://192.168.139.140:8081 
-
-http://192.168.139.140:8082  
-
-http://192.168.139.140:8083 
-
-观察app是否正常启动
-</code></pre>
-
-<p>三个web app 服务都正常启动后，我们接下来就开始最重要的工作了。</p>
-
-<h2 id="vuland搭建">vuland搭建</h2>
-
-<p>为了最大限度降低复杂度，我使用了通过容器构建方式，因为相比源码构建，docker容器构建简单快捷。</p>
-
-<blockquote>
-<p>在搭建vuland前，我们需要确保Etcd服务已经搭建并启动， 关于搭建方式可以参考我之前的文档 ： <a href="http://lihaoquan.me/2016/6/24/learning-etcd-1.html">Etcd环境搭建</a></p>
-</blockquote>
-
-<p>具体步骤 ：</p>
-
-<h4 id="1-下载镜像">1.下载镜像：</h4>
-<pre><code> $ sudo docker pull mailgun/vulcand:v0.8.0-beta.2
-</code></pre>
-
-<h4 id="2-构建容器">2.构建容器</h4>
-<pre><code> $ sudo docker run -p 8182:8182 -p 8181:8181 mailgun/vulcand:v0.8.0-beta.2 /go/bin/vulcand -name vulcand_server -apiInterface=0.0.0.0 -interface=0.0.0.0 --etcd=http://192.168.139.134:2379
-</code></pre>
-
-<h4 id="3-查看日志可以用以下的命令">3.查看日志可以用以下的命令：</h4>
-<pre><code>  $ sudo docker logs $(sudo docker ps -a | grep vulcand | awk '{ print $1 }')
-</code></pre>
-
-<h4 id="4-配置backend">4.配置backend</h4>
-
-<p>配置backend， 我们直接通过etcd的命令工具进行：</p>
-<pre><code> $ etcdctl set /vulcand/backends/b1/backend '{&quot;Type&quot;: &quot;http&quot;}'
-</code></pre>
-
-<h4 id="5-配置app服务">5.配置app服务</h4>
-
-<p>这环境，我们需要把我们之前搭建web app 的相关信息注册到我们的vulcand集群配置中：</p>
-<pre><code> $ etcdctl set /vulcand/backends/b1/servers/srv1 '{&quot;URL&quot;: &quot;http://192.168.139.140:8081&quot;}'
-
- $ etcdctl set /vulcand/backends/b1/servers/srv2 '{&quot;URL&quot;: &quot;http://192.168.139.140:8082&quot;}'
-
- $ etcdctl set /vulcand/backends/b1/servers/srv3 '{&quot;URL&quot;: &quot;http://192.168.139.140:8083&quot;}'
-</code></pre>
-
-<h4 id="6-配置-frontend">6.配置 frontend</h4>
-<pre><code>./etcdctl set /vulcand/frontends/f1/frontend '{&quot;Type&quot;: &quot;http&quot;, &quot;BackendId&quot;: &quot;b1&quot;, &quot;Route&quot;: &quot;Path(`/`)&quot;}'
-</code></pre>
-
-<h2 id="程序测试">程序测试：</h2>
-
-<p>我们可以很直观地使用浏览器进行大量的请求，观察我们的请求是否都被负载分配到每个web应用上</p>
-
-<blockquote>
-<p>或通过命令工具 curl <a href="http://localhost:8181">http://localhost:8181</a></p>
-</blockquote>
-
-<p><img src="/media/2016/2016_vulcand_res1.png" alt="nsq" /></p>
-
-<p><img src="/media/2016/2016_vulcand_res2.png" alt="nsq" /></p>
-
-<p><img src="/media/2016/2016_vulcand_res3.png" alt="nsq" /></p>
-
-<p>至此，一个简单的可运行的例子就搭建起来，当然vulcand的用法远不于这样，我们可以结合官方文档提供更复杂的功能。</p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/7/17/using-vulcand.html">继续阅读</a>
                         </aside>
@@ -253,7 +84,7 @@ http://192.168.139.140:8083
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -267,70 +98,7 @@ http://192.168.139.140:8083
                                 <a href="/2016/7/9/learning-k8s-1.html">k8s学习（一）：基本概念</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>Kubernetes是在群集中管理跨多台主机容器化应用的开源系统。它为容器化应用提供了<code>资源调度</code>、<code>部署</code>、<code>服务发现</code>、<code>扩展</code>等功能。</p>
-
-<p><strong>TL;DR</strong></p>
-
-<h3 id="主要功能用途">主要功能用途：</h3>
-
-<ol>
-<li><p>使用Docker对我们的应用进行打包、实例化和运行。</p></li>
-
-<li><p>以集群的方式运行和管理跨主机的容器。</p></li>
-
-<li><p>解决跨主机容器的通讯问题。</p></li>
-
-<li><p>提供自我修复的功能，保证系统运行的健壮性。</p></li>
-</ol>
-
-<h3 id="核心概念">核心概念</h3>
-
-<p>先看下K8s的架构图</p>
-
-<p><img src="/media/2016/20160709_k8s.png" alt="k8s" /></p>
-
-<p>核心组件：</p>
-
-<ul>
-<li><p>Node</p>
-
-<p>节点是Kubernates系统中的一台工作机器，既从属主机。它可以是物理机，也可以是虚拟机。每一个节点都包含了Pod运行所需的必要服务，例如Docker、kubelet和网络
-代理（proxy），节点受Kubernates系统中的主节点控制。</p>
-
-<p>和Pod、Service不一样，节点本身并不属于Kubernates的概念，它是云平台中的虚拟机或实体机。所以当一个节点加入到Kubernates系统中时，它将会创建一个数据结构
-来记录该节点的信息。另外，不是所有节点都能加入到Kubernates系统中，只有那些通过验证的节点才能成为Kubernates节点。</p>
-
-<p>你可以通过下面的命令获取节点运行情况列表：</p>
-<pre><code>$ kubectl get nodes
-
-NAME          LABELS                               STATUS
-172.19.17.99  kubernetes.io/hostname=172.19.17.99  Ready
-</code></pre></li>
-
-<li><p>Pod</p>
-
-<p>Pod是一组并置的应用容器，这些容器是共享磁盘卷的。</p>
-
-<p>Pod是可以被创建，调度，并与Kubernetes管理最小部署单元。Pod可以单独创建。由于Pods没有受管的生命周期，如果他们进程死掉了，他们将不会重新创建。出于这个原因，建议您使用复制控制器（我们将在后面介绍），即使你创造了单独的Pod。</p>
-
-<p>所有在Pod的应用使用相同的网络命名空间，IP地址及端口空间。他们可以找到并互相使用localhost沟通。每个Pod有一个与跨网络的其他物理计算机和容器充分沟通的扁平网络共享命名空间中的IP地址。</p></li>
-
-<li><p>Service</p>
-
-<p>服务为一组Pod提供单一稳定的名称和地址。他们作为基本负载均衡器而存在。是一系列Pod以及这些Pod的访问策略的抽象。</p>
-
-<p>Pod大多数被设计为长期运行的，但具备时效性，一旦单个进程死亡，Pod也跟着退出。如果Pod退出，复制控制器使用新的Pod替换它。每个Pod都有自己专用的IP地址，这使得容器具有相同的端口，即使他们共享相同的主机。但每次Pod由复制控制器启动，Pod将获取一个新的IP地址。</p></li>
-
-<li><p>Replication Controller</p>
-
-<p>复制控制器管理Pod的生命周期。它们保证指定数量的Pod在任何给定的时间都在运行。他们通过创建或删除Pod做到这一点。出于这个原因，建议您使用复制控制器，即使你创造了单独的Pod。</p></li>
-
-<li><p>Label</p>
-
-<p>Label(标签)是一组附加在对象上的键值对。标签常用来从一组对象中选取符合条件的对象，这也是Kubernates中目前为止最重要的节点分组方法。标签的本质是附属在对象上的非系统属性类的元数据，
-即它不是名字、Id以及对象的硬件属性，而是一些附加的键值对。</p></li>
-</ul>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/7/9/learning-k8s-1.html">继续阅读</a>
                         </aside>
@@ -338,7 +106,7 @@ NAME          LABELS                               STATUS
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -352,42 +120,7 @@ NAME          LABELS                               STATUS
                                 <a href="/2016/6/27/learning-etcd-4.html">etcd学习（四）：服务故障恢复</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>在使用etcd集群的过程中，有时会出现少量主机故障，这时我们需要对集群进行维护。然而，在现实情况下，还可能遇到由于严重的设备
-或网络的故障，导致超过半数的节点无法正常工作。</p>
-
-<p>在etcd集群无法提供正常的服务，我们需要用到一些备份和数据恢复的手段。etcd背后的raft，保证了集群的数据的一致性与稳定性。所以我们对etcd的恢复，更多的是恢复etcd的节点服务，并还原用户数据。</p>
-
-<p>首先，从剩余的正常节点中选择一个正常的成员节点， 使用 <code>etcdctl backup</code> 命令备份etcd数据。</p>
-<pre><code>$ ./etcdctl backup --data-dir /var/lib/etcd -backup-dir /tmp/etcd_backup
-$ tar -zcxf backup.etcd.tar.gz /tmp/etcd_backup
-</code></pre>
-
-<p>这个命令会将节点中的用户数据全部写入到指定的备份目录中，但是节点ID,集群ID等信息将会丢失， 并在恢复到目的节点时被重新。这样主要是防止原先的节点意外重新加入新的节点集群而导致数据混乱。</p>
-
-<p>然后将Etcd数据恢复到新的集群的任意一个节点上， 使用 <code>--force-new-cluster</code> 参数启动Etcd服务。这个参数会重置集群ID和集群的所有成员信息，其中节点的监听地址会被重置为localhost:2379,
-表示集群中只有一个节点。</p>
-<pre><code>$ tar -zxvf backup.etcd.tar.gz -C /var/lib/etcd
-$ etcd --data-dir=/var/lib/etcd --force-new-cluster ...
-</code></pre>
-
-<p>启动完成单节点的etcd,可以先对数据的完整性进行验证， 确认无误后再通过Etcd API修改节点的监听地址，让它监听节点的外部IP地址，为增加其他节点做准备。例如：</p>
-
-<p>用etcd命令找到当前节点的ID。</p>
-<pre><code>$ etcdctl member list 
-
-98f0c6bf64240842: name=cd-2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579
-
-</code></pre>
-
-<p>由于etcdctl不具备修改成员节点参数的功能， 下面的操作要使用API来完成。</p>
-<pre><code>$ curl http://127.0.0.1:2579/v2/members/98f0c6bf64240842 -XPUT \
- -H &quot;Content-Type:application/json&quot; -d '{&quot;peerURLs&quot;:[&quot;http://127.0.0.1:2580&quot;]}'
-</code></pre>
-
-<p>注意，在Etcd文档中， 建议首先将集群恢复到一个临时的目录中，从临时目录启动etcd，验证新的数据正确完整后，停止etcd，在将数据恢复到正常的目录中。</p>
-
-<p>最后，在完成第一个成员节点的启动后，可以通过集群扩展的方法使用 <code>etcdctl member add</code> 命令添加其他成员节点进来。</p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/6/27/learning-etcd-4.html">继续阅读</a>
                         </aside>

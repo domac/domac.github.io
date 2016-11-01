@@ -40,7 +40,7 @@
 <section id="main">
     <div class="container">
         <div id="article-list">
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -54,102 +54,7 @@
                                 <a href="/2016/6/22/about-go-inject.html">关于Go的依赖注入</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>有关依赖注入的概念,大家熟知的可能是Java系的Spring框架: 采用动态、灵活的方式来管理各种对象。
-对象与对象之间的具体实现都是透明的。Spring的依赖注入对调用者和被调用者几乎没有任何要求，完全支持对POJO之间依赖关系的管理。</p>
-
-<p>之前使用Go开发工具的时候，常常有以下的场景</p>
-
-<p>应用通过配置文件或者命令行参数获取属性数据，假如我们有多个“下游”的服务需要被调用，我们如何能动态得去做这些工作，而不是手动地掺杂很多逻辑去获取这些服务调用呢？</p>
-
-<p>解决方法</p>
-
-<p>可以采用 <a href="https://github.com/codegangsta/inject">codegangsta/inject</a>，它能在运行时注入参数，调用方法。比较出名的martini就是用它实现路由的相关功能。</p>
-
-<p>演示例子</p>
-<pre><code class="language-go">
-package main
-
-import (
-    &quot;fmt&quot;
-)
-
-type Demo struct {
-}
-
-type TestObj interface{}
-
-func (d *Demo) Say(name string, version float64, obj TestObj) {
-    fmt.Printf(&quot;Coding with %s, obj is %v, version is %f!\n&quot;, name, obj, version)
-}
-
-func main() {
-    testDemo := new(Demo)
-    testDemo.Say(&quot;Golang&quot;, 10.0, &quot;语言&quot;)
-}
-
-</code></pre>
-
-<p>终端输出 ：</p>
-<pre><code class="language-sh">Coding with Golang, obj is 语言, version is 10.000000!
-</code></pre>
-
-<p>在上面的代码，是一个很常见的方法调用的例子， 基本我们大部分常见都是这种形式的，但想想，因为在go中，func是可以用于传输的，假如我们有一个channel，我们从channel
-中，不断获取不同的func, 这个时候，我们手动的调用func(x,y,z)这种就比较麻烦了，因为有些方法需要两个参数， 有些方法需要三个参数， 有些方法需要更多， 这时候怎么办
-？ 显然，我们需要采用一种运行时动态的手段来“美化”我们的代码。</p>
-
-<p>改进后的例子:</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;fmt&quot;
-    &quot;github.com/codegangsta/inject&quot;
-)
-
-type Demo struct {
-}
-
-type TestObj interface{}
-
-func (d *Demo) Say(name string, version float64, obj TestObj) {
-    fmt.Printf(&quot;Coding with %s, obj is %v, version is %f!\n&quot;, name, obj, version)
-}
-
-func main() {
-    testDemo := new(Demo)
-    inj := inject.New()
-    inj.Map(&quot;Golang&quot;)
-    inj.MapTo(&quot;语言&quot;, (*TestObj)(nil))
-    inj.Map(10.0)
-    f := testDemo.Say
-    inj.Invoke(f)
-}
-
-</code></pre>
-
-<p>终端输出 ：</p>
-<pre><code class="language-sh">Coding with Golang, obj is 语言, version is 10.000000!
-</code></pre>
-
-<p>通过这种方式，上游根本不需要知道下游的服务的方法细节，只需要把准备好的属性注册到injector中去就行了。</p>
-
-<p>injecter中提供了几个重要的方法：</p>
-
-<ul>
-<li><p>Map</p></li>
-
-<li><p>MapTo</p></li>
-
-<li><p>SetParent</p></li>
-</ul>
-
-<p><code>Map</code>和<code>MapTo</code>方法都用于注入参数，保存于<code>injector</code>的成员<code>values</code>中。这两个方法的功能完全相同，唯一的区别就是<code>Map</code>方法用参数值本身的类型当键，而<code>MapTo</code>方法有一个额外的参数可以指定特定的类型当键。</p>
-
-<p>为什么需要有<code>MapTo</code>方法？因为注入的参数是存储在一个以类型为键的map中，可想而知，当一个函数中有一个以上的参数的类型是一样时，后执行Map进行注入的参数将会覆盖前一个通过Map注入的参数。</p>
-
-<p><code>SetParent</code>方法用于给某个Injector指定父Injector。Get方法通过reflect.Type从injector的values成员中取出对应的值，它可能会检查是否设置了parent，直到找到或返回无效的值，最后Get方法的返回值会经过IsValid方法的校验。</p>
-
-<p>如果想更深入了解注入的实战用法，可以查看<a href="http://github.com/codegangsta/martini">martini</a>的源码</p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/6/22/about-go-inject.html">继续阅读</a>
                         </aside>
@@ -157,7 +62,7 @@ func main() {
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -171,62 +76,7 @@ func main() {
                                 <a href="/2016/6/20/using-nsq.html">NSQ使用总结</a>
                             </h5>
                         </header>
-                        <section class="brief"><blockquote>
-<p>最近, 由于需要使用NSQ作为队列的支撑工作, 于是对NSQ进行了相关的研究与源码的阅读.</p>
-
-<p>以下是本人使用过程中对NSQ的一些认知与实践总结</p>
-</blockquote>
-
-<h3 id="1-nsq基础">1. NSQ基础</h3>
-
-<p>NSQ是一个基于Go语言的分布式实时消息平台。</p>
-
-<p>NSQ可用于大规模系统中的实时消息服务，并且每天能够处理数亿级别的消息，其设计目标是为在分布式环境下运行的去中心化服务提供一个强大的基础架构。NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故障、故障容错、高可用性以及能够保证消息的可靠传递的特征。NSQ非常容易配置和部署，且具有最大的灵活性，支持众多消息协议。</p>
-
-<h4 id="1-1-nsq工具组件主要包含">1.1 NSQ工具组件主要包含:</h4>
-
-<blockquote>
-<p>nsqd：一个负责接收、排队、转发消息到客户端的守护进程</p>
-
-<p>nsqlookupd：管理拓扑信息并提供最终一致性的发现服务的守护进程</p>
-
-<p>nsqadmin：一套Web用户界面，可实时查看集群的统计数据和执行各种各样的管理任务</p>
-</blockquote>
-
-<h4 id="1-2-核心概念">1.2 核心概念</h4>
-
-<blockquote>
-<p>topic: topic是nsq的消息发布的逻辑<code>关键词</code>。当程序初次发布带topic的消息时,如果topic不存在,则会被创建。</p>
-
-<p>channels: 当生产者每次发布消息的时候,消息会采用多播的方式被拷贝到各个channel中,channel起到队列的作用。</p>
-
-<p>messages: 数据流的形式。</p>
-</blockquote>
-
-<h4 id="1-3-消息的生命周期">1.3 消息的生命周期</h4>
-
-<p>NSQ提倡co-locating的部署方式, 也就是生产者与nsqd尽量在同一个实例环境中。生产者不需要负责发现其他的nsqd实例, 它们只管往自己的nsqd中投放消息。</p>
-
-<p>具体的流程方式为:</p>
-
-<ol>
-<li><p>生产者往本地的nsqd中发送消息.这个过程会开启一个连接, 并发送一个带有topic和消息体的PUB的命令到nsqd中. 我们假如是发送一个events的topic</p></li>
-
-<li><p>events topic 会对消息进行copy,并多路发送到各个channel中, 我们假设有三个channel, 那么这个流程会如下图描述所示:</p>
-
-<p><img src="/media/20160620_nsq.png" alt="nsq" /></p></li>
-
-<li><p>在channel中的每条消息会被放进队列中, 直到消息被worker所消费掉, 如果队列占用的内存超出限制, 消息会被写进硬盘</p></li>
-
-<li><p>nsqd节点会首先向nsqlookd节点广播它的位置信息, 一旦这些信息被nsqlookupd注册上, workers就会发现这些nsqd节点,包括这些节点的events topic</p></li>
-
-<li><p>相关过程如下图</p>
-
-<p><img src="/media/20160620_nsq-lookups.png" alt="nsqlookup" /></p></li>
-
-<li><p>每个worker会订阅各个nsqd的host信息, 表示它已经准备好消息的接收.</p></li>
-</ol>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/6/20/using-nsq.html">继续阅读</a>
                         </aside>
@@ -234,7 +84,7 @@ func main() {
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -248,78 +98,7 @@ func main() {
                                 <a href="/2016/5/2/about-sysnc-once-in-go.html">关于golang的sync.Once的实现分析</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>sync.once可以控制函数只能被调用一次，不能多次重复调用。</p>
-
-<p>我们可以用下面的代码实现一个线程安全的单例模式</p>
-<pre><code>package singleton
-import (
-    &quot;fmt&quot;
-    &quot;sync&quot;
-)
-type object struct {
-    name string
-}
-var once sync.Once
-var obj *object //单例指针
-//公开方法 外包调用
-func Instance() *object {
-    once.Do(getObj)
-    return obj
-}
-func getObj() {
-    if obj == nil {
-        obj = new(object)
-        //可以做其他初始化事件
-    }
-}
-//单例测试
-func (obj *object) Test() {
-    fmt.Println(obj.name)
-}
-</code></pre>
-
-<p>如果我们要自己实现这么一个功能如何做呢？
-1. 定义一个status变量用来描述是否已经执行过了
-2. 使用sync.Mutex 或者sync.Atomic实现线程安全的获取status状态， 根据状态判断是否执行特定的函数</p>
-
-<p>然后看下sync.Once实际是如何实现的</p>
-<pre><code>// Once is an object that will perform exactly one action.
-type Once struct {
-    m    Mutex
-    done uint32
-}
-//使用了双层检查机制 
-func (o *Once) Do(f func()) {
-    if atomic.LoadUint32(&amp;o.done) == 1 {
-        return
-    }
-    // Slow-path.
-    o.m.Lock()
-    defer o.m.Unlock()
-    //这里需要再次重新判断下，因为 atomic.LoadUint32取出状态值到  o.m.Lock() 之间是有可能存在其它gotoutine改变status的状态值的
-    if o.done == 0 {
-        f()
-        atomic.StoreUint32(&amp;o.done, 1)
-    }
-}
-
-另外一种实现形式
-
-type Once struct {
-    done int32
-}
-func (o *Once) Do(f func()) {
-    if atomic.LoadInt32(&amp;o.done) == 1 {
-        return
-    }
-    // Slow-path.
-    if atomic.CompareAndSwapInt32(&amp;o.done, 0, 1) {
-        f()
-    }
-}
-
-</code></pre>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/5/2/about-sysnc-once-in-go.html">继续阅读</a>
                         </aside>
@@ -327,7 +106,7 @@ func (o *Once) Do(f func()) {
                 </div>
             </article>
             
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -341,173 +120,7 @@ func (o *Once) Do(f func()) {
                                 <a href="/2016/4/18/docker-network.html">Docker网络部分知识点归纳</a>
                             </h5>
                         </header>
-                        <section class="brief"><h3 id="网络工具">网络工具</h3>
-
-<ul>
-<li><p>iptables</p></li>
-
-<li><p>ip addr</p></li>
-
-<li><p>brctl-util</p></li>
-</ul>
-
-<h3 id="docker虚拟网络">Docker虚拟网络</h3>
-
-<p>(1) docker网络虚拟化是基于Linux下的网络命名空间实现的。</p>
-
-<blockquote>
-<p>使用 ip netns 命令我们同样可以创建自己的虚拟网络环境</p>
-</blockquote>
-
-<p>例子：通过ip netns 创建一个名为net0的虚拟网络</p>
-<pre><code>$ ip netns add net0
-$ ip netns list
-$ net0
-</code></pre>
-
-<p>使用ip netns exec 可以为net0网络空间中的网络设备eth0部署ip</p>
-<pre><code>$ ip netns exec net0 ip addr add 172.17.42.99/16 dev eth0
-</code></pre>
-
-<p>(2) 网络设备虚拟化</p>
-
-<p>网卡（网络接口）：一台主机通过ip与其它主机通讯</p>
-
-<p>网络设备：把各个主机连接在一起。</p>
-
-<blockquote>
-<p>这里的设备可以是虚拟设备（网桥、路由器、交换机等）</p>
-
-<p>例如linux的lo回环接口，就是用于快速高效地发送和接收回环数据包。</p>
-</blockquote>
-
-<p>(3) Docker就是利用特殊的虚拟网络接口来连接容器和主机的。</p>
-
-<p>(4) 当我们在主机上启动Docker服务时，Docker引擎会在操作系统内核创建一个docker0的虚拟以太网桥，这个虚拟网桥会把容器组织成一个虚拟子网。</p>
-
-<p>(5) docker0创建虚拟以太网docker0后，会被分配一个主机没有使用的私有化ip和子网掩码</p>
-
-<p>(6) 我们可以使用ip addr 查看wlan0和docker0的信息</p>
-
-<p>(7) Docker容器的网络互联正是依赖linux底层的veth机制，veth总是成对出现的</p>
-
-<p>创建一对veth设备：</p>
-<pre><code>$ ip link A type veth peer name B
-</code></pre>
-
-<p>(8) Docker引擎会在主机上创建一个虚拟的以太网卡接口，并且会将这个veth接口一端放在主机的网络空间，并且连接到docker网桥，另外一端
-放在docker容器的网络空间中</p>
-
-<blockquote>
-<p>容器退出时，虚拟网卡也会被销毁，下次启动将创建一个新的网络接口与docker0重新连接</p>
-
-<p>可以通过ip addr 查看， 然后通过brctl show来验证veth*的设备是否连接在docker0网络上。</p>
-</blockquote>
-
-<p>(9) 网络结构</p>
-
-<p><img src="/media/2016/20160703_dockerjg.png" alt="index" /></p>
-
-<p>(10) Docker支持自定义容器的主机名和DNS配置</p>
-<pre><code> 指定DNS服务器  -- dns=IP_ADDRESS 
-</code></pre>
-
-<p>(11) 容器的访问控制主要通过Linux的iptables防火墙管理和实现的</p>
-<pre><code>检查转发是否打开
-
-$ sudo sysctl net.ipv4.ip_forward
-
-$ net.ipv4.ip_forward = 1
-
-如果为0，要手动打开
-
-</code></pre>
-
-<p>(12) 容器启动时， 使用 --link=CONTAINER_NAME:ALAIS选项，docker会在iptables为两个互联的容器添加
-一条ACCEPT规则， 允许互相开发端口</p>
-
-<p>(13) 除了默认的docker0网桥，用户也可以自定义网桥来连接各个容器</p>
-
-<p>删除旧的网桥</p>
-<pre><code>$ sudo service docker stop
-
-$ sudo ip link set dev docker0 down
-
-$ sudo brctl delbr docker0
-
-</code></pre>
-
-<p>创建新的网桥</p>
-<pre><code>$ sudo brctl addbr docker0
-
-$ sudo ip addr add 192.168.5.1/24 dev docker0
-
-$ sudo ip link set dev docker0 up
-</code></pre>
-
-<p>查看网桥</p>
-<pre><code>$ ip addr show bridge0
-
-</code></pre>
-
-<p>配置服务，默认连接到新的网桥上</p>
-<pre><code>$ echo 'DOCKER_OPTS=&quot;-b=bridge0&quot;' &gt;&gt; /etc/default/docker
-
-$ sudo service docker restart
-</code></pre>
-
-<p>(14) 容器允许的四种网络模式</p>
-
-<ul>
-<li><code>--net=bridge</code></li>
-</ul>
-
-<blockquote>
-<p>bridge模式是Docker默认的网络设置，此模式会为每一个容器分配Network Namespace、设置IP等，并将一个主机上的Docker容器连接到一个虚拟网桥上。</p>
-</blockquote>
-
-<ul>
-<li><code>--net=host</code></li>
-</ul>
-
-<blockquote>
-<p>Docker使用了Linux的Namespaces技术来进行资源隔离，如PID Namespace隔离进程，Mount Namespace隔离文件系统，Network Namespace隔离网络等。一个Network Namespace提供了一份独立的网络环境，包括网卡、路由、Iptable规则等都与其他的Network Namespace隔离。一个Docker容器一般会分配一个独立的Network Namespace。但如果启动容器的时候使用host模式，那么这个容器将不会获得一个独立的Network Namespace，而是和宿主机共用一个Network Namespace。容器将不会虚拟出自己的网卡，配置自己的IP等，而是使用宿主机的IP和端口。</p>
-</blockquote>
-
-<ul>
-<li><code>--net=CONTAINER:NAME_OR_ID</code></li>
-</ul>
-
-<blockquote>
-<p>这个模式指定新创建的容器和已经存在的容器共享一个network namespace。新创建的容器不会创建自己的网卡，配置自己的IP，而是和一个指定的容器共享IP、端口范围等。同样，两个容器除了网络方面，其他的如文件系统、进程列表等还是隔离的。两个容器的进程可以通过lo网卡设备通信</p>
-</blockquote>
-
-<ul>
-<li><code>--net=none</code></li>
-</ul>
-
-<blockquote>
-<p>在这种模式下，Docker容器拥有自己的Network Namespace，但是，并不为Docker容器进行任何网络配置。也就是说，这个Docker容器没有网卡、IP、路由等信息。需要我们自己为Docker容器添加网卡、配置IP等。</p>
-</blockquote>
-
-<p>(15) Linux主机名保存在 /etc/hostname文件中，域名解析服务器IP保存在 /etc/resolv.conf中，host保存在 /etc/host中</p>
-
-<p>(16) DNS配置</p>
-<pre><code> 使用 --dns=IP_ADDRESS可以为新启动的容器配置一个或多个域名配置服务器， 底层会修改 /etc/resolv.conf
-</code></pre>
-
-<p>(17) 容器与容器之间能否进行通信，主要下面2个因素决定</p>
-
-<blockquote>
-<p>1.需要通信的容器的网络接口是否处于同一网络拓扑结构中</p>
-
-<p>2.iptables配置是否允许2个容器之间创建连接</p>
-</blockquote>
-
-<p>(18) 当我们启动容器时，Docker引擎会在主机iptables中创建一条转发链。</p>
-
-<p>如果我们配置了 --ice=true, 这条转发链会使用ACCEPT策略进行配置， 使用--ice=false, 转发链使用DROP策略进行配置。</p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/4/18/docker-network.html">继续阅读</a>
                         </aside>

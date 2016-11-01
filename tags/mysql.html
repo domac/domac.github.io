@@ -41,7 +41,7 @@
     <div class="container">
         <div id="article-list">
             <h2 class="tag text-center">mysql</h2>
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -55,16 +55,7 @@
                                 <a href="/2015/3/25/connect-to-vm-mysql.html">连接mysql失败的问题</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>原因之一，可能是iptables问题：</p>
-
-<p>可以进行相关端口开放设置：</p>
-<pre><code>sudo iptables -I INPUT -s 127.0.0.1 -p tcp --dport 3306 -j ACCEPT
-sudo iptables -I INPUT -s 192.168.1.101 -p tcp --dport 3306 -j ACCEPT
-sudo iptables -nL | grep 3306
-sudo service iptables save
-sudo service iptables restart
-</code></pre>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2015/3/25/connect-to-vm-mysql.html">继续阅读</a>
                         </aside>

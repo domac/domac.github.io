@@ -41,7 +41,7 @@
     <div class="container">
         <div id="article-list">
             <h2 class="tag text-center">http</h2>
-            <article class="article">
+            <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -55,21 +55,7 @@
                                 <a href="/2015/9/1/about-http-timeout.html">http timeout 研究</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>今晚看了有关http connection的超时处理的文章, 针对目前我们直接调用以下代码的时候</p>
-<pre><code class="language-go">resp,fetch_err := http.Get(url)
-</code></pre>
-
-<p>当处于网络延迟或不稳定的情况下,一般会出现长时间的等待, 这样体验就会下降.</p>
-
-<p>于是在网上看了几篇资料, 学习了目前<code>主流</code>的Go Http超时处理办法 :</p>
-
-<blockquote>
-<p><a href="https://gist.github.com/dmichael/5710968">gist 1</a>   by dmichael
-<a href="http://1234n.com/?post/mwsw2r">Go语言http.Get()超时设置</a>   by 达达</p>
-</blockquote>
-
-<p>其中第一篇文章原理是自定义Dial函数 :</p>
-</section>
+                        
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2015/9/1/about-http-timeout.html">继续阅读</a>
                         </aside>
