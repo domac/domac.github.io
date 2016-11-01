@@ -40,6 +40,9 @@
 <section id="main">
     <div class="container">
         <div id="article-list">
+            
+            
+            
             <article class="article" style="margin-bottom: 1em;">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
@@ -54,7 +57,93 @@
                                 <a href="/2016/10/26/vscode-godef-problem-with-net.html">VSCODE中godef无法跳转到定义的问题</a>
                             </h5>
                         </header>
-                        
+                        <section class="brief"><p><a href="原文链接：http://targetliu.com/vscode-can-not-go-to-def/">原文链接：http://targetliu.com/vscode-can-not-go-to-def/</a></p>
+
+<blockquote>
+<p>之前研究GOLANG时一直用LiteIDE，不得不说，LiteIDE的确不错，但是总感觉缺乏美感，是一款很中规中矩的编辑器。网上看到大家对VSCODE评价不错，尝试后发现的确不错，布局简洁、插件化、支持中文，通过VSCODE GO扩展能够很舒服的写GO的代码。</p>
+</blockquote>
+
+<h2 id="问题描述">问题描述</h2>
+
+<p>不过在实际使用过程中发现 net 包无法正常跳转到定义，如下段代码 ResolveTCPAddr就无法正常跳转</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;net&quot;
+)
+
+func main() {
+    _, err := net.ResolveTCPAddr(&quot;tcp&quot;, &quot;:4040&quot;)
+}
+</code></pre>
+
+<p>由于VSCODE GO中跳转到定义使用的是godef，遂通过godef的debug模式查看问题原因：</p>
+<pre><code>godef -debug -f main.go net.ResolveTCPAddr
+</code></pre>
+
+<p>运行结果如下：</p>
+<pre><code>2016/08/02 01:17:30 exprType tuple:false pkg: *ast.SelectorExpr net.ListenTCP [
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.Ident net [
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.ImportSpec &quot;net&quot; [
+2016/08/02 01:17:30 ] -&gt; 0x0, Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;}
+2016/08/02 01:17:30 ] -&gt; 0xc820157860, Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;}
+2016/08/02 01:17:30 member Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;} 'ListenTCP' {
+2016/08/02 01:17:30     /usr/local/go/src/net/cgo_android.go:10:8: cannot find identifier for package &quot;C&quot;: cannot find package &quot;C&quot; in any of:
+    /usr/local/go/src/vendor/C (vendor tree)
+    /usr/local/go/src/C (from $GOROOT)
+    /Users/targetliu/dev/govendor/src/C (from $GOPATH)
+    /Users/targetliu/dev/golang/src/C
+2016/08/02 01:17:30 } -&gt; &lt;nil&gt;
+2016/08/02 01:17:30 ] -&gt; 0x0, Type{bad &quot;&quot; &lt;nil&gt; }
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.SelectorExpr net.ListenTCP [
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.Ident net [
+2016/08/02 01:17:30 exprType tuple:false pkg: *ast.ImportSpec &quot;net&quot; [
+2016/08/02 01:17:30 ] -&gt; 0x0, Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;}
+2016/08/02 01:17:30 ] -&gt; 0xc820157860, Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;}
+2016/08/02 01:17:30 member Type{package &quot;&quot; *ast.ImportSpec &quot;net&quot;} 'ListenTCP' {
+2016/08/02 01:17:30     /usr/local/go/src/net/cgo_android.go:10:8: cannot find identifier for package &quot;C&quot;: cannot find package &quot;C&quot; in any of:
+    /usr/local/go/src/vendor/C (vendor tree)
+    /usr/local/go/src/C (from $GOROOT)
+    /Users/targetliu/dev/govendor/src/C (from $GOPATH)
+    /Users/targetliu/dev/golang/src/C
+2016/08/02 01:17:30 } -&gt; &lt;nil&gt;
+2016/08/02 01:17:30 ] -&gt; 0x0, Type{bad &quot;&quot; &lt;nil&gt; }
+godef: no declaration found for net.ListenTCP
+</code></pre>
+
+<p>注意到这一句:</p>
+<pre><code>cannot find identifier for package &quot;C&quot;: cannot find package &quot;C&quot; in any of:
+</code></pre>
+
+<p>原来是 net 包里 import C ，然而C并不是一个具体真实存在的包，所以godef无法进行分析，导致找不到定义。</p>
+
+<p>godef的GitHub上作者也发现了同样的问题：<a href="https://github.com/rogpeppe/godef/issues/41">Issue:net.LookupIP fails #41</a></p>
+
+<h2 id="解决方案">解决方案</h2>
+
+<p>在godef的GitHub上看到有人提交了针对这个问题的解决方案：master - Special treatment for &ldquo;C&rdquo; package. #44</p>
+
+<p>根据这个提交，可以尝试使用如下方法解决：</p>
+
+<p>找到并打开godef的 <code>go/parser/parser.go</code> 这个文件</p>
+
+<p>在 1970行 左右添加(代码中+号部分，可以通过搜索定位)：</p>
+<pre><code>if declIdent == nil {
+              filename := p.fset.Position(path.Pos()).Filename
+              name, err := p.pathToName(litToString(path), filepath.Dir(filename))
+ +            if litToString(path) == &quot;C&quot; {
+ +                name = &quot;C&quot;
+ +            }
+              if name == &quot;&quot; {
+                  p.error(path.Pos(), fmt.Sprintf(&quot;cannot find identifier for package %q: %v&quot;, litToString(path), err))
+              } else {
+
+</code></pre>
+
+<p>重新编译godef</p>
+
+<p>如果遇到同样问题的同学不妨试一试以上方式，至少对于我来说，问题得到了解决。也希望作者能尽快修复这个问题。</p>
+</section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/10/26/vscode-godef-problem-with-net.html">继续阅读</a>
                         </aside>
@@ -76,7 +165,25 @@
                                 <a href="/2016/10/15/rand-in-go.html">聊聊golang的rand</a>
                             </h5>
                         </header>
-                        
+                        <section class="brief"><p>使用golang生成随机数的时候，官方提供了两种方式，分别是 <code>math/rand</code> 和 <code>crypo/rand</code> ，那么它们两者之间究竟有什么
+不同呢？如果通过它们来生成我们的随机数呢？下面我们一起来聊聊golang的随机数生成方式。</p>
+
+<blockquote>
+<p>什么是随机数<br />
+很多软件和应用都需要随机数，从纸牌游戏中纸牌的分发到 SSL 安全协议中密钥的产生，到处都有随机数的身影。随机数至少具备两个条件：
+数字序列在统计上是随机的
+不能通过已知序列推算后面的序列
+自从计算机诞生起，寻求用计算机产生高质量的随机数序列的研究就一直是研究者长期关注的课题。<br />
+一般情况下，使用计算机程序产生一个真正的随机数是很难的，因为程序的行为是可预测的，计算机利用设计好的算法结合用户提供的种子产生的随机数序列通常是“伪随机数”（pseudo-random number），伪随机数就是我们平时经常使用的“随机数”。伪随机数可以满足一般应用的需求，但是在对于安全要求比较高的环境和领域中存在明显的缺点：<br />
+例如：<br />
+1.伪随机数是周期性的，当它们足够多时，会重复数字序列<br />
+2.如果提供相同的算法和相同的种子值，将会得出完全一样的随机数序列<br />
+3.可以使用逆向工程，猜测算法与种子值，以便推算后面所有的随机数列<br />
+生成随机数是密码学中的一项基本任务，是生成加密密钥、加密算法和加密协议所必不可少的，随机数的质量对安全性至关重要</p>
+</blockquote>
+
+<p>Go 的rand包：<code>math/rand</code> 和 <code>crypo/rand</code>， 前者是一种伪随机数生成方式，后者是真正意义上的随机数生成方式。</p>
+</section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/10/15/rand-in-go.html">继续阅读</a>
                         </aside>
@@ -98,7 +205,10 @@
                                 <a href="/2016/10/2/codis-in-action-2-start-server.html">codis实践（二）：自定义参数与环境方式搭建</a>
                             </h5>
                         </header>
-                        
+                        <section class="brief"><p>上一节， 我们通过运行了一个名称为“codis-test”的codis的demo方案，本节，我们尝试通过官方的相关命令组件，运行自己的自定义环境。</p>
+
+<p>还是跟上一节一样，我这边继续选用etcd作为我的配置管理工具。</p>
+</section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/10/2/codis-in-action-2-start-server.html">继续阅读</a>
                         </aside>
@@ -120,13 +230,31 @@
                                 <a href="/2016/10/2/codis-in-action-1-basic-demo.html">codis实践（一）：基本概念与demo环境搭建</a>
                             </h5>
                         </header>
-                        
+                        <section class="brief"><h2 id="背景">背景</h2>
+
+<p><code>Redis</code> 在 <code>3.0</code> 的时候,推出了一个集群解决方案: redis-cluster. 能让我们通过官方的方式构建我们的redis集群, 但在之前, 我们
+生产环境跑的基本是redis 2.x 版本的实例, 如果需要进行集群管理, 以 唯品会 为例，很多同事采用的方案都是twitter的Twemproxy。</p>
+
+<p><code>Twemproxy</code> 本身是一个静态的分布式方案，进行扩容、缩容的时候对我们devops的要求很高，而且很难得做到平滑的扩容、缩容。而且没有用于集群管理的
+Dashboard，这样十分不便。</p>
+
+<p>为了解决这些痛点，豌豆荚开源了它们的 <code>Codis</code>, 很感谢作者们带来了这么好的工具，不管是使用或者学习CAP相关开发，codis都是很好的参考。
+关于codis的开发历程，可以google搜下 《Codis作者黄东旭细说分布式Redis架构设计和踩过的那些坑们》
+这边文章。 里面作者从CAP三个层次介绍codis的优点。（ps: 作为一名喜欢go开发的人，选择codis也很正常。哈）</p>
+
+<blockquote>
+<p>Codis 官方项目地址 ： <a href="https://github.com/CodisLabs/codis">https://github.com/CodisLabs/codis</a></p>
+</blockquote>
+
+<p>为了更深入学习codis，从本篇博客开始我会陆续陆续一些实践的总结和思路 :)</p>
+</section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/10/2/codis-in-action-1-basic-demo.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
             </article>
+            
             
             <div class="article-pager text-center">
                 
