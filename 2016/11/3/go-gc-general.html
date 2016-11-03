@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>go垃圾回收概要 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="go gc general"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">3</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/11/3/go-gc-general.html">go垃圾回收概要</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                        </aside>
+                        <section class="brief"><p>最近在读雨痕老师的《Go语言学习笔记》关于GC的章节，在这里记录一下相关的知识点</p>
+
+<blockquote>
+<p>补充中 &hellip;</p>
+</blockquote>
+
+<h3 id="go-gc的基本特征">Go GC的基本特征</h3>
+
+<ul>
+<li>非分代</li>
+<li>非紧缩</li>
+<li>写屏障</li>
+<li>并发标记</li>
+</ul>
+
+<h3 id="标记的问题核心">标记的问题核心</h3>
+
+<ul>
+<li>抑制堆增长</li>
+<li>充分利用CPU资源</li>
+</ul>
+<pre><code>某些时候，对象的分配速度可能快于后台标记，所以要想办法做到分配和回收的平衡
+</code></pre>
+
+<p>为了让进程处于良性的状态，Go启动了辅助回收：让用户代码线程参与回收，并通过mallocgc检查垃圾回收触发条件。</p>
+
+<h3 id="标记工作">标记工作</h3>
+
+<p>标记由多个mark worker共同完成；这些mark worker的工作方式有三种：</p>
+
+<ul>
+<li>全力运行</li>
+<li>参与标记任务，但可被抢占和调度</li>
+<li>仅在空闲时参与标记</li>
+</ul>
+<pre><code>处于灰色对象时，无须知道真实大小，只当做内存分配器object块就可以了
+</code></pre>
+
+<p>遍历的依据是： <code>指针类型</code>进行长度对齐+bitmap （这样就可以找出所有引用成员）</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="go-gc-general" data-title="go垃圾回收概要 - domac博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>

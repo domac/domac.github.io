@@ -4,7 +4,13 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my site</description>
     <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Wed, 02 Nov 2016 23:46:25 +0800</pubDate>
+    <pubDate>Thu, 03 Nov 2016 23:40:49 +0800</pubDate>
+    <item>
+      <title>go垃圾回收概要</title>
+      <link>http://lihaoquan.me/2016/11/3/go-gc-general.html</link>
+      <description>&lt;p&gt;最近在读雨痕老师的《Go语言学习笔记》关于GC的章节，在这里记录一下相关的知识点&lt;/p&gt;&#xA;&#xA;&lt;blockquote&gt;&#xA;&lt;p&gt;补充中 &amp;hellip;&lt;/p&gt;&#xA;&lt;/blockquote&gt;&#xA;&#xA;&lt;h3 id=&#34;go-gc的基本特征&#34;&gt;Go GC的基本特征&lt;/h3&gt;&#xA;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;非分代&lt;/li&gt;&#xA;&lt;li&gt;非紧缩&lt;/li&gt;&#xA;&lt;li&gt;写屏障&lt;/li&gt;&#xA;&lt;li&gt;并发标记&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&#xA;&lt;h3 id=&#34;标记的问题核心&#34;&gt;标记的问题核心&lt;/h3&gt;&#xA;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;抑制堆增长&lt;/li&gt;&#xA;&lt;li&gt;充分利用CPU资源&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;pre&gt;&lt;code&gt;某些时候，对象的分配速度可能快于后台标记，所以要想办法做到分配和回收的平衡&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;为了让进程处于良性的状态，Go启动了辅助回收：让用户代码线程参与回收，并通过mallocgc检查垃圾回收触发条件。&lt;/p&gt;&#xA;&#xA;&lt;h3 id=&#34;标记工作&#34;&gt;标记工作&lt;/h3&gt;&#xA;&#xA;&lt;p&gt;标记由多个mark worker共同完成；这些mark worker的工作方式有三种：&lt;/p&gt;&#xA;&#xA;&lt;ul&gt;&#xA;&lt;li&gt;全力运行&lt;/li&gt;&#xA;&lt;li&gt;参与标记任务，但可被抢占和调度&lt;/li&gt;&#xA;&lt;li&gt;仅在空闲时参与标记&lt;/li&gt;&#xA;&lt;/ul&gt;&#xA;&lt;pre&gt;&lt;code&gt;处于灰色对象时，无须知道真实大小，只当做内存分配器object块就可以了&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;遍历的依据是： &lt;code&gt;指针类型&lt;/code&gt;进行长度对齐+bitmap （这样就可以找出所有引用成员）&lt;/p&gt;&#xA;</description>
+      <pubDate>Thu, 03 Nov 2016 23:26:23 +0000</pubDate>
+    </item>
     <item>
       <title>VSCODE中godef无法跳转到定义的问题</title>
       <link>http://lihaoquan.me/2016/10/26/vscode-godef-problem-with-net.html</link>
