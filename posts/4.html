@@ -50,6 +50,194 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">7</span>
+                            <span class="day">17</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/7/17/using-vulcand.html">Vulcand使用实践</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="背景">背景</h2>
+
+<p>最近一直想通过Etcd的集群配置能力去构建一个应用动态负载均衡的项目，一开始想到的是使用目前广泛使用的Confd+Etcd的方案。
+在学习实践中发现复杂度一点都不低，如果初学者想通过Etcd去做一些工具，我感觉不够简单。</p>
+
+<p>后来，我在etcd的官网了解了一个同样基于Etcd的开源工具 <strong><code>Vulcand</code></strong> 。作为一个专用的工具，它的使用比Confd更加简单。</p>
+
+<p>进步一说，Vulcand还能为我们的服务提供<code>零停机</code>的web更新。</p>
+
+<h2 id="vulcand-是什么">Vulcand 是什么</h2>
+
+<blockquote>
+<p>想详细了解可以进入官方项目页面 ： <a href="https://github.com/vulcand/vulcand">github.com/vulcand/vulcand</a></p>
+</blockquote>
+
+<p><strong><code>Vulcand</code></strong> 是一个专门为HTTP API管理与微服务而开发的 <code>反向代理</code> 服务， 它底层基于 Netflix 的 <a href="https://github.com/Netflix/Hystrix">Hystrix</a></p>
+
+<p>它的功能特性分别为：</p>
+
+<ul>
+<li>使用Etcd作为配置后端</li>
+<li>提供API和命令行的交互方式</li>
+<li>支持插件式的中间件服务</li>
+<li>支持实时监控和弹性部署</li>
+</ul>
+
+<p>功能架构如下图：</p>
+
+<p><img src="/media/2016/20160717_vulcand_base.png" alt="nsq" /></p>
+
+<p><em>TL;DR</em></p>
+
+<h2 id="环境准备">环境准备</h2>
+
+<p>好了，基本了解Vulcand，我们可以创建三个用于模拟应用负载的简单web程序。</p>
+
+<p>这三个web的程序我是基于Gin构建的，因为Gin简单高效，它一直作为我web服务的首选之一。</p>
+
+<blockquote>
+<p>我们用于部署的服务器地址约定为 192.168.139.140</p>
+</blockquote>
+
+<p>以下是源码：</p>
+
+<p>web应用：app-0</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;github.com/gin-gonic/gin&quot;
+)
+
+func main() {
+    r := gin.Default()
+    r.GET(&quot;/&quot;, func(c *gin.Context) {
+        c.String(200, &quot;hello devops 0&quot;)
+    })
+    r.Run(&quot;:8081&quot;)
+}
+
+</code></pre>
+
+<p>web应用：app-1</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;github.com/gin-gonic/gin&quot;
+)
+
+func main() {
+    r := gin.Default()
+    r.GET(&quot;/&quot;, func(c *gin.Context) {
+        c.String(200, &quot;hello devops 1&quot;)
+    })
+    r.Run(&quot;:8082&quot;)
+}
+
+</code></pre>
+
+<p>web应用：app-2</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;github.com/gin-gonic/gin&quot;
+)
+
+func main() {
+    r := gin.Default()
+    r.GET(&quot;/&quot;, func(c *gin.Context) {
+        c.String(200, &quot;hello devops 3&quot;)
+    })
+    r.Run(&quot;:8083&quot;)
+}
+
+</code></pre>
+
+<p>编写完三个web应用代码后，我们分别对它们进行启动</p>
+<pre><code>此时我们可以在浏览器输入 
+
+http://192.168.139.140:8081 
+
+http://192.168.139.140:8082  
+
+http://192.168.139.140:8083 
+
+观察app是否正常启动
+</code></pre>
+
+<p>三个web app 服务都正常启动后，我们接下来就开始最重要的工作了。</p>
+
+<h2 id="vuland搭建">vuland搭建</h2>
+
+<p>为了最大限度降低复杂度，我使用了通过容器构建方式，因为相比源码构建，docker容器构建简单快捷。</p>
+
+<blockquote>
+<p>在搭建vuland前，我们需要确保Etcd服务已经搭建并启动， 关于搭建方式可以参考我之前的文档 ： <a href="http://lihaoquan.me/2016/6/24/learning-etcd-1.html">Etcd环境搭建</a></p>
+</blockquote>
+
+<p>具体步骤 ：</p>
+
+<h4 id="1-下载镜像">1.下载镜像：</h4>
+<pre><code> $ sudo docker pull mailgun/vulcand:v0.8.0-beta.2
+</code></pre>
+
+<h4 id="2-构建容器">2.构建容器</h4>
+<pre><code> $ sudo docker run -p 8182:8182 -p 8181:8181 mailgun/vulcand:v0.8.0-beta.2 /go/bin/vulcand -name vulcand_server -apiInterface=0.0.0.0 -interface=0.0.0.0 --etcd=http://192.168.139.134:2379
+</code></pre>
+
+<h4 id="3-查看日志可以用以下的命令">3.查看日志可以用以下的命令：</h4>
+<pre><code>  $ sudo docker logs $(sudo docker ps -a | grep vulcand | awk '{ print $1 }')
+</code></pre>
+
+<h4 id="4-配置backend">4.配置backend</h4>
+
+<p>配置backend， 我们直接通过etcd的命令工具进行：</p>
+<pre><code> $ etcdctl set /vulcand/backends/b1/backend '{&quot;Type&quot;: &quot;http&quot;}'
+</code></pre>
+
+<h4 id="5-配置app服务">5.配置app服务</h4>
+
+<p>这环境，我们需要把我们之前搭建web app 的相关信息注册到我们的vulcand集群配置中：</p>
+<pre><code> $ etcdctl set /vulcand/backends/b1/servers/srv1 '{&quot;URL&quot;: &quot;http://192.168.139.140:8081&quot;}'
+
+ $ etcdctl set /vulcand/backends/b1/servers/srv2 '{&quot;URL&quot;: &quot;http://192.168.139.140:8082&quot;}'
+
+ $ etcdctl set /vulcand/backends/b1/servers/srv3 '{&quot;URL&quot;: &quot;http://192.168.139.140:8083&quot;}'
+</code></pre>
+
+<h4 id="6-配置-frontend">6.配置 frontend</h4>
+<pre><code>./etcdctl set /vulcand/frontends/f1/frontend '{&quot;Type&quot;: &quot;http&quot;, &quot;BackendId&quot;: &quot;b1&quot;, &quot;Route&quot;: &quot;Path(`/`)&quot;}'
+</code></pre>
+
+<h2 id="程序测试">程序测试：</h2>
+
+<p>我们可以很直观地使用浏览器进行大量的请求，观察我们的请求是否都被负载分配到每个web应用上</p>
+
+<blockquote>
+<p>或通过命令工具 curl <a href="http://localhost:8181">http://localhost:8181</a></p>
+</blockquote>
+
+<p><img src="/media/2016/2016_vulcand_res1.png" alt="nsq" /></p>
+
+<p><img src="/media/2016/2016_vulcand_res2.png" alt="nsq" /></p>
+
+<p><img src="/media/2016/2016_vulcand_res3.png" alt="nsq" /></p>
+
+<p>至此，一个简单的可运行的例子就搭建起来，当然vulcand的用法远不于这样，我们可以结合官方文档提供更复杂的功能。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/7/17/using-vulcand.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">7</span>
                             <span class="day">9</span>
                         </span>
                             </div>
@@ -504,116 +692,6 @@ func main() {
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/6/26/learning-etcd-3.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">6</span>
-                            <span class="day">25</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/6/25/learning-etcd-2.html">etcd学习（二）：动态添加、删除节点</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>上一篇: <a href="http://lihaoquan.xyz/2016/6/24/learning-etcd-1.html">etcd学习（一）</a> 我们搭建了一个应用开发测试的etcd&rdquo;伪集群&rdquo;，集群中包含了三个工作节点，它们分别是：</p>
-
-<p>cd0 | 127.0.0.1  | cd0.example.com | 2380 | 2379</p>
-
-<p>cd1 | 127.0.0.1  | cd1.example.com | 2480 | 2479</p>
-
-<p>cd2 | 127.0.0.1  | cd2.example.com | 2580 | 2579</p>
-
-<p>在我们日常的开发中，对etcd集群中添加，删除节点是一种很常见的操作。下面我们演示如何往我们目前的节点中添加新的节点和删除它。</p>
-
-<h3 id="添加节点">添加节点</h3>
-
-<p>我们先约定好这个新的节点信息为：</p>
-
-<p>cd3 | 127.0.0.1  | cd3.example.com | 2180 | 2179</p>
-
-<p>添加前，我们先查看目前的集群信息：</p>
-<pre><code>$ ./etcdctl -peers 127.0.0.1:2379 member list
-</code></pre>
-
-<p>终端输出：</p>
-<pre><code>bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
-98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
-e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
-</code></pre>
-
-<p>好，我们尝试往集群中添加约定的新节点</p>
-<pre><code>$ ./etcdctl member add cd3 http://127.0.0.1:2180
-</code></pre>
-
-<p>终端输出：</p>
-<pre><code>Added member named cd3 with ID ca3e75fab48dd93c to cluster
-
-ETCD_NAME=&quot;cd3&quot;
-ETCD_INITIAL_CLUSTER=&quot;cd2=http://127.0.0.1:2580,cd3=http://127.0.0.1:2180,cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480&quot;
-ETCD_INITIAL_CLUSTER_STATE=&quot;existing&quot;
-</code></pre>
-
-<p>我们再查看下集群当前的信息：</p>
-<pre><code>$ ./etcdctl -peers 127.0.0.1:2379 member list
-</code></pre>
-
-<p>终端输出：</p>
-<pre><code>98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
-bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
-e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
-ca3e75fab48dd93c[unstarted]: peerURLs=http://127.0.0.1:2680
-</code></pre>
-
-<p>从终端的信息中，我们发现我们打算添加的节点处于<code>【unstarted】</code>状态，原因很简单，我们添加后，并没有启动它。</p>
-
-<h3 id="启动节点">启动节点</h3>
-
-<p>我们启动第四个成员节点(记得带上刚刚的创建后获得的环境变量)：</p>
-<pre><code>$ export ETCD_NAME=&quot;cd3&quot;
-$ export ETCD_INITIAL_CLUSTER=&quot;cd2=http://127.0.0.1:2580,cd3=http://127.0.0.1:2180,cd0=http://127.0.0.1:2380,cd1=http://127.0.0.1:2480&quot;
-$ export ETCD_INITIAL_CLUSTER_STATE=existing
-</code></pre>
-
-<p>然后启动名称为cd3的成员</p>
-<pre><code>./etcd --name cd3 --listen-client-urls http://127.0.0.1:2179 \
-  --advertise-client-urls http://127.0.0.1:2179 \
-  --listen-peer-urls http://127.0.0.1:2180 \
-  --initial-advertise-peer-urls http://127.0.0.1:2180 \
-  --initial-cluster-state existing \
-  --initial-cluster cd2=http://127.0.0.1:2580,cd0=http://127.0.0.1:2380,cd3=http://127.0.0.1:2179,cd1=http://127.0.0.1:2480 \
-  --initial-cluster-token etcd-cluster-1
-</code></pre>
-
-<h3 id="删除节点">删除节点</h3>
-
-<p>如果我们需要删除刚刚的节点，可以执行以下命令：</p>
-<pre><code>$ ./etcdctl -peers 127.0.0.1:2379 member remove ca3e75fab48dd93c
-</code></pre>
-
-<p>再次查看集群信息：</p>
-<pre><code>$ ./etcdctl -peers 127.0.0.1:2379 member list
-</code></pre>
-
-<p>终端输出：</p>
-<pre><code>98f0c6bf64240842: name=cd2 peerURLs=http://127.0.0.1:2580 clientURLs=http://127.0.0.1:2579 isLeader=false
-bf9071f4639c75cc: name=cd0 peerURLs=http://127.0.0.1:2380 clientURLs=http://127.0.0.1:2379 isLeader=true
-e3ba87c3b4858ef1: name=cd1 peerURLs=http://127.0.0.1:2480 clientURLs=http://127.0.0.1:2479 isLeader=false
-</code></pre>
-
-<p>这时，节点已经成功删除了</p>
-
-<p>对于异常节点的替换，其实也同理，无非也是删除旧节点，新增新节点，然后启动新节点，etcd会自动同步数据到新的结点。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/25/learning-etcd-2.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

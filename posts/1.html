@@ -50,6 +50,145 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">11</span>
+                            <span class="day">5</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/11/5/golang-byteorder.html">go语言的字节序</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><blockquote>
+<p>最近在看nsq的源码时候，发现它处理message的时候，都会采用字节序进行数据包的处理，于是我觉得有必要深入了解下TCP协议中
+字节序的知识</p>
+</blockquote>
+
+<h2 id="字节序-byte-order">字节序（Byte Order）</h2>
+
+<p>我们一般把字节（byte）看作是数据的最小单位。当然，其实一个字节中还包含8个bit (bit = binary digit)。
+在一个32位的CPU中“字长”为32个bit，也就是4个byte。在这样的CPU中，总是以4字节对齐的方式来读取或写入内存，
+那么同样这4个字节的数据是以什么顺序保存在内存中的呢？我们下面详细探讨一下。</p>
+
+<p>字节序包括：大端序和小端序，为什么要这么麻烦还要分门别类呢？举个例子，255用二进制表达就是1111 1111，再加1就是1 0000 0000，多了一个1出来，显然我们需要再用额外的一个字节来存放这个1，但是这个1要存放在第一个字节还是第二个字节呢？这时候因为人们选择的不同，就出现了大端序和小端序的差异。</p>
+
+<p>而所谓大字节序（big endian），便是指其“最高有效位（most significant byte）”落在低地址上的存储方式。例如像地址a写入0x0A0B0C0D之后，在内存中的数据便是：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/Big-Endian.png" alt="big-end" /></p>
+
+<p>而对于小字节序（little endian）来说就正好相反了，它把“最低有效位（least significant byte）”放在低地址上。例如：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/Little-Endian.png" alt="little-end" /></p>
+
+<p>对于我们常用的CPU架构，如Intel，AMD的CPU使用的都是小字节序，而例如Mac OS以前所使用的Power PC使用的便是大字节序（不过现在Mac OS也使用Intel的CPU了）。</p>
+
+<h2 id="go-处理字节序">Go 处理字节序</h2>
+
+<p>Go中处理大小端序的代码位于 <code>encoding/binary</code> ,包中的全局变量BigEndian用于操作大端序数据，LittleEndian用于操作小端序数据，这两个变量所对应的数据类型都实行了ByteOrder接口：</p>
+<pre><code>type ByteOrder interface {
+    Uint16([]byte) uint16
+    Uint32([]byte) uint32
+    Uint64([]byte) uint64
+    PutUint16([]byte, uint16)
+    PutUint32([]byte, uint32)
+    PutUint64([]byte, uint64)
+    String() string
+}
+</code></pre>
+
+<p>其中，前三个方法用于读取数据，后三个方法用于写入数据。</p>
+
+<p>大家可能会注意到，上面的方法操作的都是无符号整型，如果我们要操作有符号整型的时候怎么办呢？很简单，强制转换就可以了，比如这样：</p>
+<pre><code>func PutInt32(b []byte, v int32) {
+        binary.BigEndian.PutUint32(b, uint32(v))
+}
+</code></pre>
+
+<p>为了深入了解它们，我们先写一个程序观察下go处理大端序和小端序的方式：</p>
+<pre><code>package main
+
+import (
+    &quot;encoding/binary&quot;
+    &quot;fmt&quot;
+    &quot;unsafe&quot;
+)
+
+const INT_SIZE int = int(unsafe.Sizeof(0))
+
+//判断我们系统中的字节序类型
+func systemEdian() {
+    var i int = 0x1
+    bs := (*[INT_SIZE]byte)(unsafe.Pointer(&amp;i))
+    if bs[0] == 0 {
+        fmt.Println(&quot;system edian is little endian&quot;)
+    } else {
+        fmt.Println(&quot;system edian is big endian&quot;)
+    }
+}
+
+func testBigEndian() {
+
+    // 0000 0000 0000 0000   0000 0001 1111 1111
+    var testInt int32 = 256
+    fmt.Printf(&quot;%d use big endian: \n&quot;, testInt)
+    var testBytes []byte = make([]byte, 4)
+    binary.BigEndian.PutUint32(testBytes, uint32(testInt))
+    fmt.Println(&quot;int32 to bytes:&quot;, testBytes)
+
+    convInt := binary.BigEndian.Uint32(testBytes)
+    fmt.Printf(&quot;bytes to int32: %d\n\n&quot;, convInt)
+}
+
+func testLittleEndian() {
+
+    // 0000 0000 0000 0000   0000 0001 1111 1111
+    var testInt int32 = 256
+    fmt.Printf(&quot;%d use little endian: \n&quot;, testInt)
+    var testBytes []byte = make([]byte, 4)
+    binary.LittleEndian.PutUint32(testBytes, uint32(testInt))
+    fmt.Println(&quot;int32 to bytes:&quot;, testBytes)
+
+    convInt := binary.LittleEndian.Uint32(testBytes)
+    fmt.Printf(&quot;bytes to int32: %d\n\n&quot;, convInt)
+}
+
+func main() {
+    systemEdian()
+    fmt.Println(&quot;&quot;)
+    testBigEndian()
+    testLittleEndian()
+}
+
+</code></pre>
+
+<p>执行的结果：</p>
+<pre><code>system edian is big endian
+
+256 use big endian:
+int32 to bytes: [0 0 1 0]
+bytes to int32: 256
+
+256 use little endian:
+int32 to bytes: [0 1 0 0]
+bytes to int32: 256
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<p>为了程序的兼容，我们在开发跨服务器的TCP服务时，每次发送和接受数据都要进行转换，这样做的目的是保证代码在任何计算机上执行时都能达到预期的效果。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/11/5/golang-byteorder.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
                             <span class="day">4</span>
                         </span>
                             </div>
@@ -416,46 +555,6 @@ godef: no declaration found for net.ListenTCP
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/10/26/vscode-godef-problem-with-net.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
-                            <span class="day">15</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/10/15/rand-in-go.html">聊聊golang的rand</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>使用golang生成随机数的时候，官方提供了两种方式，分别是 <code>math/rand</code> 和 <code>crypo/rand</code> ，那么它们两者之间究竟有什么
-不同呢？如果通过它们来生成我们的随机数呢？下面我们一起来聊聊golang的随机数生成方式。</p>
-
-<blockquote>
-<p>什么是随机数<br />
-很多软件和应用都需要随机数，从纸牌游戏中纸牌的分发到 SSL 安全协议中密钥的产生，到处都有随机数的身影。随机数至少具备两个条件：
-数字序列在统计上是随机的
-不能通过已知序列推算后面的序列
-自从计算机诞生起，寻求用计算机产生高质量的随机数序列的研究就一直是研究者长期关注的课题。<br />
-一般情况下，使用计算机程序产生一个真正的随机数是很难的，因为程序的行为是可预测的，计算机利用设计好的算法结合用户提供的种子产生的随机数序列通常是“伪随机数”（pseudo-random number），伪随机数就是我们平时经常使用的“随机数”。伪随机数可以满足一般应用的需求，但是在对于安全要求比较高的环境和领域中存在明显的缺点：<br />
-例如：<br />
-1.伪随机数是周期性的，当它们足够多时，会重复数字序列<br />
-2.如果提供相同的算法和相同的种子值，将会得出完全一样的随机数序列<br />
-3.可以使用逆向工程，猜测算法与种子值，以便推算后面所有的随机数列<br />
-生成随机数是密码学中的一项基本任务，是生成加密密钥、加密算法和加密协议所必不可少的，随机数的质量对安全性至关重要</p>
-</blockquote>
-
-<p>Go 的rand包：<code>math/rand</code> 和 <code>crypo/rand</code>， 前者是一种伪随机数生成方式，后者是真正意义上的随机数生成方式。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/15/rand-in-go.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
