@@ -182,13 +182,40 @@ func main() {
                                 <a href="/2016/11/3/go-gc-general.html">go垃圾回收概要</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>最近在读雨痕老师的《Go语言学习笔记》关于GC的章节，在这里记录一下相关的知识点</p>
-
-<blockquote>
-<p>补充中 &hellip;</p>
+                        <section class="brief"><blockquote>
+<p>垃圾回收器：是一种动态存储分配器，它自动释放程序不再需要的<code>已分配块</code>(垃圾);它可以被视为一个和应用并行的线程，不断更新<code>可达图</code>。</p>
 </blockquote>
 
-<h3 id="go-gc的基本特征">Go GC的基本特征</h3>
+<h3 id="john-mccarthy">John McCarthy</h3>
+
+<p><a href="https://en.wikipedia.org/wiki/John_McCarthy_(computer_scientist)">约翰·麦卡锡</a>
+在1959年前后为了去掉Lisp中的手动回收机制而发明了自动垃圾回收。随着时代的进步，目前很多语言已经支持自动的垃圾回收机制，包括：</p>
+
+<ul>
+<li>Lisp</li>
+<li>Python</li>
+<li>Java</li>
+<li>Perl</li>
+<li>Ruby</li>
+<li>Haskell</li>
+<li><em>Go</em></li>
+</ul>
+
+<h2 id="go-的垃圾回收方式">Go 的垃圾回收方式</h2>
+
+<p>Go1.5开始采用三色-标记-清除的垃圾回收方式进行GC处理 (<em>三色标记的目的，主要是用于做增量的垃圾回收</em>)</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/Animation_of_tri-color_garbage_collection.gif" alt="3ms" /></p>
+
+<p>标记清除算法把存储器视为<code>可达图</code>, 可达图中的根节点对应于不在堆的位置，这些位置包括：</p>
+
+<ul>
+<li>寄存器</li>
+<li>栈</li>
+<li>虚拟机存储器中读写数据区域内的全局变量</li>
+</ul>
+
+<h2 id="go-gc的基本特征">Go GC的基本特征</h2>
 
 <ul>
 <li>非分代</li>
@@ -197,7 +224,35 @@ func main() {
 <li>并发标记</li>
 </ul>
 
-<h3 id="标记的问题核心">标记的问题核心</h3>
+<p>go采用三色标记和写屏障：</p>
+
+<ul>
+<li>起初所有的对象都是白色</li>
+<li>扫描找出所有可达对象，标记为灰色，放入待处理队列</li>
+<li>从队列提取灰色对象，将其引用对象标记为灰色放入队列</li>
+<li>写屏障监视对象的内存修改，重新标色或放回队列</li>
+</ul>
+
+<blockquote>
+<p>关于go的写屏障(write barrier)，可以阅读最近一篇比较热的文章《<a href="https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md">Proposal: Eliminate STW stack re-scanning</a>》。
+作者主要介绍下个版本Go为了消除STW所做的一些改进，包括写屏障的优化方式。</p>
+</blockquote>
+
+<p>并发的三色标记算法是一个经典算法，通过write barrier，维护&rdquo;黑色对象不能引用白色对象&rdquo;这条约束，就可以保证程序的正确性。Go1.5会在标记阶段开启write barrier。在这个阶段里，如果用户代码想要执行操作，修改一个黑色对象去引用白色对象，则write barrier代码直接将该白色对象置为灰色。去读源代码实现的时候，有一个很小的细节：原版的算法中只是黑色引用白色则需要将白色标记，而Go1.5实现中是不管黑色/灰色/白色对象，只要引用了白色对象，就将这个白色对象标记。这么做的原因是，Go的标记位图跟对象本身的内存是在不同的地方，无法原子性地进行修改，而采用一些线程同步的实现代价又较高，所以这里的算法做过一些变种的处理。</p>
+
+<h3 id="go回收的几个阶段">go回收的几个阶段</h3>
+
+<ul>
+<li>GCoff 垃圾回收关闭状态</li>
+<li>GCscan 扫描阶段</li>
+<li>GCmark 标记阶段，write barrier生效</li>
+<li>GCmarktermination 标记结束阶段，STW，分配黑色对象</li>
+<li>GCsweep 清扫阶段</li>
+</ul>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/gc.png" alt="gc" /></p>
+
+<h2 id="标记核心">标记核心</h2>
 
 <ul>
 <li>抑制堆增长</li>
@@ -206,11 +261,22 @@ func main() {
 <pre><code>某些时候，对象的分配速度可能快于后台标记，所以要想办法做到分配和回收的平衡
 </code></pre>
 
-<p>为了让进程处于良性的状态，Go启动了辅助回收：让用户代码线程参与回收，并通过mallocgc检查垃圾回收触发条件。</p>
+<p>Go1.5的设计目标是，尽量缩短STW(stop the world)的时间，提高应用程序的实时性。不stop the world，意味着垃圾回收过程将和用户代码同时运行
+为了让进程处于良性的状态，Go启动了辅助回收：让用户代码线程参与回收，并通过mallocgc检查垃圾回收触发条件。</p>
 
-<h3 id="标记工作">标记工作</h3>
+<h2 id="gc控制器">GC控制器</h2>
 
-<p>标记由多个mark worker共同完成；这些mark worker的工作方式有三种：</p>
+<p>go的回收控制器可以参考mgc.go的代码实现。所谓控制器就是全程参与并发回收任务，记录相关状态数据。<br />
+为了平衡cpu的资源占用，go采用的是动态调整策略，它把工作具体划分为以下的过程：</p>
+
+<ul>
+<li>初始化：重点设置 <code>gcpercent</code> 和 <code>next_gc</code></li>
+<li>启动：mallocgc会在启动前检查垃圾回收的触发条件</li>
+<li>扫描/标记： 交由MarkWorker去完成</li>
+<li>清理</li>
+</ul>
+
+<p>标记由多个MarkWorker共同完成；这些mark worker的工作方式有三种：</p>
 
 <ul>
 <li>全力运行</li>
@@ -220,7 +286,22 @@ func main() {
 <pre><code>处于灰色对象时，无须知道真实大小，只当做内存分配器object块就可以了
 </code></pre>
 
-<p>遍历的依据是： <code>指针类型</code>进行长度对齐+bitmap （这样就可以找出所有引用成员）</p>
+<p>C语言的标记清除手机去必须是保守的，其根本原因是C语言不会用类型信息来标记存储位置， 例如：<br />
+- 像int或者float这样的标量可以伪装成指针
+- 没有办法判断这个数据是int而不是指针</p>
+
+<p>所以C里面必须使用保守的方式来把对象标记为可达。<br />
+而Go标记可达的工作方式是 <code>指针类型</code>进行长度对齐+bitmap （这样就可以找出所有引用成员）。</p>
+
+<p>使用bitmap的目的是为了让copy-on-write兼容，达到快速清除。因为GC中标记清除在使用过程中会逐渐产生细化的分块，不久后，会导致无数的小分块散布在堆的各处。
+也就是我们常说的碎片化， 为了降低碎片，Go使用了bitmap作为辅助。</p>
+
+<h2 id="资料">资料</h2>
+
+<ul>
+<li><a href="https://www.youtube.com/watch?v=KuSBYub2PQ0&amp;list=PLYBisXH43xCHnxYON_Xa1XdvqfX8fk2EM">Golang GC Prioritizing Low Latency and Simplicity - Rick Hudson</a> (youtube)</li>
+<li><a href="http://www.zenlife.tk/go-gc1.5.md">Go1.5的垃圾回收</a></li>
+</ul>
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/11/3/go-gc-general.html">继续阅读</a>
