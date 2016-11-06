@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>snappy试玩 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="google snappy"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">6</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/11/6/google-snappy.html">snappy试玩</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                        </aside>
+                        <section class="brief"><h2 id="背景">背景</h2>
+
+<p>今天在看nsq源码的时候，发现client_v2.go里面有一段代码引起了我的注意</p>
+<pre><code class="language-go">func (c *clientV2) UpgradeSnappy() error {
+
+    c.Reader = bufio.NewReaderSize(snappystream.NewReader(conn, snappystream.SkipVerifyChecksum), defaultBufferSize)
+    c.Writer = bufio.NewWriterSize(snappystream.NewWriter(conn), c.OutputBufferSize)
+
+    ...
+}
+</code></pre>
+
+<p>我大概知道它是用于对我的数据在传输前进行压缩的，我之前了解过<a href="http://lz4.github.io/lz4/">LZ4</a>,
+但，snappy我了解甚少，于是我顺着snappystream，找到了一个库 <a href="https://github.com/mreiferson/go-snappystream">go-snappystream</a></p>
+
+<p>里面是这样定义的：</p>
+<pre><code>This package wraps snappy-go and supplies a Reader and Writer for the snappy framed stream format.
+</code></pre>
+
+<p>这个库是nsq的作者mreiferson基于google的snappy进行封装的工具。</p>
+
+<h2 id="snappy-介绍">Snappy 介绍</h2>
+
+<p>Snappy（以前称Zippy）是Google基于<a href="https://zh.wikipedia.org/wiki/LZ77%E4%B8%8ELZ78">LZ77</a>
+的思路用C++语言编写的快速数据压缩与解压程序库，并在2011年开源。它的目标并非最大压缩率或与其他压缩程序库的兼容性，
+而是非常高的速度和合理的压缩率。使用一个运行在64位模式下的酷睿i7处理器的单个核心，
+压缩速度250 MB/s，解压速度500 MB/s。压缩率比gzip低20-100%</p>
+
+<p>Snappy广泛应用在Google的项目，例如BigTable、MapReduce和Google内部RPC系统的压缩数据。
+它可在开源项目中使用，例如Cassandra、Hadoop、LevelDB、MongoDB、RocksDB和Lucene。
+解压缩时会检测压缩流中是否存在错误。Snappy不使用内联汇编并且可移植。</p>
+
+<p>Snappy是一个C++的库，你可以在产品中使用，不过也有一些其他语言的版本，例如Haskell、Java、Perl、Python和Ruby。</p>
+
+<p>golang版snappy可以查看<a href="https://github.com/golang/snappy">这里</a></p>
+
+<h2 id="使用">使用</h2>
+
+<p>先看第一个例子，我们采用snappy+gob来处理我们的文件</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;encoding/gob&quot;
+    &quot;fmt&quot;
+    &quot;github.com/mreiferson/go-snappystream&quot;
+    &quot;os&quot;
+)
+
+type FileCompress struct {
+    Classifier interface{}
+}
+
+func (t *FileCompress) SaveFile(filename string) error {
+    fi, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer fi.Close()
+
+    fs := snappystream.NewBufferedWriter(fi)
+    encoder := gob.NewEncoder(fs)
+    err = encoder.Encode(t.Classifier)
+    if err != nil {
+        return err
+    }
+    err = fs.Close()
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
+func main() {
+    obj := FileCompress{Classifier: &quot;it works&quot;}
+    err := obj.SaveFile(&quot;test.sz&quot;)
+    if err != nil {
+        fmt.Println(err)
+    }
+}
+
+</code></pre>
+
+<p>第二个例子，我们写一个命令交互的工具，它介绍我们的输入并进行snappy处理</p>
+<pre><code class="language-go">package main
+
+import snap &quot;github.com/mreiferson/go-snappystream&quot;
+import &quot;os&quot;
+import &quot;io&quot;
+import &quot;flag&quot;
+
+type Options struct {
+    Encode bool
+    Decode bool
+}
+
+func check(err error) {
+    if err != nil {
+        panic(err)
+    }
+}
+
+var en = flag.Bool(&quot;encode&quot;, false, &quot;encode stdin (the default)&quot;)
+var de = flag.Bool(&quot;decode&quot;, false, &quot;decode stdin&quot;)
+
+func main() {
+    flag.Parse()
+    opts := &amp;Options{
+        Decode: *en,
+        Encode: *de,
+    }
+
+    if opts.Decode {
+        decode()
+    } else {
+        encode()
+    }
+}
+
+func encode() {
+    _, err := io.Copy(snap.NewWriter(os.Stdout), os.Stdin)
+    check(err)
+}
+
+func decode() {
+    _, err := io.Copy(os.Stdout, snap.NewReader(os.Stdin, snap.VerifyChecksum))
+    check(err)
+}
+
+</code></pre>
+
+<p>我们可以再终端输入命令进行使用</p>
+<pre><code>go run snap.go &lt; test.txt | go run snap.go --decode
+</code></pre>
+
+<p>总的来说，snappy对比其它压缩算法的工具，具备以下的特定：</p>
+
+<ul>
+<li>快</li>
+<li>稳定</li>
+<li>鲁棒性强</li>
+<li>开源</li>
+</ul>
+
+<p>下面附加一份我机器上用go-snappy的一个基准测试报告，仅供参考</p>
+<pre><code>BenchmarkWordsDecode1e1-4       50000000            25.6 ns/op   390.89 MB/s
+BenchmarkWordsDecode1e2-4       20000000            96.5 ns/op  1036.03 MB/s
+BenchmarkWordsDecode1e3-4        2000000           822 ns/op    1216.36 MB/s
+BenchmarkWordsDecode1e4-4         200000          9008 ns/op    1110.06 MB/s
+BenchmarkWordsDecode1e5-4          10000        205258 ns/op     487.19 MB/s
+BenchmarkWordsDecode1e6-4           1000       1644589 ns/op     608.05 MB/s
+BenchmarkWordsEncode1e1-4       100000000           21.5 ns/op   465.78 MB/s
+BenchmarkWordsEncode1e2-4       10000000           217 ns/op     459.67 MB/s
+BenchmarkWordsEncode1e3-4        1000000          2038 ns/op     490.50 MB/s
+BenchmarkWordsEncode1e4-4          50000         29909 ns/op     334.35 MB/s
+BenchmarkWordsEncode1e5-4           5000        355186 ns/op     281.54 MB/s
+BenchmarkWordsEncode1e6-4            500       3387786 ns/op     295.18 MB/s
+BenchmarkRandomEncode-4            10000        107681 ns/op    9737.75 MB/s
+BenchmarkExtendMatch-4            200000         10816 ns/op
+PASS
+</code></pre>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="google-snappy" data-title="snappy试玩 - domac博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
