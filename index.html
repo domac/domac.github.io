@@ -140,7 +140,7 @@ func main() {
 
 </code></pre>
 
-<p>第二个例子，我们写一个命令交互的工具，它介绍我们的输入并进行snappy处理</p>
+<p>第二个例子 ，我们写一个命令交互的工具 snappy2.go，它介绍我们的输入并进行snappy处理</p>
 <pre><code class="language-go">package main
 
 import snap &quot;github.com/mreiferson/go-snappystream&quot;
@@ -189,7 +189,7 @@ func decode() {
 </code></pre>
 
 <p>我们可以再终端输入命令进行使用</p>
-<pre><code>go run snap.go &lt; test.txt | go run snap.go --decode
+<pre><code>go run snappy2.go &lt; test.txt | go run snappy2.go --decode
 </code></pre>
 
 <p>总的来说，snappy对比其它压缩算法的工具，具备以下的特定：</p>
