@@ -49,6 +49,45 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">10</span>
+                            <span class="day">2</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/10/2/codis-in-action-1-basic-demo.html">codis实践（一）：基本概念与demo环境搭建</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="背景">背景</h2>
+
+<p><code>Redis</code> 在 <code>3.0</code> 的时候,推出了一个集群解决方案: redis-cluster. 能让我们通过官方的方式构建我们的redis集群, 但在之前, 我们
+生产环境跑的基本是redis 2.x 版本的实例, 如果需要进行集群管理, 以 唯品会 为例，很多同事采用的方案都是twitter的Twemproxy。</p>
+
+<p><code>Twemproxy</code> 本身是一个静态的分布式方案，进行扩容、缩容的时候对我们devops的要求很高，而且很难得做到平滑的扩容、缩容。而且没有用于集群管理的
+Dashboard，这样十分不便。</p>
+
+<p>为了解决这些痛点，豌豆荚开源了它们的 <code>Codis</code>, 很感谢作者们带来了这么好的工具，不管是使用或者学习CAP相关开发，codis都是很好的参考。
+关于codis的开发历程，可以google搜下 《Codis作者黄东旭细说分布式Redis架构设计和踩过的那些坑们》
+这边文章。 里面作者从CAP三个层次介绍codis的优点。（ps: 作为一名喜欢go开发的人，选择codis也很正常。哈）</p>
+
+<blockquote>
+<p>Codis 官方项目地址 ： <a href="https://github.com/CodisLabs/codis">https://github.com/CodisLabs/codis</a></p>
+</blockquote>
+
+<p>为了更深入学习codis，从本篇博客开始我会陆续陆续一些实践的总结和思路 :)</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/2/codis-in-action-1-basic-demo.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">8</span>
                             <span class="day">29</span>
                         </span>
@@ -245,36 +284,6 @@ sudo docker run --net=host --name etcd quay.io/coreos/etcd:${ETCD_VERSION} \
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/8/2/learning-etcd-5.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">7</span>
-                            <span class="day">23</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/7/23/debug-golang-using-gdb.html">使用GDB工具调试Go程序</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>对于程序的调试相信程序员并不陌生，不过对于大部分Java和Python的程序员来说，大部分都是依赖IDE进行的。而且目前类似Eclipse和IntelliJ等工具都提供了很方便的调试工具。</p>
-
-<p>不过除了通过IDE，我们其实还可以通过GDB这个工具来辅助我们的代码调试。以看到一些内部的运行机理，对于学习还是挺有好处的。
-GDB是一个由GNU开源组织发布的、UNIX/LINUX操作系统下的、基于命令行的、功能强大的程序调试工具。</p>
-
-<p>详细的GDB命令参数可以参考这篇文章 <a href="http://www.cnblogs.com/ggjucheng/archive/2011/12/14/2288004.html">点击这里</a></p>
-
-<p>这里我主要介绍下如果使用gdb来debug我们的go代码， 我们先写一段简单的代码(命名为main.go)，如下：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/7/23/debug-golang-using-gdb.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

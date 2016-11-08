@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Go!并发 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="go concurrence"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">8</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/11/8/go-concurrence.html">Go!并发</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/%e5%b9%b6%e5%8f%91.html">并发</a>
+                        </aside>
+                        <section class="brief"><p>Go语言本身是二级线程模型，它刻意模糊线程或协程的概念，通过三种基本对象（M、P、G）互相协作来实现用户空间管理和调度任务。</p>
+
+<h2 id="并发模型">并发模型</h2>
+
+<p>go的并发模型最主要有三部分组成：</p>
+
+<ul>
+<li><p>M: 内核线程，是主要的<code>执行体</code></p></li>
+
+<li><p>P: 其作用类似CPU的核，用来控制可同时并发执行的任务数量（i.e. 每个工作线程M必须绑定一个有效的P才能允许执行任务）,<br />
+线程独享P，可在无锁状态下执行高效操作。</p>
+
+<ul>
+<li>由于P拥有可运行G和自由G，所以它可以为M提供执行资源</li>
+<li>尽管P/M构成执行组合体，但两者数量并非一一对应的，通常情况下，P的数量相对恒定，默认与CPU核数量相同。</li>
+</ul></li>
+
+<li><p>G：一般指goroutinue</p>
+
+<ul>
+<li>并非执行体，仅保存并发任务状态。</li>
+<li>为M（执行体）提供内存空间：runtime在初始化M的时候会分配一个g0给M，g0也是goroutinue，它包含各种<code>调度</code>、<code>垃圾回收</code>和<code>栈管理</code>。
+g0不是由go程序中的代码间接生成的，而是在运行时系统初始化M的时候创建并分配给M的。</li>
+<li>除了g0之外，还存在runtime.g0,runtime.g0被执行引导程序，它会被静态分配的。</li>
+<li>除了上述的系统G,我们接触最多的是用户G，也就是我们写代码经常接触的goroutinue</li>
+</ul></li>
+</ul>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/go-model.jpg" alt="go-model" /></p>
+
+<p><em>M、P、G 的关系模型如上图</em></p>
+
+<h2 id="基本关系示意图">基本关系示意图</h2>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/mpg_flow.png" alt="mgp" /></p>
+
+<p>这里出现了一个很关键的东西 -- *调度器*。</p>
+
+<p><strong>调度器</strong> 负责两级线程模型的一部分调度任务（一轮调度、全力查找可运行G、启用或停止M、系统检测任务、变更P的最大数量），关于调度器，我们在接下来再去深入学习，我们先看下M</p>
+
+<p><strong>M</strong>是<code>无状态</code>的，在创建之初会进行一番初始化工作（由G提供栈空间、信号处理方面的东西）然后加入到全局的M列表（runtime.allm），为P而准备。</p>
+
+<p>与全局M列表对应的是空闲M列表， 在一个未被使用的M的时候，runtime会先尝试从该列表获取。</p>
+
+<p><strong>P</strong> 是<code>有状态</code>的, 而且在P的结构中，可运行G队列和自由G队列是最重要的两个成员</p>
+
+<ul>
+<li>Pgcstop ：gc之后的状态</li>
+<li>Pidle ： 完成可运行G队列的初始化和结束gc后的状态</li>
+<li>Prunning</li>
+<li>Psyscall</li>
+<li>Pdead</li>
+</ul>
+
+<p><strong>G</strong> 也是有状态的，runtime在接收到一个go调用后，会先检查一个go函数以及它参数的合法性，然后从本地P的自由G队列和调度器的自由G队列获取可用G，如果真的没有，那就创建一个了。
+和MP一样，G在runtim里也有一个全局队列 runtime.allg。新建的G（指针）会在第一时候加入到该队列中去，而且新加入的G无论是新或者旧都会进行一次初始化。</p>
+
+<p>我们上面也了解到调度的引导程序是由runtime.g0去做的，引导程序执行的目的是让main函数的G马上有机会运行。</p>
+
+<h2 id="一轮调度">一轮调度</h2>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/go-sched.png" alt="go sched" /></p>
+
+<p>这个图最关键的部分是“全力查找可运行的G”,为了增加G的利用率，go语言的找G之旅也是相当讲究的：</p>
+
+<ol>
+<li>从本地P的可运行队列获取G</li>
+<li>从调度器可运行队列获取G</li>
+<li>从网络I/O轮询器处查找可运行的G</li>
+<li>在条件许可下，从另外一个P的可运行G队列中“偷”一个</li>
+<li>再次尝试从调度器可运行队列获取G</li>
+<li>再次尝试从本地P的可运行队列获取G</li>
+<li>从网络I/O轮询器处查找已经<code>就绪</code>的G</li>
+</ol>
+
+<h2 id="调度器学习">调度器学习</h2>
+
+<p>补充中 &hellip;</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="go-concurrence" data-title="Go!并发 - domac博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
