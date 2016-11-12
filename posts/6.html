@@ -50,194 +50,6 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">4</span>
-                            <span class="day">18</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/4/18/docker-network.html">Docker网络部分知识点归纳</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h3 id="网络工具">网络工具</h3>
-
-<ul>
-<li><p>iptables</p></li>
-
-<li><p>ip addr</p></li>
-
-<li><p>brctl-util</p></li>
-</ul>
-
-<h3 id="docker虚拟网络">Docker虚拟网络</h3>
-
-<p>(1) docker网络虚拟化是基于Linux下的网络命名空间实现的。</p>
-
-<blockquote>
-<p>使用 ip netns 命令我们同样可以创建自己的虚拟网络环境</p>
-</blockquote>
-
-<p>例子：通过ip netns 创建一个名为net0的虚拟网络</p>
-<pre><code>$ ip netns add net0
-$ ip netns list
-$ net0
-</code></pre>
-
-<p>使用ip netns exec 可以为net0网络空间中的网络设备eth0部署ip</p>
-<pre><code>$ ip netns exec net0 ip addr add 172.17.42.99/16 dev eth0
-</code></pre>
-
-<p>(2) 网络设备虚拟化</p>
-
-<p>网卡（网络接口）：一台主机通过ip与其它主机通讯</p>
-
-<p>网络设备：把各个主机连接在一起。</p>
-
-<blockquote>
-<p>这里的设备可以是虚拟设备（网桥、路由器、交换机等）</p>
-
-<p>例如linux的lo回环接口，就是用于快速高效地发送和接收回环数据包。</p>
-</blockquote>
-
-<p>(3) Docker就是利用特殊的虚拟网络接口来连接容器和主机的。</p>
-
-<p>(4) 当我们在主机上启动Docker服务时，Docker引擎会在操作系统内核创建一个docker0的虚拟以太网桥，这个虚拟网桥会把容器组织成一个虚拟子网。</p>
-
-<p>(5) docker0创建虚拟以太网docker0后，会被分配一个主机没有使用的私有化ip和子网掩码</p>
-
-<p>(6) 我们可以使用ip addr 查看wlan0和docker0的信息</p>
-
-<p>(7) Docker容器的网络互联正是依赖linux底层的veth机制，veth总是成对出现的</p>
-
-<p>创建一对veth设备：</p>
-<pre><code>$ ip link A type veth peer name B
-</code></pre>
-
-<p>(8) Docker引擎会在主机上创建一个虚拟的以太网卡接口，并且会将这个veth接口一端放在主机的网络空间，并且连接到docker网桥，另外一端
-放在docker容器的网络空间中</p>
-
-<blockquote>
-<p>容器退出时，虚拟网卡也会被销毁，下次启动将创建一个新的网络接口与docker0重新连接</p>
-
-<p>可以通过ip addr 查看， 然后通过brctl show来验证veth*的设备是否连接在docker0网络上。</p>
-</blockquote>
-
-<p>(9) 网络结构</p>
-
-<p><img src="/media/2016/20160703_dockerjg.png" alt="index" /></p>
-
-<p>(10) Docker支持自定义容器的主机名和DNS配置</p>
-<pre><code> 指定DNS服务器  -- dns=IP_ADDRESS 
-</code></pre>
-
-<p>(11) 容器的访问控制主要通过Linux的iptables防火墙管理和实现的</p>
-<pre><code>检查转发是否打开
-
-$ sudo sysctl net.ipv4.ip_forward
-
-$ net.ipv4.ip_forward = 1
-
-如果为0，要手动打开
-
-</code></pre>
-
-<p>(12) 容器启动时， 使用 --link=CONTAINER_NAME:ALAIS选项，docker会在iptables为两个互联的容器添加
-一条ACCEPT规则， 允许互相开发端口</p>
-
-<p>(13) 除了默认的docker0网桥，用户也可以自定义网桥来连接各个容器</p>
-
-<p>删除旧的网桥</p>
-<pre><code>$ sudo service docker stop
-
-$ sudo ip link set dev docker0 down
-
-$ sudo brctl delbr docker0
-
-</code></pre>
-
-<p>创建新的网桥</p>
-<pre><code>$ sudo brctl addbr docker0
-
-$ sudo ip addr add 192.168.5.1/24 dev docker0
-
-$ sudo ip link set dev docker0 up
-</code></pre>
-
-<p>查看网桥</p>
-<pre><code>$ ip addr show bridge0
-
-</code></pre>
-
-<p>配置服务，默认连接到新的网桥上</p>
-<pre><code>$ echo 'DOCKER_OPTS=&quot;-b=bridge0&quot;' &gt;&gt; /etc/default/docker
-
-$ sudo service docker restart
-</code></pre>
-
-<p>(14) 容器允许的四种网络模式</p>
-
-<ul>
-<li><code>--net=bridge</code></li>
-</ul>
-
-<blockquote>
-<p>bridge模式是Docker默认的网络设置，此模式会为每一个容器分配Network Namespace、设置IP等，并将一个主机上的Docker容器连接到一个虚拟网桥上。</p>
-</blockquote>
-
-<ul>
-<li><code>--net=host</code></li>
-</ul>
-
-<blockquote>
-<p>Docker使用了Linux的Namespaces技术来进行资源隔离，如PID Namespace隔离进程，Mount Namespace隔离文件系统，Network Namespace隔离网络等。一个Network Namespace提供了一份独立的网络环境，包括网卡、路由、Iptable规则等都与其他的Network Namespace隔离。一个Docker容器一般会分配一个独立的Network Namespace。但如果启动容器的时候使用host模式，那么这个容器将不会获得一个独立的Network Namespace，而是和宿主机共用一个Network Namespace。容器将不会虚拟出自己的网卡，配置自己的IP等，而是使用宿主机的IP和端口。</p>
-</blockquote>
-
-<ul>
-<li><code>--net=CONTAINER:NAME_OR_ID</code></li>
-</ul>
-
-<blockquote>
-<p>这个模式指定新创建的容器和已经存在的容器共享一个network namespace。新创建的容器不会创建自己的网卡，配置自己的IP，而是和一个指定的容器共享IP、端口范围等。同样，两个容器除了网络方面，其他的如文件系统、进程列表等还是隔离的。两个容器的进程可以通过lo网卡设备通信</p>
-</blockquote>
-
-<ul>
-<li><code>--net=none</code></li>
-</ul>
-
-<blockquote>
-<p>在这种模式下，Docker容器拥有自己的Network Namespace，但是，并不为Docker容器进行任何网络配置。也就是说，这个Docker容器没有网卡、IP、路由等信息。需要我们自己为Docker容器添加网卡、配置IP等。</p>
-</blockquote>
-
-<p>(15) Linux主机名保存在 /etc/hostname文件中，域名解析服务器IP保存在 /etc/resolv.conf中，host保存在 /etc/host中</p>
-
-<p>(16) DNS配置</p>
-<pre><code> 使用 --dns=IP_ADDRESS可以为新启动的容器配置一个或多个域名配置服务器， 底层会修改 /etc/resolv.conf
-</code></pre>
-
-<p>(17) 容器与容器之间能否进行通信，主要下面2个因素决定</p>
-
-<blockquote>
-<p>1.需要通信的容器的网络接口是否处于同一网络拓扑结构中</p>
-
-<p>2.iptables配置是否允许2个容器之间创建连接</p>
-</blockquote>
-
-<p>(18) 当我们启动容器时，Docker引擎会在主机iptables中创建一条转发链。</p>
-
-<p>如果我们配置了 --ice=true, 这条转发链会使用ACCEPT策略进行配置， 使用--ice=false, 转发链使用DROP策略进行配置。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/4/18/docker-network.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">4</span>
                             <span class="day">17</span>
                         </span>
                             </div>
@@ -412,6 +224,29 @@ root@fc1:/#  chmod -x run.sh
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/2/19/my-mongo-shards.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">1</span>
+                            <span class="day">13</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/1/13/build-web-application-in-docker.html">build web application in docker</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>教程参考： <a href="http://dockone.io/article/1269">http://dockone.io/article/1269</a></p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/1/13/build-web-application-in-docker.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
