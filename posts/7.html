@@ -49,183 +49,18 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
-                            <span class="month">4</span>
-                            <span class="day">18</span>
+                            <span class="month">1</span>
+                            <span class="day">13</span>
                         </span>
                             </div>
                             <h5 class="title">
-                                <a href="/2016/4/18/docker-network.html">Docker网络部分知识点归纳</a>
+                                <a href="/2016/1/13/build-web-application-in-docker.html">build web application in docker</a>
                             </h5>
                         </header>
-                        <section class="brief"><h3 id="网络工具">网络工具</h3>
-
-<ul>
-<li><p>iptables</p></li>
-
-<li><p>ip addr</p></li>
-
-<li><p>brctl-util</p></li>
-</ul>
-
-<h3 id="docker虚拟网络">Docker虚拟网络</h3>
-
-<p>(1) docker网络虚拟化是基于Linux下的网络命名空间实现的。</p>
-
-<blockquote>
-<p>使用 ip netns 命令我们同样可以创建自己的虚拟网络环境</p>
-</blockquote>
-
-<p>例子：通过ip netns 创建一个名为net0的虚拟网络</p>
-<pre><code>$ ip netns add net0
-$ ip netns list
-$ net0
-</code></pre>
-
-<p>使用ip netns exec 可以为net0网络空间中的网络设备eth0部署ip</p>
-<pre><code>$ ip netns exec net0 ip addr add 172.17.42.99/16 dev eth0
-</code></pre>
-
-<p>(2) 网络设备虚拟化</p>
-
-<p>网卡（网络接口）：一台主机通过ip与其它主机通讯</p>
-
-<p>网络设备：把各个主机连接在一起。</p>
-
-<blockquote>
-<p>这里的设备可以是虚拟设备（网桥、路由器、交换机等）</p>
-
-<p>例如linux的lo回环接口，就是用于快速高效地发送和接收回环数据包。</p>
-</blockquote>
-
-<p>(3) Docker就是利用特殊的虚拟网络接口来连接容器和主机的。</p>
-
-<p>(4) 当我们在主机上启动Docker服务时，Docker引擎会在操作系统内核创建一个docker0的虚拟以太网桥，这个虚拟网桥会把容器组织成一个虚拟子网。</p>
-
-<p>(5) docker0创建虚拟以太网docker0后，会被分配一个主机没有使用的私有化ip和子网掩码</p>
-
-<p>(6) 我们可以使用ip addr 查看wlan0和docker0的信息</p>
-
-<p>(7) Docker容器的网络互联正是依赖linux底层的veth机制，veth总是成对出现的</p>
-
-<p>创建一对veth设备：</p>
-<pre><code>$ ip link A type veth peer name B
-</code></pre>
-
-<p>(8) Docker引擎会在主机上创建一个虚拟的以太网卡接口，并且会将这个veth接口一端放在主机的网络空间，并且连接到docker网桥，另外一端
-放在docker容器的网络空间中</p>
-
-<blockquote>
-<p>容器退出时，虚拟网卡也会被销毁，下次启动将创建一个新的网络接口与docker0重新连接</p>
-
-<p>可以通过ip addr 查看， 然后通过brctl show来验证veth*的设备是否连接在docker0网络上。</p>
-</blockquote>
-
-<p>(9) 网络结构</p>
-
-<p><img src="/media/2016/20160703_dockerjg.png" alt="index" /></p>
-
-<p>(10) Docker支持自定义容器的主机名和DNS配置</p>
-<pre><code> 指定DNS服务器  -- dns=IP_ADDRESS 
-</code></pre>
-
-<p>(11) 容器的访问控制主要通过Linux的iptables防火墙管理和实现的</p>
-<pre><code>检查转发是否打开
-
-$ sudo sysctl net.ipv4.ip_forward
-
-$ net.ipv4.ip_forward = 1
-
-如果为0，要手动打开
-
-</code></pre>
-
-<p>(12) 容器启动时， 使用 --link=CONTAINER_NAME:ALAIS选项，docker会在iptables为两个互联的容器添加
-一条ACCEPT规则， 允许互相开发端口</p>
-
-<p>(13) 除了默认的docker0网桥，用户也可以自定义网桥来连接各个容器</p>
-
-<p>删除旧的网桥</p>
-<pre><code>$ sudo service docker stop
-
-$ sudo ip link set dev docker0 down
-
-$ sudo brctl delbr docker0
-
-</code></pre>
-
-<p>创建新的网桥</p>
-<pre><code>$ sudo brctl addbr docker0
-
-$ sudo ip addr add 192.168.5.1/24 dev docker0
-
-$ sudo ip link set dev docker0 up
-</code></pre>
-
-<p>查看网桥</p>
-<pre><code>$ ip addr show bridge0
-
-</code></pre>
-
-<p>配置服务，默认连接到新的网桥上</p>
-<pre><code>$ echo 'DOCKER_OPTS=&quot;-b=bridge0&quot;' &gt;&gt; /etc/default/docker
-
-$ sudo service docker restart
-</code></pre>
-
-<p>(14) 容器允许的四种网络模式</p>
-
-<ul>
-<li><code>--net=bridge</code></li>
-</ul>
-
-<blockquote>
-<p>bridge模式是Docker默认的网络设置，此模式会为每一个容器分配Network Namespace、设置IP等，并将一个主机上的Docker容器连接到一个虚拟网桥上。</p>
-</blockquote>
-
-<ul>
-<li><code>--net=host</code></li>
-</ul>
-
-<blockquote>
-<p>Docker使用了Linux的Namespaces技术来进行资源隔离，如PID Namespace隔离进程，Mount Namespace隔离文件系统，Network Namespace隔离网络等。一个Network Namespace提供了一份独立的网络环境，包括网卡、路由、Iptable规则等都与其他的Network Namespace隔离。一个Docker容器一般会分配一个独立的Network Namespace。但如果启动容器的时候使用host模式，那么这个容器将不会获得一个独立的Network Namespace，而是和宿主机共用一个Network Namespace。容器将不会虚拟出自己的网卡，配置自己的IP等，而是使用宿主机的IP和端口。</p>
-</blockquote>
-
-<ul>
-<li><code>--net=CONTAINER:NAME_OR_ID</code></li>
-</ul>
-
-<blockquote>
-<p>这个模式指定新创建的容器和已经存在的容器共享一个network namespace。新创建的容器不会创建自己的网卡，配置自己的IP，而是和一个指定的容器共享IP、端口范围等。同样，两个容器除了网络方面，其他的如文件系统、进程列表等还是隔离的。两个容器的进程可以通过lo网卡设备通信</p>
-</blockquote>
-
-<ul>
-<li><code>--net=none</code></li>
-</ul>
-
-<blockquote>
-<p>在这种模式下，Docker容器拥有自己的Network Namespace，但是，并不为Docker容器进行任何网络配置。也就是说，这个Docker容器没有网卡、IP、路由等信息。需要我们自己为Docker容器添加网卡、配置IP等。</p>
-</blockquote>
-
-<p>(15) Linux主机名保存在 /etc/hostname文件中，域名解析服务器IP保存在 /etc/resolv.conf中，host保存在 /etc/host中</p>
-
-<p>(16) DNS配置</p>
-<pre><code> 使用 --dns=IP_ADDRESS可以为新启动的容器配置一个或多个域名配置服务器， 底层会修改 /etc/resolv.conf
-</code></pre>
-
-<p>(17) 容器与容器之间能否进行通信，主要下面2个因素决定</p>
-
-<blockquote>
-<p>1.需要通信的容器的网络接口是否处于同一网络拓扑结构中</p>
-
-<p>2.iptables配置是否允许2个容器之间创建连接</p>
-</blockquote>
-
-<p>(18) 当我们启动容器时，Docker引擎会在主机iptables中创建一条转发链。</p>
-
-<p>如果我们配置了 --ice=true, 这条转发链会使用ACCEPT策略进行配置， 使用--ice=false, 转发链使用DROP策略进行配置。</p>
+                        <section class="brief"><p>教程参考： <a href="http://dockone.io/article/1269">http://dockone.io/article/1269</a></p>
 </section>
                         <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/4/18/docker-network.html">继续阅读</a>
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/1/13/build-web-application-in-docker.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
@@ -237,49 +72,63 @@ $ sudo service docker restart
                         <header class="header">
                             <div class="meta">
                         <span class="date">
-                            <span class="month">4</span>
-                            <span class="day">17</span>
+                            <span class="month">10</span>
+                            <span class="day">10</span>
                         </span>
                             </div>
                             <h5 class="title">
-                                <a href="/2016/4/17/docker-custom-bridge.html">docker自定义网桥</a>
+                                <a href="/2015/10/10/go-slice-byte-convert.html">golang里slice与[]byte的零拷贝转换</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>除了默认的 docker0 网桥，用户也可以指定网桥来连接各个容器。</p>
-
-<p>在启动 Docker 服务的时候，使用 -b BRIDGE或--bridge=BRIDGE 来指定使用的网桥。</p>
-
-<p>如果服务已经运行，那需要先停止服务，并删除旧的网桥。</p>
-<pre><code>$ sudo service docker stop
-$ sudo ip link set dev docker0 down
-$ sudo brctl delbr docker0
+                        <section class="brief"><p>slice在Go的运行时库中就是一个C语言动态数组的实现，在$GOROOT/src/pkg/runtime/runtime.h中可以看到它的定义：</p>
+<pre><code class="language-c">struct Slice
+{   
+    byte*    array;        // actual data
+    uintgo    len;        // number of elements
+    uintgo    cap;        // allocated number of elements
+};
 </code></pre>
 
-<p>然后创建一个网桥 bridge0。</p>
-<pre><code>$ sudo brctl addbr bridge0
-$ sudo ip addr add 192.168.5.1/24 dev bridge0
-$ sudo ip link set dev bridge0 up
+<p>所以要实现一个“zero-copy”的转换，我们需要借助unsafe.Pointer的帮助</p>
+<pre><code class="language-go">func stringToBytes(s string) []byte {
+    x := (*[2]uintptr)(unsafe.Pointer(&amp;s))
+    h := [3]uintptr{x[0], x[1], x[1]}
+    return *(*[]byte)(unsafe.Pointer(&amp;h))
+}
+
+func bytesToString(b []byte) string {
+    return *(*string)(unsafe.Pointer(&amp;b))
+}
+
+func main() {
+    s := strings.Repeat(&quot;abc&quot;, 3)
+    b := stringToBytes(s)
+    s2 := bytesToString(b)
+
+    fmt.Println(b, s2)
+}
 </code></pre>
 
-<p>查看确认网桥创建并启动。</p>
-<pre><code>$ ip addr show bridge0
-4: bridge0: &lt;BROADCAST,MULTICAST&gt; mtu 1500 qdisc noop state UP group default
-    link/ether 66:38:d0:0d:76:18 brd ff:ff:ff:ff:ff:ff
-    inet 192.168.5.1/24 scope global bridge0
-       valid_lft forever preferred_lft forever
+<p>还可以这样：</p>
+<pre><code class="language-go">var ptr unsafe.Pointer
+var s1 = struct {
+    addr uintptr
+    len int
+    cap int
+}{ptr, length, length}
+s := *(*[]byte)(unsafe.Pointer(&amp;s1))
 </code></pre>
 
-<p>配置 Docker 服务，默认桥接到创建的网桥上。</p>
-<pre><code>$ echo 'DOCKER_OPTS=&quot;-b=bridge0&quot;' &gt;&gt; /etc/default/docker
-$ sudo service docker start
+<p>或者使用reflect.SliceHeader的方式来构造slice，比较推荐这种做法：</p>
+<pre><code class="language-go">var o []byte
+sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&amp;o)))
+sliceHeader.Cap = length
+sliceHeader.Len = length
+sliceHeader.Data = uintptr(ptr)
 </code></pre>
-
-<p>启动 Docker 服务。 新建一个容器，可以看到它已经桥接到了 bridge0 上。</p>
-
-<p>可以继续用 brctl show 命令查看桥接的信息。另外，在容器中可以使用 ip addr 和 ip route 命令来查看 IP 地址配置和路由信息。</p>
 </section>
                         <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/4/17/docker-custom-bridge.html">继续阅读</a>
+                            <a class="btn btn-primary btn-lg pull-right" href="/2015/10/10/go-slice-byte-convert.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
@@ -291,89 +140,59 @@ $ sudo service docker start
                         <header class="header">
                             <div class="meta">
                         <span class="date">
-                            <span class="month">2</span>
-                            <span class="day">22</span>
+                            <span class="month">9</span>
+                            <span class="day">3</span>
                         </span>
                             </div>
                             <h5 class="title">
-                                <a href="/2016/2/22/quck-build-docker-ssh-container.html">快速构建支持SSH的Docker容器</a>
+                                <a href="/2015/9/3/about-keepalived.html">关于 keepalived</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>在构建之前，我们先想一个问题：你需要ssh来干什么？</p>
+                        <section class="brief"><p>今天看了一些关于keepalived的资料,在这里复习总结一下:
+官网的介绍:
+  <a href="http://www.keepalived.org/">http://www.keepalived.org/</a></p>
+
+<p>Keeplived是Linux下的一个轻量级高可用解决方案, 专门用来监控集群系统中的各个服务节点的状态.其中,它的一个关键概念就是VRRP(Virtual Router Redundancy Protocol) 虚拟路由冗余协议, VRRP的目的是为了解决静态路由出现的单点故障问题.</p>
 
 <blockquote>
-<p>大部分需求是，你要检查日志，做备份，或者重启进程，调整配置，查看服务器情况，</p>
+<p>背景: 在现实的网络环境中, 主机之间的通讯都是通过配置静态路由(默认网关)完成的, 所以路由会成为单点瓶颈.所以引入VRRP</p>
 </blockquote>
 
-<p>虽然目前docker提供很多工具来做这些工作，但，为我们的容器提供SSH支持，也是不错的补充方案。</p>
+<p>用途: <code>服务器状态检测</code>, <code>故障隔离</code>, <code>HA cluster</code></p>
 
-<p>本文，省略了镜像，容器的构建、生产id_rsa的步骤，这些可以去谷歌查阅相关资料。</p>
+<p>手段: VRRP可用将两台或者多台物理路由器设备虚拟成一个虚拟路由(通过虚拟IP对外提供服务), 并且多个物理理由协同工作,保证同一时刻只有一个物理路由作为主物理路由(用过选举)</p>
 
-<h3 id="1-在容器内安装ssh">1. 在容器内安装SSH</h3>
+<p>keepalived工作在TCP/IP参考模型的第三,第四和第五层,也就是网络层,传输层和应用层.运行机制如下:
+1. 在网络层 (IP, ICMP, ARP, RARP)
+2. 传输层 (TCP, UDP)
+3. 应用层(FTP, TELNET, SMTP, DNS)</p>
 
-<p>我们这里选择了一个普通的ubuntu容器，名称叫ubdemo，进入容器内:</p>
-<pre><code>sudo docker exec -t -i  ubdemo /bin/bash
-</code></pre>
+<p>VRRP 工作流程:
+1.初始化
+&gt;路由器启动时，如果路由器的优先级是255(最高优先级，路由器拥有路由器地址)，要发送VRRP通告信息，并发送广播ARP信息通告路由器IP地址对应的MAC地址为路由虚拟MAC，设置通告信息定时器准备定时发送VRRP通告信息，转为MASTER状态；否则进入BACKUP状态，设置定时器检查定时检查是否收到MASTER的通告信息。</p>
 
-<p>进入ubdemo容器后,更新apt-get源</p>
-<pre><code>root@fc1:/# apt-get update
-root@fc1:/# get-get install openssh-server
-</code></pre>
+<p>2.Master
+&gt;设置定时通告定时器；
+        用VRRP虚拟MAC地址响应路由器IP地址的ARP请求；
+        转发目的MAC是VRRP虚拟MAC的数据包；
+        如果是虚拟路由器IP的拥有者，将接受目的地址是虚拟路由器IP的数据包，否则丢弃；
+        当收到shutdown的事件时删除定时通告定时器，发送优先权级为0的通告包，转初始化状态；
+        如果定时通告定时器超时时，发送VRRP通告信息；
+        收到VRRP通告信息时，如果优先权为0，发送VRRP通告信息；否则判断数据的优先级是否高于本机，或相等而且实际IP地址大于本地实际IP，设置定时通告定时器，复位主机超时定时器，转BACKUP状态；否则的话，丢弃该通告包；</p>
 
-<p>安装后, 创建相关文件夹:</p>
-<pre><code>root@fc1:/# mkdir -p /var/run/sshd
-root@fc1:/# /usr/sbin/sshd -D &amp;
-</code></pre>
+<p>3.Backup
+&gt;设置主机超时定时器；
+        不能响应针对虚拟路由器IP的ARP请求信息；
+        丢弃所有目的MAC地址是虚拟路由器MAC地址的数据包；
+        不接受目的是虚拟路由器IP的所有数据包；
+        当收到shutdown的事件时删除主机超时定时器，转初始化状态；
+        主机超时定时器超时的时候，发送VRRP通告信息，广播ARP地址信息，转MASTER状态；
+        收到VRRP通告信息时，如果优先权为0，表示进入MASTER选举；否则判断数据的优先级是否高于本机，如果高的话承认MASTER有效，复位主机超时定时器；否则的话，丢弃该通告包；</p>
 
-<p>查看服务是否启动成功</p>
-<pre><code>root@fc1:/# netstat -tunlp
-</code></pre>
-
-<p>如果发现<code>22</code>端口信息,则服务启动启动</p>
-
-<p>我们在root用户目录下创建<code>.ssh</code>目录, 并复制需要登陆的公钥信息(在宿主机的.ssh/id_rsa.pub中)到authorized_keys中</p>
-<pre><code>root@fc1:/# mkdir root/.ssh
-root@fc1:/# vi /root/.ssh/authorized_keys
-</code></pre>
-
-<p>打开authorized_keys后,把宿主机 <code>.ssh/id_rsa.pub</code> 的内容拷贝进去</p>
-
-<p>创建自动启动SSH服务的脚本 (<em>必须要授权执行的权限</em>)</p>
-<pre><code>root@fc1:/#  vi /run.sh
-root@fc1:/#  chmod -x run.sh
-</code></pre>
-
-<p>run.sh的内容如下:</p>
-<pre><code>#! /bin/bash
-/usr/sbin/sshd -D
-</code></pre>
-
-<p>退出容器</p>
-<pre><code>root@fc1:/#  exit
-</code></pre>
-
-<h3 id="2-构建新的镜像">2.构建新的镜像</h3>
-
-<p>OK.. 我们是时候基于这个sshd的容器创建一个新的镜像, 加入这个容器的名字叫 ubdemo</p>
-<pre><code>apps@dockers:~$  sudo docker commit ubdemo  sshd:ubuntu
-</code></pre>
-
-<p>这样我们就创建了一个新的镜像，这个新的镜像是基于我们原始容器安装SSH后构建起来的</p>
-
-<h3 id="3-构建新的容器">3.构建新的容器</h3>
-
-<p>我们可以基于这个镜像运行一个具备ssh的容器了</p>
-<pre><code>apps@dockers:~$ sudo docker run -p 10022:22 -d  sshd:ubuntu  /run.sh
-</code></pre>
-
-<p>最好我们可以在宿主机ssh登陆这个docker容器了</p>
-<pre><code>ssh root@ip -p 10022  (可以通过sudo docker inspect sshd_ubdemo获取IP)
-</code></pre>
-
-<p>it work ~~</p>
+<p>安装与配置可用参考这篇文章 : <a href="http://freeloda.blog.51cto.com/2033581/1280962">http://freeloda.blog.51cto.com/2033581/1280962</a></p>
 </section>
                         <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/2/22/quck-build-docker-ssh-container.html">继续阅读</a>
+                            <a class="btn btn-primary btn-lg pull-right" href="/2015/9/3/about-keepalived.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
@@ -385,33 +204,20 @@ root@fc1:/#  chmod -x run.sh
                         <header class="header">
                             <div class="meta">
                         <span class="date">
-                            <span class="month">2</span>
-                            <span class="day">19</span>
+                            <span class="month">9</span>
+                            <span class="day">1</span>
                         </span>
                             </div>
                             <h5 class="title">
-                                <a href="/2016/2/19/my-mongo-shards.html">Mongodb分片部署</a>
+                                <a href="/2015/9/1/using-fsnotity.html">使用go-fsnotify文件监控工具</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>参考:</p>
+                        <section class="brief"><p>最近利用<code>Golang</code>+<code>fsnotify</code>写了一个服务器缓存文件变更通知工具, 并通过邮件等辅助手段实现相关监控功能.</p>
 
-<ul>
-<li><a href="https://segmentfault.com/a/1190000002426743">MongoDB分片部署实践</a></li>
-<li><a href="http://yhv5.com/mongodb-shard_821.html">MongoDB分片集群部署</a></li>
-</ul>
-
-<h3 id="选用服务器">选用服务器:</h3>
-<pre><code>`192.168.139.139 (主)`
-
-`192.168.139.138`
-
-`192.168.139.134`
-</code></pre>
-
-<h3 id="在每台服务器上建立mongodb的软连接">在每台服务器上建立MongoDB的软连接</h3>
+<p>之后发现开源框架<code>Beego</code>也是使用fsnotify( 我进去<code>bee</code>工具的源码查阅了下,可能是另外一个版本的, 不过不重要,我们了解下原理 )来实现web应用的热编译实现功能的.可以同时监控多个目录</p>
 </section>
                         <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/2/19/my-mongo-shards.html">继续阅读</a>
+                            <a class="btn btn-primary btn-lg pull-right" href="/2015/9/1/using-fsnotity.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
