@@ -263,7 +263,7 @@ func testffJson() {
 
     b, _ := ffjson.Marshal(p)
     np := Person{}
-    json.Unmarshal(b, &amp;np)
+    ffjson.Unmarshal(b, &amp;np)
 }
 
 func testMagic() {
@@ -301,9 +301,9 @@ func BenchmarkTestMarshalMagic(b *testing.B) {
 <p>程序运行：</p>
 <pre><code>$ go test -v -bench . -benchmem
 testing: warning: no tests to run
-BenchmarkTestMarshalJson-4        300000     3415 ns/op      544 B/op        9 allocs/op
-BenchmarkTestMarshalFFJson-4      500000     3577 ns/op      544 B/op        9 allocs/op
-BenchmarkTestMarshalMagic-4     200000000    6.70 ns/op      0 B/op          0 allocs/op
+BenchmarkTestMarshalJson-4        500000        3552 ns/op        544 B/op        9 allocs/op
+BenchmarkTestMarshalFFJson-4      300000        4959 ns/op        544 B/op        9 allocs/op
+BenchmarkTestMarshalMagic-4     200000000       6.68 ns/op        0 B/op          0 allocs/op
 PASS
 </code></pre>
 
