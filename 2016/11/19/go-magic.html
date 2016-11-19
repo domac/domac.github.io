@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Go黑技巧 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="go magic"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">19</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/11/19/go-magic.html">Go黑技巧</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                        </aside>
+                        <section class="brief"><p>最近因为项目需要, 打算根据profile对自己的代码进行优化,于是重新阅读了「达达的黑魔法」</p>
+
+<p>这里总结整理一下在用Go coding的时候，一些不常见也不常用的技巧，通过这些技巧更加深入了解一下go的底层知识。</p>
+
+<h2 id="一-字符串与byte数组">一、字符串与byte数组</h2>
+
+<p>字符串（string）作为一种不可变类型，在与字节数组（slice, [ ]byte）转换时需付出 “沉重” 代价，
+根本原因是对底层字节数组的复制。这种代价会在以万为单位的高并发压力下迅速放大，所以对它的优化常变成 “必须” 行为。</p>
+
+<p>Go字符串的指针，它本质上是一个reflect.StringHeader，我们先看下go源码的定义：</p>
+
+<p><code>reflect/value.go 1734行</code></p>
+<pre><code class="language-go">// StringHeader is the runtime representation of a string.
+// It cannot be used safely or portably and its representation may
+// change in a later release.
+// Moreover, the Data field is not sufficient to guarantee the data
+// it references will not be garbage collected, so programs must keep
+// a separate, correctly typed pointer to the underlying data.
+
+type StringHeader struct {
+    Data uintptr
+    Len  int
+}
+</code></pre>
+
+<p>字节数组（[]byte），同理与slice一样，本质是一个reflect.SliceHeader.</p>
+<pre><code class="language-go">// SliceHeader is the runtime representation of a slice.
+// It cannot be used safely or portably and its representation may
+// change in a later release.
+// Moreover, the Data field is not sufficient to guarantee the data
+// it references will not be garbage collected, so programs must keep
+// a separate, correctly typed pointer to the underlying data.
+
+type SliceHeader struct {
+    Data uintptr
+    Len  int
+    Cap  int
+}
+
+</code></pre>
+
+<p>所以，根据这两种结构，我们就可以使用一些比较tricky的技巧，来进行转化。</p>
+
+<p>首选是字符串转[]byte， string 可看做 [2]uintptr，但slice的结构明显多了一个<code>Cap</code>属性，于是我们可以通过指针用<code>Len</code>当做是<code>Cap</code>来<code>填充</code>我们的转换结构。</p>
+<pre><code class="language-go">
+//方法一
+func str2bytes(s string) []byte {
+    x := (*[2]uintptr)(unsafe.Pointer(&amp;s))
+    h := [3]uintptr{x[0], x[1], x[1]}
+    return *(*[]byte)(unsafe.Pointer(&amp;h))
+}
+
+//方法二
+var o []byte
+sliceHeader := (*reflect.SliceHeader)((unsafe.Pointer(&amp;o)))
+sliceHeader.Cap = length
+sliceHeader.Len = length
+sliceHeader.Data = uintptr(ptr)
+</code></pre>
+
+<p>然后是[]byte转字符串，这个就比较简单了，直接转换成指针类型，自动忽略Cap属性。</p>
+<pre><code class="language-go">func bytes2str(b []byte) string {
+    return *(*string)(unsafe.Pointer(&amp;b))
+}
+</code></pre>
+
+<p>根据上面的黑技巧，我们来写一个基准测试程序，测试一下内存是否有所改善：</p>
+<pre><code class="language-go">package stringbyte
+
+import (
+    &quot;strings&quot;
+    &quot;testing&quot;
+)
+
+var s = strings.Repeat(&quot;a&quot;, 1024)
+
+func test() {
+    b := []byte(s)
+    _ = string(b)
+}
+
+func test2() {
+    b := str2bytes(s)
+    _ = bytes2str(b)
+}
+
+func BenchmarkTest(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        test()
+    }
+}
+
+func BenchmarkTestBlock(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        test2()
+    }
+}
+
+</code></pre>
+
+<p>在终端运行 <code>$ go test -v -bench . -benchmem</code> 后， 输出的信息如下：</p>
+<pre><code>BenchmarkTest-4          3000000               523 ns/op            2048 B/op          2 allocs/op
+BenchmarkTestBlock-4    500000000                3.87 ns/op            0 B/op          0 allocs/op
+</code></pre>
+
+<p>可以看到，性能有所上升，内存分配上几乎是 zero-garbage。但我们也必须要小心，因为这样转换是很危险的：</p>
+
+<ul>
+<li><p><code>string</code>和<code>[]byte</code>的内存结构不一定兼容</p></li>
+
+<li><p>第二是会干扰GC工作</p></li>
+
+<li><p>第三是把<code>string</code>变成可变的，破坏了<code>string</code>不可变的约束。这三点都可能导致程序异常甚至崩溃</p></li>
+</ul>
+
+<p>正常情况下，追求数据质量的项目，以上这个技巧我觉得要慎用。</p>
+
+<h2 id="二-struct与byte数组">二、struct与byte数组</h2>
+
+<p>以一些接口调用的程序为例，我们基本会遇到[]byte和结构体的互转，以为我一般会先转到json再转结构，或者使用gob进行转换，但也感觉这样的效率其实不高。</p>
+
+<p>有见及此，我们再次利用slice的本质是<code>SliceHeader</code>的特定，我们来开发自己的一个转换器</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;fmt&quot;
+    &quot;reflect&quot;
+    &quot;unsafe&quot;
+)
+
+type Person struct {
+    Name     string
+    Age      int
+    PhoneNum string
+}
+
+var sizeOfPerson = int(unsafe.Sizeof(Person{}))
+
+func PersonToBytes(p *Person) []byte {
+    var x reflect.SliceHeader
+    x.Len = sizeOfPerson
+    x.Cap = sizeOfPerson
+    x.Data = uintptr(unsafe.Pointer(p))
+    return *(*[]byte)(unsafe.Pointer(&amp;x))
+}
+
+func BytesToPerson(b []byte) *Person {
+    return (*Person)(unsafe.Pointer(
+        (*reflect.SliceHeader)(unsafe.Pointer(&amp;b)).Data,
+    ))
+}
+
+func main() {
+    p := &amp;Person{
+        Name:     &quot;domac&quot;,
+        Age:      25,
+        PhoneNum: &quot;12345678&quot;,
+    }
+
+    pb := PersonToBytes(p)
+    bp := BytesToPerson(pb)
+
+    fmt.Println(bp.Name)
+    fmt.Println(bp.Age)
+    fmt.Println(bp.PhoneNum)
+}
+
+</code></pre>
+
+<p>程序输出：</p>
+<pre><code>$ go run example.go
+domac
+25
+12345678
+</code></pre>
+
+<p>我们接下来把它和我们的json包进行一下性能的比较</p>
+<pre><code class="language-go">package structbyte
+
+import (
+    &quot;encoding/json&quot;
+    &quot;testing&quot;
+)
+
+func testJson() {
+    p := &amp;Person{
+        Name:     &quot;domac&quot;,
+        Age:      25,
+        PhoneNum: &quot;12345678&quot;,
+    }
+
+    b, _ := json.Marshal(p)
+    np := Person{}
+    json.Unmarshal(b, &amp;np)
+}
+
+func testMagic() {
+    p := &amp;Person{
+        Name:     &quot;domac&quot;,
+        Age:      25,
+        PhoneNum: &quot;12345678&quot;,
+    }
+
+    pb := PersonToBytes(p)
+    BytesToPerson(pb)
+}
+
+func BenchmarkTestMarshalJson(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        testJson()
+    }
+}
+
+func BenchmarkTestMarshalMagic(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        testMagic()
+    }
+}
+
+</code></pre>
+
+<p>程序运行：</p>
+<pre><code>$ go test -v -bench . -benchmem
+testing: warning: no tests to run
+BenchmarkTestMarshalJson-4        500000   3576 ns/op   544 B/op        9 allocs/op
+BenchmarkTestMarshalMagic-4     200000000  6.75 ns/op   0 B/op          0 allocs/op
+PASS
+</code></pre>
+
+<p><strong>It works !</strong> 可以看到，通过黑技巧，处理速度和内存分配上都有很大的提升。</p>
+
+<h2 id="三-slice与array">三、slice与array</h2>
+
+<p>值传递的方式贯穿go调用路线，我们在coding的时候，每逢遇到传参的时候，心里面也会问自己，究竟slice和array传进去的话，哪个的性能更好呢?</p>
+
+<p>网上大部分的答案都是这样总结的：</p>
+
+<blockquote>
+<p>建议用 slice 代替 array，企图避免数据拷贝，提升性能</p>
+</blockquote>
+
+<p>所以在这里，我们尝试检验一下</p>
+
+<p>函数代码</p>
+<pre><code class="language-go">package main
+
+const capacity = 1024
+
+func array() [capacity]int {
+    var d [capacity]int
+
+    for i := 0; i &lt; len(d); i++ {
+        d[i] = 1
+    }
+
+    return d
+}
+
+func slice() []int {
+    d := make([]int, capacity)
+
+    for i := 0; i &lt; len(d); i++ {
+        d[i] = 1
+    }
+
+    return d
+}
+
+</code></pre>
+
+<p>测试代码：</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;testing&quot;
+)
+
+func BenchmarkArray(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        _ = array()
+    }
+}
+
+func BenchmarkSlice(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        _ = slice()
+    }
+
+}
+
+</code></pre>
+
+<p>性能测试结果：</p>
+<pre><code>$ go test -v -bench . -benchmem
+testing: warning: no tests to run
+BenchmarkArray-4         1000000              1171 ns/op               0 B/op          0 allocs/op
+BenchmarkSlice-4          500000              2073 ns/op            8192 B/op          1 allocs/op
+PASS
+</code></pre>
+
+<p>array 非但拥有更好的性能，还避免了堆内存分配，也就是说减轻了 GC 压力: 整个array函数完全在栈上完成，而slice函数则需执行 <code>makeslice</code>，
+继而在堆上分配内存，这就是问题所在。</p>
+
+<h2 id="四-闭包调用">四、闭包调用</h2>
+
+<p>go语言的闭包是由函数及其相关引用环境组合而成的实体(即：闭包=函数+引用环境)，换句话说闭包隐式携带上下文环境变量。</p>
+
+<p>一个简单的闭包代码</p>
+<pre><code class="language-go">func f(i int) func() int {
+    return func() int {
+        i++
+        return i
+    }
+}
+</code></pre>
+
+<p>函数f返回了一个函数，返回的这个函数，返回的这个函数就是一个闭包。这个函数中本身是没有定义变量i的，而是引用了它所在的环境（函数f）中的变量i。</p>
+<pre><code class="language-go">c1 := f(0)
+c2 := f(0)
+c1()    // reference to i, i = 0, return 1
+c2()    // reference to another i, i = 0, return 1
+</code></pre>
+
+<p>Go语言能通过逃逸分析识别出变量的作用域，自动将变量在堆上分配 ，闭包环境变量在堆上分配是Go实现闭包的基础。返回闭包时并不是单纯返回一个结构体，而是返回了一个结构体，记录下函数返回地址和引用的环境中的变量地址。</p>
+
+<p>测试代码</p>
+<pre><code class="language-go">package closure
+
+import (
+    &quot;testing&quot;
+)
+
+func simple(x int) int {
+    return x * 2
+}
+
+func BenchmarkTest(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        _ = simple(i)
+    }
+}
+
+func BenchmarkTestAnonymous(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        _ = func(x int) int {
+            return x * 2
+        }(i)
+    }
+}
+
+func BenchmarkTestCloseure(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        _ = func() int {
+            return i * 2
+        }()
+    }
+}
+
+</code></pre>
+
+<p>运行结果：</p>
+<pre><code>$ go test -v -bench . -benchmem
+testing: warning: no tests to run
+BenchmarkTest-4                 2000000000       0.35 ns/op        0 B/op       0 allocs/op
+BenchmarkTestAnonymous-4        1000000000       2.81 ns/op        0 B/op       0 allocs/op
+BenchmarkTestCloseure-4         1000000000       2.78 ns/op        0 B/op       0 allocs/op
+PASS
+</code></pre>
+
+<p>注意： 闭包引用原环境变量，导致变量逃逸到堆上，这必然增加了 GC 扫描和回收对象的数量</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="go-magic" data-title="Go黑技巧 - domac博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
