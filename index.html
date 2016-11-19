@@ -238,6 +238,7 @@ domac
 
 import (
     &quot;encoding/json&quot;
+    &quot;github.com/pquerna/ffjson/ffjson&quot;
     &quot;testing&quot;
 )
 
@@ -249,6 +250,18 @@ func testJson() {
     }
 
     b, _ := json.Marshal(p)
+    np := Person{}
+    json.Unmarshal(b, &amp;np)
+}
+
+func testffJson() {
+    p := &amp;Person{
+        Name:     &quot;domac&quot;,
+        Age:      25,
+        PhoneNum: &quot;12345678&quot;,
+    }
+
+    b, _ := ffjson.Marshal(p)
     np := Person{}
     json.Unmarshal(b, &amp;np)
 }
@@ -270,19 +283,27 @@ func BenchmarkTestMarshalJson(b *testing.B) {
     }
 }
 
+func BenchmarkTestMarshalFFJson(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        testffJson()
+    }
+}
+
 func BenchmarkTestMarshalMagic(b *testing.B) {
     for i := 0; i &lt; b.N; i++ {
         testMagic()
     }
 }
 
+
 </code></pre>
 
 <p>程序运行：</p>
 <pre><code>$ go test -v -bench . -benchmem
 testing: warning: no tests to run
-BenchmarkTestMarshalJson-4        500000   3576 ns/op   544 B/op        9 allocs/op
-BenchmarkTestMarshalMagic-4     200000000  6.75 ns/op   0 B/op          0 allocs/op
+BenchmarkTestMarshalJson-4        300000     3415 ns/op      544 B/op        9 allocs/op
+BenchmarkTestMarshalFFJson-4      500000     3577 ns/op      544 B/op        9 allocs/op
+BenchmarkTestMarshalMagic-4     200000000    6.70 ns/op      0 B/op          0 allocs/op
 PASS
 </code></pre>
 
