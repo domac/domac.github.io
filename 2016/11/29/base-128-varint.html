@@ -59,7 +59,7 @@
                             <a class="tag label label-info" href="/tags/linux.html">linux</a>
                         </aside>
                         <section class="brief"><p>最近在使用google的protobuf的时候，有一个地方引起了我的好奇，下面是一段样例代码：</p>
-<pre><code>type KeyValue struct {
+<pre><code class="language-go">type KeyValue struct {
 
     Key []byte `protobuf:&quot;bytes,1,opt,name=key,proto3&quot; json:&quot;key,omitempty&quot;`
 
@@ -85,7 +85,7 @@
 <p>对于编码的步骤，可以看skoo的 <a href="http://skoo.me/algorithm/2013/09/30/base-128-varint">《Base 128 Varint, 一种处理整数的变长二进制编码算法》</a></p>
 
 <p>下面是一个go的实现例子，我们尝试把占用8字节的int64的整数，转换为更小&rdquo;长度&rdquo;的整数</p>
-<pre><code>package main
+<pre><code class="language-go">package main
 
 import (
     &quot;bytes&quot;
