@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Base128变长编码 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="base 128 varint"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">29</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/11/29/base-128-varint.html">Base128变长编码</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/linux.html">linux</a>
+                        </aside>
+                        <section class="brief"><p>最近在使用google的protobuf的时候，有一个地方引起了我的好奇，下面是一段样例代码：</p>
+<pre><code>type KeyValue struct {
+
+    Key []byte `protobuf:&quot;bytes,1,opt,name=key,proto3&quot; json:&quot;key,omitempty&quot;`
+
+    CreateRevision int64 `protobuf:&quot;varint,2,opt,name=create_revision,json=createRevision,proto3&quot; json:&quot;create_revision,omitempty&quot;`
+
+    ModRevision int64 `protobuf:&quot;varint,3,opt,name=mod_revision,json=modRevision,proto3&quot; json:&quot;mod_revision,omitempty&quot;`
+
+    Value []byte `protobuf:&quot;bytes,5,opt,name=value,proto3&quot; json:&quot;value,omitempty&quot;`
+
+    Lease int64 `protobuf:&quot;varint,6,opt,name=lease,proto3&quot; json:&quot;lease,omitempty&quot;`
+}
+</code></pre>
+
+<p>上面代码中，varint几乎都出现在每个字段属性的定义中，当时我在想，这个varint是用来做什么的呢？于是我查阅了Protocol Buffers的文档中对
+<a href="https://developers.google.com/protocol-buffers/docs/encoding">varints的说明</a>：</p>
+
+<blockquote>
+<p>varints是protobuf的序列化整型数据的一种编码方式，它的优点是整型数据的值越小，编码后所用的字节数越小</p>
+</blockquote>
+
+<p>在base128中，有效存储的只有7位，其中第8位是用于存储标志位：如果这一位是1，就表示这个字节后面还有其他字节，如果这个位是0的话，就表示这是最后一个字节了，这样一来，就可以准确的知道一个整数的结束位置。</p>
+
+<p>对于编码的步骤，可以看skoo的 <a href="http://skoo.me/algorithm/2013/09/30/base-128-varint">《Base 128 Varint, 一种处理整数的变长二进制编码算法》</a></p>
+
+<p>下面是一个go的实现例子，我们尝试把占用8字节的int64的整数，转换为更小&rdquo;长度&rdquo;的整数</p>
+<pre><code>package main
+
+import (
+    &quot;bytes&quot;
+    &quot;fmt&quot;
+)
+
+func toBase128Int(out *bytes.Buffer, n int64) (err error) {
+    if n == 0 {
+        err = out.WriteByte(0)
+        return
+    }
+
+    l := 0
+    for i := n; i &gt; 0; i &gt;&gt;= 7 {
+        l++
+    }
+
+    for i := l - 1; i &gt;= 0; i-- {
+        o := byte(n &gt;&gt; uint(i*7))
+        o &amp;= 0x7f
+        if i != 0 {
+            o |= 0x80
+        }
+        err = out.WriteByte(o)
+        if err != nil {
+            return
+        }
+    }
+
+    return nil
+}
+
+func main() {
+    num := int64(30)
+    b := bytes.Buffer{}
+    toBase128Int(&amp;b, num)
+    fmt.Printf(&quot;%v\n&quot;, b.Bytes())
+
+    num2 := int64(300)
+    b2 := bytes.Buffer{}
+    toBase128Int(&amp;b2, num2)
+    fmt.Printf(&quot;%v\n&quot;, b2.Bytes())
+}
+
+</code></pre>
+
+<p>输出结果：</p>
+<pre><code>[30]
+[130 44]
+</code></pre>
+
+<p>通过varint,我们可以用更小的内存存储我们的数据，而不是统一固定用4个字节或者8个字节。好处显然是非常明显的，特别是在二进制网络协议设计的时候，对整数进行变长编码很有必要。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="base-128-varint" data-title="Base128变长编码 - domac博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
