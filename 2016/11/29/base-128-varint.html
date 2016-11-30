@@ -92,7 +92,7 @@ import (
     &quot;fmt&quot;
 )
 
-func toBase128Int(out *bytes.Buffer, n int64) (err error) {
+func marshall128Int(out *bytes.Buffer, n int64) (err error) {
     if n == 0 {
         err = out.WriteByte(0)
         return
@@ -118,23 +118,46 @@ func toBase128Int(out *bytes.Buffer, n int64) (err error) {
     return nil
 }
 
+func unmashallBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) {
+    offset = initOffset
+    for shifted := 0; offset &lt; len(bytes); shifted++ {
+        if shifted &gt; 4 {
+            err = fmt.Errorf(&quot;Structural Error: base 128 integer too large&quot;)
+            return
+        }
+        ret &lt;&lt;= 7
+        b := bytes[offset]
+        ret |= int(b &amp; 0x7f)
+        offset++
+        if b&amp;0x80 == 0 {
+            return
+        }
+    }
+    err = fmt.Errorf(&quot;Syntax Error: truncated base 128 integer&quot;)
+    return
+}
+
 func main() {
     num := int64(30)
     b := bytes.Buffer{}
-    toBase128Int(&amp;b, num)
+    marshall128Int(&amp;b, num)
     fmt.Printf(&quot;%v\n&quot;, b.Bytes())
 
     num2 := int64(300)
     b2 := bytes.Buffer{}
-    toBase128Int(&amp;b2, num2)
+    marshall128Int(&amp;b2, num2)
+    ret, offset, _ := unmashallBase128Int(b2.Bytes(), 0)
     fmt.Printf(&quot;%v\n&quot;, b2.Bytes())
+    fmt.Printf(&quot;%d , size: %d \n&quot;, ret, offset)
 }
+
 
 </code></pre>
 
 <p>输出结果：</p>
 <pre><code>[30]
 [130 44]
+300 , size: 2
 </code></pre>
 
 <p>通过varint,我们可以用更小的内存存储我们的数据，而不是统一固定用4个字节或者8个字节。好处显然是非常明显的，特别是在二进制网络协议设计的时候，对整数进行变长编码很有必要。</p>
