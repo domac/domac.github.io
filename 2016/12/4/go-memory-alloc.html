@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Go的内存分配 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="go memory alloc"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">12</span>
+                            <span class="day">4</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/12/4/go-memory-alloc.html">Go的内存分配</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                        </aside>
+                        <section class="brief"><h2 id="内存分配知识">内存分配知识</h2>
+
+<ul>
+<li>计算机系统的主存被组织成一个由M个连续的字节大小的单元组成的数组，每个字节都有一个唯一的物理地址（PA）</li>
+<li>现代处理器使用的是一种为虚拟寻址（VA）的寻址形式，最少的寻址单位是字</li>
+<li>虚拟地址映射物理地址是通过读取页表（page table）进行地址翻译完成的：页表存放在物理存储器中</li>
+<li>MMU（内核吧物理页作为内存管理的基本单位）以页（page）大小为单位来管理系统中的页表</li>
+<li>在虚拟存储器的习惯说法中，DRAM缓存不命中的成为：缺页</li>
+<li>page的结构与物理页相关，而非与虚拟页相关</li>
+<li>系统中的每个物理页都要分配一个page结构体</li>
+</ul>
+
+<p>在了解Go的内存分配器原理之前，我们先了解一下“动态存储分配器”</p>
+
+<h3 id="动态存储分配器">动态存储分配器</h3>
+
+<p>动态存储分配器维护着一个进程的虚拟存储区域，这个区域称为 “堆”，堆可以视为一组大小不同的 “块”（chunk: 连续的虚拟存储片）的集合，并交由动态存储器维护。</p>
+
+<p>动态分配器主要分为：
+ - 显式：常见的malloc
+ - 隐式：垃圾回收</p>
+
+<h3 id="mmap函数">mmap函数</h3>
+
+<p>Unix进程可以使用mmap函数来创建新的虚拟存储区域并将对象映射到这些区域中。</p>
+
+<p>mmap函数要求内核创建一个新的虚拟存储区域，最好是从地址start开始的一个区域，并将文件描述符fd指定的对象的一个连续的片（chunk）映射到新的区域。</p>
+
+<h3 id="数据频繁分配与回收">数据频繁分配与回收</h3>
+
+<p>对于有效地进行数据频繁分配与回收，减少碎片，一般有两种手段：</p>
+
+<ul>
+<li>空闲链表: 提供直接可供使用，已分配的结构块，缺点是不能全局控制</li>
+<li>slab：linux提供的，可以把不同的对象划分为所谓高速缓存组</li>
+</ul>
+
+<h2 id="go的内存分配">Go的内存分配</h2>
+
+<p>Go的内存分配器是采用google自家的tcmalloc，tcmalloc是一个带内存池的分配器，底层直接调用mmap函数，并使用bestfit进行动态分配。</p>
+
+<p>Go为每个系统线程分配了一个本地MCache,少量的地址分配就是从MCache分配的，并且定期进行垃圾回收，所以可见go的分配器包含了显式与隐式的调用。</p>
+
+<p>Go定义的小块内存，大小上是指32K或以下的对象，go底层会把这些小块内存按照指定规格（大约100种）进行切割：为了避免随意切割，申请任意字节内存时会向上取整到接近的块，将整块分配（从空闲链表）给到申请者。</p>
+
+<p>Go内存分配主要组成：</p>
+
+<ul>
+<li><p>FixAlloc：目的是用来分配Mcache和Mspan两个特定的对象</p></li>
+
+<li><p>MHeap：负责将MSpan组织和管理起来。</p>
+
+<ul>
+<li>分配过程：从free[]中分配，如果发生切割则将剩余的部分放回到free[]中</li>
+<li>回收过程：回收一个Mspan时，首选查找它相邻的地址，再通过map映射得到对应的Mspan，如果Mspan的state是未使用，则可以将
+两者进行合并。最后将这页或者合并后的页归还到free[]分配池或者large中。</li>
+</ul></li>
+
+<li><p>MSpan</p></li>
+
+<li><p>MCache：层次与MHeap类似，对于每个尺寸的类别都有一个空闲链表。每个M都有自己的局部Mcache(小对象从它取，无需加锁)，这就是Go能够在
+多线程中高效内存管理的重要原因</p></li>
+
+<li><p>MCentral：在无空闲内存的时候，向Mheap申请一个span,而不是多个，申请的span包含多少个page由central的sizeclass来确定</p></li>
+</ul>
+
+<h3 id="go的内存模型">Go的内存模型</h3>
+
+<p>Go的内存模型可以视为两级的内存模型：</p>
+
+<ul>
+<li><p>第一级：Mheap为主要组件：分配的单位是页，但管理的单位是MSpan,每次分配都是用bestFit的原则分配连续的页，回收是采用位图的方式。</p></li>
+
+<li><p>第二级：MCache为只要组件：相当于一个内存池， 回收采用引用计数器</p></li>
+</ul>
+
+<h3 id="内存分配流程">内存分配流程</h3>
+
+<p>1、将小对象的大小向上取整到一个对应的尺寸类别（大约100种），查找相应的MCache的空闲链表，如果链表不空，直接从上面分配一个对象，这个过程不加锁</p>
+
+<p>2、如果MCache自由链表是空的，通过MCentral的自由链表取一些对象进行补充</p>
+
+<p>3、如果MCentral的自由链表是空的，则往MHeap中取用一些页对MCentral进行补充，然后将这些内存截断成特定规格</p>
+
+<p>4、如果MHeap空或者没有足够大的页的情况下，从OS分配一组新的页面，一般在1MB以上</p>
+
+<p>Go分配流程核心源码实现：</p>
+<pre><code>func mallocgc(size uintptr, typ *_type, flags uint32) unsafe.Pointer {
+    if gcphase == _GCmarktermination {
+        throw(&quot;mallocgc called with gcphase == _GCmarktermination&quot;)
+    }
+
+    if size == 0 {
+        return unsafe.Pointer(&amp;zerobase)
+    }
+
+    if flags&amp;flagNoScan == 0 &amp;&amp; typ == nil {
+        throw(&quot;malloc missing type&quot;)
+    }
+
+    if debug.sbrk != 0 {
+        align := uintptr(16)
+        if typ != nil {
+            align = uintptr(typ.align)
+        }
+        return persistentalloc(size, align, &amp;memstats.other_sys)
+    }
+
+    // assistG is the G to charge for this allocation, or nil if
+    // GC is not currently active.
+    var assistG *g
+    if gcBlackenEnabled != 0 {
+        // Charge the current user G for this allocation.
+        assistG = getg()
+        if assistG.m.curg != nil {
+            assistG = assistG.m.curg
+        }
+        // Charge the allocation against the G. We'll account
+        // for internal fragmentation at the end of mallocgc.
+        assistG.gcAssistBytes -= int64(size)
+
+        if assistG.gcAssistBytes &lt; 0 {
+            // This G is in debt. Assist the GC to correct
+            // this before allocating. This must happen
+            // before disabling preemption.
+            gcAssistAlloc(assistG)
+        }
+    }
+
+    // Set mp.mallocing to keep from being preempted by GC.
+    mp := acquirem()
+    if mp.mallocing != 0 {
+        throw(&quot;malloc deadlock&quot;)
+    }
+    if mp.gsignal == getg() {
+        throw(&quot;malloc during signal&quot;)
+    }
+    mp.mallocing = 1
+
+    shouldhelpgc := false
+    dataSize := size
+    c := gomcache()
+    var s *mspan
+    var x unsafe.Pointer
+    if size &lt;= maxSmallSize {
+        if flags&amp;flagNoScan != 0 &amp;&amp; size &lt; maxTinySize {
+            //小对象分配
+            off := c.tinyoffset
+            // Align tiny pointer for required (conservative) alignment.
+            if size&amp;7 == 0 {
+                off = round(off, 8)
+            } else if size&amp;3 == 0 {
+                off = round(off, 4)
+            } else if size&amp;1 == 0 {
+                off = round(off, 2)
+            }
+            if off+size &lt;= maxTinySize &amp;&amp; c.tiny != 0 {
+                // The object fits into existing tiny block.
+                x = unsafe.Pointer(c.tiny + off)
+                c.tinyoffset = off + size
+                c.local_tinyallocs++
+                mp.mallocing = 0
+                releasem(mp)
+                return x
+            }
+            // Allocate a new maxTinySize block.
+            s = c.alloc[tinySizeClass]
+            v := s.freelist
+            if v.ptr() == nil {
+                systemstack(func() {
+                    c.refill(tinySizeClass)
+                })
+                shouldhelpgc = true
+                s = c.alloc[tinySizeClass]
+                v = s.freelist
+            }
+            s.freelist = v.ptr().next
+            s.ref++
+            // prefetchnta offers best performance, see change list message.
+            prefetchnta(uintptr(v.ptr().next))
+            x = unsafe.Pointer(v)
+            (*[2]uint64)(x)[0] = 0
+            (*[2]uint64)(x)[1] = 0
+            // See if we need to replace the existing tiny block with the new one
+            // based on amount of remaining free space.
+            if size &lt; c.tinyoffset || c.tiny == 0 {
+                c.tiny = uintptr(x)
+                c.tinyoffset = size
+            }
+            size = maxTinySize
+        } else {
+            var sizeclass int8
+            if size &lt;= 1024-8 {
+                sizeclass = size_to_class8[(size+7)&gt;&gt;3]
+            } else {
+                sizeclass = size_to_class128[(size-1024+127)&gt;&gt;7]
+            }
+            size = uintptr(class_to_size[sizeclass])
+            s = c.alloc[sizeclass]
+            v := s.freelist
+            if v.ptr() == nil {
+                systemstack(func() {
+                    c.refill(int32(sizeclass))
+                })
+                shouldhelpgc = true
+                s = c.alloc[sizeclass]
+                v = s.freelist
+            }
+            s.freelist = v.ptr().next
+            s.ref++
+            // prefetchnta offers best performance, see change list message.
+            prefetchnta(uintptr(v.ptr().next))
+            x = unsafe.Pointer(v)
+            if flags&amp;flagNoZero == 0 {
+                v.ptr().next = 0
+                if size &gt; 2*sys.PtrSize &amp;&amp; ((*[2]uintptr)(x))[1] != 0 {
+                    memclr(unsafe.Pointer(v), size)
+                }
+            }
+        }
+    } else {
+        var s *mspan
+        shouldhelpgc = true
+        systemstack(func() {
+            s = largeAlloc(size, flags)
+        })
+        x = unsafe.Pointer(uintptr(s.start &lt;&lt; pageShift))
+        size = s.elemsize
+    }
+
+    if flags&amp;flagNoScan != 0 {
+        // All objects are pre-marked as noscan. Nothing to do.
+    } else {
+        if typ == deferType {
+            dataSize = unsafe.Sizeof(_defer{})
+        }
+        heapBitsSetType(uintptr(x), size, dataSize, typ)
+        if dataSize &gt; typ.size {
+            // Array allocation. If there are any
+            // pointers, GC has to scan to the last
+            // element.
+            if typ.ptrdata != 0 {
+                c.local_scan += dataSize - typ.size + typ.ptrdata
+            }
+        } else {
+            c.local_scan += typ.ptrdata
+        }
+        publicationBarrier()
+    }
+    if gcphase == _GCmarktermination || gcBlackenPromptly {
+        systemstack(func() {
+            gcmarknewobject_m(uintptr(x), size)
+        })
+    }
+
+    if raceenabled {
+        racemalloc(x, size)
+    }
+    if msanenabled {
+        msanmalloc(x, size)
+    }
+
+    mp.mallocing = 0
+    releasem(mp)
+
+    if debug.allocfreetrace != 0 {
+        tracealloc(x, size, typ)
+    }
+
+    if rate := MemProfileRate; rate &gt; 0 {
+        if size &lt; uintptr(rate) &amp;&amp; int32(size) &lt; c.next_sample {
+            c.next_sample -= int32(size)
+        } else {
+            mp := acquirem()
+            profilealloc(mp, x, size)
+            releasem(mp)
+        }
+    }
+
+    if assistG != nil {
+        // Account for internal fragmentation in the assist
+        // debt now that we know it.
+        assistG.gcAssistBytes -= int64(size - dataSize)
+    }
+
+    if shouldhelpgc &amp;&amp; gcShouldStart(false) {
+        gcStart(gcBackgroundMode, false)
+    }
+
+    return x
+}
+</code></pre>
+
+<h3 id="go也有happens-before">Go也有happens-before</h3>
+
+<p>go happens-before常用的三原则是：</p>
+
+<ul>
+<li>对于不带缓冲区的channel，对其写happens-before对其读</li>
+<li>对于带缓冲区的channel,对其读happens-before对其写</li>
+<li>不带缓冲的channel的接收操作 happens-before 相应channel的发送操作完成</li>
+</ul>
+
+<p>所以我们看看下面的例子哪个是有问题的：</p>
+
+<p>例子一：</p>
+<pre><code>var c = make(chan int, 10)
+var a string
+func f() {
+    a = &quot;hello, world&quot; 
+    c &lt;- 0 
+}
+func main() {
+    go f()
+    &lt;-c  
+    print(a)
+}
+</code></pre>
+
+<p>例子二：</p>
+<pre><code>var c = make(chan int)
+var a string
+func f() {
+    a = &quot;hello, world&quot;
+    &lt;-c 
+}
+func main() {
+    go f()
+    c &lt;- 0 
+    print(a)
+}
+</code></pre>
+
+<p>例子三：</p>
+<pre><code>var c = make(chan int, 1)
+var a string
+func f() {
+    a = &quot;hello, world&quot; 
+    &lt;-c   
+}
+func main() {
+    go f()
+    c &lt;- 0 
+    print(a)
+}
+</code></pre>
+
+<h3 id="参考资料">参考资料</h3>
+
+<p><a href="https://tiancaiamao.gitbooks.io/go-internals/content/zh//10.1.html">go内存模型</a><br />
+<a href="http://blog.csdn.net/hguisu/article/details/5713164">操作系统内存管理</a></p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="go-memory-alloc" data-title="Go的内存分配 - domac博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
