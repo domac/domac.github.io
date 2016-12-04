@@ -133,7 +133,7 @@
 <ul>
 <li><p>第一级：Mheap为主要组件：分配的单位是页，但管理的单位是MSpan,每次分配都是用bestFit的原则分配连续的页，回收是采用位图的方式。</p></li>
 
-<li><p>第二级：MCache为只要组件：相当于一个内存池， 回收采用引用计数器</p></li>
+<li><p>第二级：MCache为主要组件：相当于一个内存池， 回收采用引用计数器</p></li>
 </ul>
 
 <h3 id="内存分配流程">内存分配流程</h3>
@@ -144,7 +144,7 @@
 
 <p>3、如果MCentral的自由链表是空的，则往MHeap中取用一些页对MCentral进行补充，然后将这些内存截断成特定规格</p>
 
-<p>4、如果MHeap空或者没有足够大的页的情况下，从OS分配一组新的页面，一般在1MB以上</p>
+<p>4、如果MHeap空或者没有足够大的页的情况下，从操作系统分配一组新的页面，一般在1MB以上</p>
 
 <p>Go分配流程核心源码实现：</p>
 <pre><code>func mallocgc(size uintptr, typ *_type, flags uint32) unsafe.Pointer {
@@ -360,7 +360,7 @@
 <ul>
 <li>对于不带缓冲区的channel，对其写happens-before对其读</li>
 <li>对于带缓冲区的channel,对其读happens-before对其写</li>
-<li>不带缓冲的channel的接收操作 happens-before 相应channel的发送操作完成</li>
+<li>对于不带缓冲的channel的接收操作 happens-before 相应channel的发送操作完成</li>
 </ul>
 
 <p>所以我们看看下面的例子哪个是有问题的：</p>
