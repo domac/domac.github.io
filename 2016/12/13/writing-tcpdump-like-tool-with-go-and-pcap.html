@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>基于pcap写一个简单的tcpdump - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="writing tcpdump like tool with go and pcap"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">12</span>
+                            <span class="day">13</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/12/13/writing-tcpdump-like-tool-with-go-and-pcap.html">基于pcap写一个简单的tcpdump</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/linux.html">linux</a>
+                        </aside>
+                        <section class="brief"><h2 id="pcap">PCAP</h2>
+
+<p>pcap (packet capture) 通涵盖两个概念：API 和 库(libpcap)，其中API是使用C进行编写的；
+pcap的用途很广，我们常见的工具例如tcpdump、netstat、wireshark、gor等跟网络嗅探相关的都离不开libpcap库的支持。</p>
+
+<p>libpcap的开发常见主要有以下几种：</p>
+
+<ul>
+<li>数据包捕获：捕获流经网卡的原始数据包</li>
+<li>自定义数据包发送：构造任何格式的原始数据包</li>
+<li>流量采集与统计：采集网络中的流量信息</li>
+<li>规则过滤：提供自带规则过滤功能，按需要选择过滤规则</li>
+</ul>
+
+<p>它的应用范围非常广泛，典型应用包括玩罗协议分析器，网络流量发生器，网络入侵检测系统，网络扫描器和其他安全工具。</p>
+
+<h2 id="libpcap工作原理">libpcap工作原理</h2>
+
+<p>作为捕捉网络数据包的库，它是一个独立于系统的用户级的API接口，为底层网络检测提供了一个可移植的框架。</p>
+
+<p>一个包的捕捉分为三个主要部分，包括面向底层包捕获、面向中间层的数据包过滤和面向应用层的用户接口。
+这与Linux操作系统对数据包的处理流程是相同的（网卡-&gt;网卡驱动-&gt;数据链路层-&gt;IP层-&gt;传输层-&gt;应用程序）。</p>
+
+<p>工作流程图：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/libpcap.png" alt="pcap" /></p>
+
+<p>包捕获机制是在数据链路层增加一个旁路处理（并不干扰系统自身的网络协议栈的处理），对发送和接收的数据包通过Linux内核做过滤和缓冲处理，最后直接传递给上层应用程序。</p>
+
+<p>接下来我们归纳下libpcap的流程：</p>
+
+<ul>
+<li><p>查找网络设备：目的是发现可用的网卡，实现的函数为pcap_lookupdev()，如果当前有多个网卡，函数就会返回一个网络设备名的指针列表。</p></li>
+
+<li><p>打开网络设备：利用上一步中的返回值，可以决定使用哪个网卡，通过函数pcap_open_live()打开网卡，返回用于捕捉网络数据包的秒数字。</p></li>
+
+<li><p>获得网络参数：这里是利用函数pcap_lookupnet()，可以获得指定网络设备的IP地址和子网掩码。</p></li>
+
+<li><p>编译过滤策略：Lipcap的主要功能就是提供数据包的过滤，函数pcap_compile()来实现。</p></li>
+
+<li><p>设置过滤器：在上一步的基础上利用pcap_setfilter()函数来设置。</p></li>
+
+<li><p>利用回调函数，捕获数据包：函数pcap_loop()和pcap_dispatch()来抓去数据包，也可以利用函数pcap_next()和pcap_next_ex()来完成同样的工作。</p></li>
+
+<li><p>关闭网络设备：pcap_close()函数关系设备，释放资源。</p></li>
+</ul>
+
+<h2 id="代码实现">代码实现</h2>
+
+<p>了解了原理和工作流程后，我们可以自己尝试做一个嗅探工具。</p>
+
+<p>我们以原生的tcpdump为参考，用Go语言来做一个“轮子”</p>
+
+<p>代码如下：</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;bufio&quot;
+    &quot;flag&quot;
+    &quot;fmt&quot;
+    &quot;github.com/gophil/pcap&quot;
+    &quot;os&quot;
+    &quot;os/signal&quot;
+    &quot;strconv&quot;
+    &quot;time&quot;
+)
+
+const (
+    TYPE_IP  = 0x0800
+    TYPE_ARP = 0x0806
+    TYPE_IP6 = 0x86DD
+
+    IP_ICMP = 1
+    IP_INIP = 4
+    IP_TCP  = 6
+    IP_UDP  = 17
+)
+
+var (
+    device  = flag.String(&quot;i&quot;, &quot;&quot;, &quot;interface&quot;)      //设备名: en0,bond0
+    ofile   = flag.String(&quot;d&quot;, &quot;&quot;, &quot;dump file path&quot;) //生成离线文件
+    read    = flag.String(&quot;r&quot;, &quot;&quot;, &quot;read dump file&quot;) //生成离线文件
+    snaplen = flag.Int(&quot;s&quot;, 65535, &quot;snaplen&quot;)
+    hexdump = flag.Bool(&quot;X&quot;, false, &quot;hexdump&quot;)
+    help    = flag.Bool(&quot;h&quot;, false, &quot;help&quot;)
+    count   = flag.String(&quot;c&quot;, &quot;&quot;, &quot;capture count of the dump line&quot;)
+    timeout = flag.String(&quot;t&quot;, &quot;&quot;, &quot;timeout&quot;)
+)
+
+func main() {
+    expr := &quot;&quot;
+
+    flag.Usage = func() {
+        fmt.Fprintf(os.Stderr,
+            &quot;usage: %s \n [ -i interface ] \n [ -t timeout ] \n [ -c count ] \n [ -s snaplen ] \n [ -X hexdump ] \n [ -d dump file ] \n [ -r read file ] \n [ -h show usage] \n [ expression ] \n&quot;, os.Args[0])
+        os.Exit(1)
+    }
+
+    flag.Parse()
+
+    if len(flag.Args()) &gt; 0 {
+        expr = flag.Arg(0)
+    }
+
+    if *help {
+        flag.Usage()
+    }
+
+    if *read != &quot;&quot; {
+        src := *read
+        f, err := os.Open(src)
+        if err != nil {
+            fmt.Printf(&quot;couldn't open %q: %v\n&quot;, src, err)
+            return
+        }
+        defer f.Close()
+        reader, err := pcap.NewReader(bufio.NewReader(f))
+        if err != nil {
+            fmt.Printf(&quot;couldn't create reader: %v\n&quot;, err)
+            return
+        }
+        for {
+            pkt := reader.Next()
+            if pkt == nil {
+                break
+            }
+            pkt.Decode()
+            fmt.Println(pkt)
+            if *hexdump {
+                Hexdump(pkt)
+            }
+        }
+        return
+    }
+
+    if *device == &quot;&quot; {
+        devs, err := pcap.FindAllDevs()
+        if err != nil {
+            fmt.Fprintln(os.Stderr, &quot;tinydump: couldn't find any devices:&quot;, err)
+        }
+        if 0 == len(devs) {
+            flag.Usage()
+        }
+        *device = devs[0].Name
+    }
+
+    //在线方式读取
+    h, err := pcap.OpenLive(*device, int32(*snaplen), true, 500)
+    if h == nil {
+        fmt.Fprintf(os.Stderr, &quot;tinydump:&quot;, err)
+        return
+    }
+    defer h.Close()
+
+    //设置过滤
+    if expr != &quot;&quot; {
+        fmt.Println(&quot;tinydump: setting filter to&quot;, expr)
+        ferr := h.SetFilter(expr)
+        if ferr != nil {
+            fmt.Println(&quot;tinydump:&quot;, ferr)
+        }
+    }
+
+    cs := *count
+    lineCoint := 1
+    useCount := false
+    if cs != &quot;&quot; {
+        useCount = true
+        lineCoint, err = strconv.Atoi(cs)
+        if err != nil {
+            lineCoint = 1
+        }
+    }
+
+    //生成离线分析文件
+    if *ofile != &quot;&quot; {
+        dumper, oerr := h.DumpOpen(ofile)
+        signalNotify(h, dumper)
+        if oerr != nil {
+            fmt.Fprintln(os.Stderr, &quot;tinydump: couldn't write to file:&quot;, oerr)
+        }
+        _, lerr := h.PcapLoop(lineCoint-1, dumper)
+        if lerr != nil {
+            fmt.Fprintln(os.Stderr, &quot;tinydump: loop error:&quot;, lerr, h.Geterror())
+        }
+        defer h.PcapDumpClose(dumper)
+        return
+    }
+
+    //超时处理
+    ts := *timeout
+    if ts != &quot;&quot; {
+        t, err := strconv.Atoi(ts)
+        if err == nil {
+            time.AfterFunc(time.Second*time.Duration(t), func() {
+                h.Close()
+                os.Exit(1)
+            })
+        }
+    }
+
+    //监听事件消息输出
+    for pkt, r := h.NextEx(); r &gt;= 0; pkt, r = h.NextEx() {
+        if r == 0 {
+            // 超时, continue(100)
+            continue
+        }
+
+        if useCount {
+            lineCoint = lineCoint - 1
+            if lineCoint &lt; 0 {
+                h.Close()
+                os.Exit(1)
+            }
+        }
+
+        pkt.Decode()
+        fmt.Println(pkt)
+        if *hexdump {
+            Hexdump(pkt)
+        }
+
+    }
+    fmt.Fprintln(os.Stderr, &quot;tinydump:&quot;, h.Geterror())
+
+}
+
+func signalNotify(h *pcap.Pcap, dumper *pcap.PcapDumper) {
+    c := make(chan os.Signal, 1)
+    signal.Notify(c, os.Interrupt)
+    go func() {
+        for sig := range c {
+            fmt.Fprintln(os.Stderr, &quot;tinydump: received signal:&quot;, sig)
+            if os.Interrupt == sig {
+                //关闭退出
+                h.PcapDumpClose(dumper)
+                h.Close()
+                os.Exit(1)
+            }
+        }
+    }()
+}
+
+func min(a, b int) int {
+    if a &lt; b {
+        return a
+    }
+    return b
+}
+
+func Hexdump(pkt *pcap.Packet) {
+    for i := 0; i &lt; len(pkt.Data); i += 16 {
+        Dumpline(uint32(i), pkt.Data[i:min(i+16, len(pkt.Data))])
+    }
+}
+
+//行dump
+func Dumpline(addr uint32, line []byte) {
+    fmt.Printf(&quot;\t0x%04x: &quot;, int32(addr))
+    var i uint16
+    for i = 0; i &lt; 16 &amp;&amp; i &lt; uint16(len(line)); i++ {
+        if i%2 == 0 {
+            fmt.Print(&quot; &quot;)
+        }
+        fmt.Printf(&quot;%02x&quot;, line[i])
+    }
+    for j := i; j &lt;= 16; j++ {
+        if j%2 == 0 {
+            fmt.Print(&quot; &quot;)
+        }
+        fmt.Print(&quot;  &quot;)
+    }
+    fmt.Print(&quot;  &quot;)
+    for i = 0; i &lt; 16 &amp;&amp; i &lt; uint16(len(line)); i++ {
+        if line[i] &gt;= 32 &amp;&amp; line[i] &lt;= 126 {
+            fmt.Println(&quot;%c&quot;, line[i])
+        } else {
+            fmt.Print(&quot;.&quot;)
+        }
+    }
+    fmt.Println()
+}
+
+</code></pre>
+
+<h3 id="使用方法">使用方法：</h3>
+<pre><code>go build
+</code></pre>
+
+<p>生成 <code>tinydump</code> 执行文件</p>
+
+<h4 id="命令参数">命令参数</h4>
+<pre><code>sudo ./tinydump -h
+
+ [ -i interface ]
+ [ -t timeout ]
+ [ -c count ]
+ [ -s snaplen ]
+ [ -X hexdump ]
+ [ -d dump file ]
+ [ -r read file ]
+ [ -h show usage]
+ [ expression ]
+</code></pre>
+
+<p>使用范例:</p>
+
+<p>1.直接使用</p>
+<pre><code>$ sudo ./tinydump 
+</code></pre>
+
+<p>2.host过滤</p>
+<pre><code>$ sudo ./tinydump 'src 192.168.1.101 or dst 192.168.1.101'
+</code></pre>
+
+<p>3.端口过滤</p>
+<pre><code>$ sudo ./tinydump 'port 8000'
+</code></pre>
+
+<p>4.超时捕获 (时间单位为秒)</p>
+<pre><code>$ sudo ./tinydump -t 60
+</code></pre>
+
+<p>5.生成快照文件</p>
+<pre><code>$ sudo ./tinydump -d /tmp/test.cap
+</code></pre>
+
+<p>6.读取快照文件</p>
+<pre><code>$ sudo ./tinydump -r /tmp/test.cap
+</code></pre>
+
+<p>7.捕获指定行数的包</p>
+<pre><code>$ sudo ./tinydump -c 10
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<p>到这里为止，我们结合原理实现了一个Go的tcpdump工具。我们日常开发中，理解透原理也是我们做好工具的第一步。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="writing-tcpdump-like-tool-with-go-and-pcap" data-title="基于pcap写一个简单的tcpdump - domac博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
