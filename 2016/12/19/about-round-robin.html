@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>关于Round-Robin - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="about round robin"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">12</span>
+                            <span class="day">19</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/12/19/about-round-robin.html">关于Round-Robin</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                        </aside>
+                        <section class="brief"><h2 id="背景">背景</h2>
+
+<p>之前写过一篇关于 <a href="http://lihaoquan.me/2016/7/17/using-vulcand.html">vulcand的文章</a> ,
+里面理解介绍了vulcand作为服务负载的相关信息。</p>
+
+<p>它的功能处理架构如下：</p>
+<pre><code>               +----------------------------------------^------+
+               |                       +---------------v+ etcd |
+               |                       |                +-----^+
+               |                       |                      |
+               |       +-----------+   |                      |
+               |       |           |   |                      |
+     +----------------^+  vulcand  +^---------------+         |
+     |         |       |           |   |            |         |
+     |         |       +-----+-----+   |            |         |
+     |         |             ^         |            |         |
+     |         |             |         |            |         |
+     |         |             |         |            |         |
+     |         |             |         |            |         |
+     |         |             |         |            |         |
+     |         |             |         |            |         |
++----+-----+   |        +----+-----+   |      +-----+----+    |
+|          +---+---+    |          +---+---+  |          +----+--+
+|  Server  |       |    |  Server  |       |  |  Server  |       |
+|          | regis |    |          | regis |  |          | regis |
+|          |       |    |          |       |  |          |       |
++----------+-------+    +----------+-------+  +----------+-------+
+
+</code></pre>
+
+<p>可以看到 vulcand 支持弹性部署的同时，面向服务的角度，它还提供了负载均衡的处理。查看 vulcand 的源码，我们不难发现它背后是自己实现了一套 RR 的算法 ：<a href="https://github.com/mailgun/vulcan/blob/master/loadbalance/roundrobin/roundrobin.go">代码文件</a></p>
+
+<h2 id="weighted-round-robin-scheduling">Weighted Round-Robin Scheduling</h2>
+
+<p><code>Round-Robin</code>，轮询调度，通信中信道调度的一种策略，该调度策略使用户轮流使用共享资源，不会考虑瞬时信道条件。轮询调度算法的原理是每一次把来自用户的请求轮流分配给内部中的服务器，从1开始，直到N(内部服务器个数)，然后重新开始循环。</p>
+
+<p>算法的优点是其简洁性，它无需记录当前所有连接的状态，所以它是一种无状态调度。</p>
+
+<p><code>Weighted Round-Robin</code> 顾名思义就是带权重的RR调度方式。
+上面所讲的轮询调度算法并没有考虑每台服务器的处理能力，在实际情况中，可能并不是这种情况。由于每台服务器的配置、安装的业务应用等不同，其处理能力会不一样。所以，我们根据服务器的不同处理能力，给每个服务器分配不同的权值，使其能够接受相应权值数的服务请求。</p>
+
+<h2 id="nginx的负载方式">Nginx的负载方式</h2>
+
+<p>nginx的upstream的负载策略其实也是wrr的算法的实现。</p>
+
+<p>下面我们看下它其中的issue:</p>
+<pre><code>Upstream: smooth weighted round-robin balancing.
+For edge case weights like { 5, 1, 1 } we now produce { a, a, b, a, c, a, a }
+sequence instead of { c, b, a, a, a, a, a } produced previously.
+
+Algorithm is as follows: on each peer selection we increase current_weight
+of each eligible peer by its weight, select peer with greatest current_weight
+and reduce its current_weight by total number of weight points distributed
+among peers.
+
+In case of { 5, 1, 1 } weights this gives the following sequence of
+current_weight's:
+
+     a  b  c
+     0  0  0  (initial state)
+
+     5  1  1  (a selected)
+    -2  1  1
+
+     3  2  2  (a selected)
+    -4  2  2
+
+     1  3  3  (b selected)
+     1 -4  3
+
+     6 -3  4  (a selected)
+    -1 -3  4
+
+     4 -2  5  (c selected)
+     4 -2 -2
+
+     9 -1 -1  (a selected)
+     2 -1 -1
+
+     7  0  0  (a selected)
+     0  0  0
+
+To preserve weight reduction in case of failures the effective_weight
+variable was introduced, which usually matches peer's weight, but is
+reduced temporarily on peer failures.
+
+This change also fixes loop with backup servers and proxy_next_upstream
+http_404 (ticket #47), and skipping alive upstreams in some cases if there
+are multiple dead ones (ticket #64).
+
+
+git-svn-id: svn://svn.nginx.org/nginx/trunk@4622 73f98a42-aea0-e011-b76d-00259023448c
+</code></pre>
+
+<p>上述描述可能不太直观，来看个例子。</p>
+
+<p>现在使用以下的upstream配置块：</p>
+<pre><code>upstream backend {
+    server a weight=4;
+    server b weight=2;
+    server c weight=1;
+}
+</code></pre>
+
+<p>按照这个配置，每7个客户端请求中，a会被选中4次、b会被选中2次、c会被选中1次，且分布平滑。
+我们来算算看是不是这样子的。
+initial current_weight of a, b, c is { 0, 0, 0 }</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/rr.png" alt="pprr" /></p>
+
+<p>通过上述过程，可得以下结论：</p>
+
+<ol>
+<li><p>7个请求中，a、b、c分别被选取了4、2、1次，符合它们的权重值。</p></li>
+
+<li><p>7个请求中，a、b、c被选取的顺序为a, b, a, c, a, b, a，分布均匀，权重大的后端a没有被连续选取。</p></li>
+
+<li><p>每经过7个请求后，a、b、c的current_weight又回到初始值{ 0, 0, 0 }，因此上述流程是不断循环的。</p></li>
+</ol>
+
+<p>这种算法不但实现了基于权重的轮询算法，而且还实现了平滑的算法：所谓平滑，就是在一段时间内，不仅服务器被选择的次数的分布和它们的权重一致，而且调度算法还比较均匀的选择服务器，而不会集中一段时间之内只选择某一个权重比较高的服务器。如果使用随机算法选择或者普通的基于权重的轮询算法，就比较容易造成某个服务集中被调用压力过大。</p>
+
+<h2 id="lvs的负载方式">LVS的负载方式</h2>
+
+<p>LVS使用的另外一种算法。</p>
+
+<p>设计思路可以查看 <a href="http://www.linuxvirtualserver.org/docs/scheduling.html">Job Scheduling Algorithms in Linux Virtual Server</a></p>
+
+<p>主要实现算法如下：</p>
+<pre><code>Supposing that there is a server set S = {S0, S1, …, Sn-1};
+W(Si) indicates the weight of Si;
+i indicates the server selected last time, and i is initialized with -1;
+cw is the current weight in scheduling, and cw is initialized with zero; 
+max(S) is the maximum weight of all the servers in S;
+gcd(S) is the greatest common divisor of all server weights in S;
+
+while (true) {
+    i = (i + 1) mod n;
+    if (i == 0) {
+        cw = cw - gcd(S); 
+        if (cw &lt;= 0) {
+            cw = max(S);
+            if (cw == 0)
+            return NULL;
+        }
+    } 
+    if (W(Si) &gt;= cw) 
+        return Si;
+}
+</code></pre>
+
+<h2 id="go代码实现">Go代码实现</h2>
+
+<p>我们抽离vulcand的rr实现，利用其思想我们实现了一个简单高效的WRR实现</p>
+<pre><code class="language-go">
+package roundrobin
+
+// RR: 基于 权重round robin算法的接口
+type RR interface {
+    Next() interface{}
+    Add(node interface{}, weight int)
+    RemoveAll()
+    Reset()
+}
+
+const (
+    RR_NGINX = 0 //Nginx算法
+    RR_LVS   = 1 //LVS算法
+)
+
+//算法实现工厂类
+func NewWeightedRR(rtype int) RR {
+    if rtype == RR_NGINX {
+        return &amp;WNGINX{}
+    } else if rtype == RR_LVS {
+        return &amp;WLVS{}
+    }
+    return nil
+}
+
+
+//节点结构
+type WeightNginx struct {
+    Node            interface{}
+    Weight          int
+    CurrentWeight   int
+    EffectiveWeight int
+}
+
+func (ww *WeightNginx) fail() {
+    ww.EffectiveWeight -= ww.Weight
+    if ww.EffectiveWeight &lt; 0 {
+        ww.EffectiveWeight = 0
+    }
+}
+
+//nginx算法实现类
+type WNGINX struct {
+    nodes []*WeightNginx
+    n     int
+}
+
+//增加权重节点
+func (w *WNGINX) Add(node interface{}, weight int) {
+    weighted := &amp;WeightNginx{
+        Node:            node,
+        Weight:          weight,
+        EffectiveWeight: weight}
+    w.nodes = append(w.nodes, weighted)
+    w.n++
+}
+
+func (w *WNGINX) RemoveAll() {
+    w.nodes = w.nodes[:0]
+    w.n = 0
+}
+
+//下次轮询事件
+func (w *WNGINX) Next() interface{} {
+    if w.n == 0 {
+        return nil
+    }
+    if w.n == 1 {
+        return w.nodes[0].Node
+    }
+
+    return nextWeightedNode(w.nodes).Node
+}
+
+func nextWeightedNode(nodes []*WeightNginx) (best *WeightNginx) {
+    total := 0
+
+    for i := 0; i &lt; len(nodes); i++ {
+        w := nodes[i]
+
+        if w == nil {
+            continue
+        }
+
+        w.CurrentWeight += w.EffectiveWeight
+        total += w.EffectiveWeight
+        if w.EffectiveWeight &lt; w.Weight {
+            w.EffectiveWeight++
+        }
+
+        if best == nil || w.CurrentWeight &gt; best.CurrentWeight {
+            best = w
+        }
+    }
+
+    if best == nil {
+        return nil
+    }
+    best.CurrentWeight -= total
+    return best
+}
+
+func (w *WNGINX) Reset() {
+    for _, s := range w.nodes {
+        s.EffectiveWeight = s.Weight
+        s.CurrentWeight = 0
+    }
+}
+
+
+//节点结构
+type WeightLvs struct {
+    Node   interface{}
+    Weight int
+}
+
+//lvs算法实现类
+type WLVS struct {
+    nodes []*WeightLvs
+    n     int
+    gcd   int //通用的权重因子
+    maxW  int //最大权重
+    i     int //被选择的次数
+    cw    int //当前的权重值
+}
+
+//下次轮询事件
+func (w *WLVS) Next() interface{} {
+    if w.n == 0 {
+        return nil
+    }
+
+    if w.n == 1 {
+        return w.nodes[0].Node
+    }
+
+    for {
+        w.i = (w.i + 1) % w.n
+        if w.i == 0 {
+            w.cw = w.cw - w.gcd
+            if w.cw &lt;= 0 {
+                w.cw = w.maxW
+                if w.cw == 0 {
+                    return nil
+                }
+            }
+        }
+        if w.nodes[w.i].Weight &gt;= w.cw {
+            return w.nodes[w.i].Node
+        }
+    }
+}
+
+//增加权重节点
+func (w *WLVS) Add(node interface{}, weight int) {
+    weighted := &amp;WeightLvs{Node: node, Weight: weight}
+    if weight &gt; 0 {
+        if w.gcd == 0 {
+            w.gcd = weight
+            w.maxW = weight
+            w.i = -1
+            w.cw = 0
+        } else {
+            w.gcd = gcd(w.gcd, weight)
+            if w.maxW &lt; weight {
+                w.maxW = weight
+            }
+        }
+    }
+    w.nodes = append(w.nodes, weighted)
+    w.n++
+}
+
+func gcd(x, y int) int {
+    var t int
+    for {
+        t = (x % y)
+        if t &gt; 0 {
+            x = y
+            y = t
+        } else {
+            return y
+        }
+    }
+}
+func (w *WLVS) RemoveAll() {
+    w.nodes = w.nodes[:0]
+    w.n = 0
+    w.gcd = 0
+    w.maxW = 0
+    w.i = -1
+    w.cw = 0
+}
+func (w *WLVS) Reset() {
+    w.i = -1
+    w.cw = 0
+}
+
+</code></pre>
+
+<p>有了上面的代码示例go，我们可以看下测试的例子：</p>
+<pre><code class="language-go">package roundrobin
+
+import (
+    &quot;math/rand&quot;
+    &quot;strconv&quot;
+    &quot;testing&quot;
+    &quot;time&quot;
+)
+
+func BenchmarkW1_Next(b *testing.B) {
+    b.ReportAllocs()
+    rand.Seed(time.Now().UnixNano())
+    w := NewWeightedRR(RR_NGINX)
+    for i := 0; i &lt; 10; i++ {
+        w.Add(&quot;server&quot;+strconv.Itoa(i), rand.Intn(100))
+    }
+
+    b.StartTimer()
+    for i := 0; i &lt; b.N; i++ {
+        w.Next()
+    }
+}
+
+func BenchmarkW2_Next(b *testing.B) {
+    b.ReportAllocs()
+    rand.Seed(time.Now().UnixNano())
+    w := NewWeightedRR(RR_LVS)
+    for i := 0; i &lt; 10; i++ {
+        w.Add(&quot;server&quot;+strconv.Itoa(i), rand.Intn(100))
+    }
+
+    b.StartTimer()
+    for i := 0; i &lt; b.N; i++ {
+        w.Next()
+    }
+}
+
+</code></pre>
+
+<p>基准测试报告：</p>
+<pre><code class="language-sh">BenchmarkNginx-4        30000000                53.6 ns/op             0 B/op          0 allocs/op
+BenchmarkLVS-4          30000000                34.7 ns/op             0 B/op          0 allocs/op
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<p>轮询调度算法以及权重轮询调度算法的特点是实现起来比较简洁，并且实用。目前几乎所有的负载均衡设备均提供这种功能。</p>
+
+<ul>
+<li><p>如果服务器的权重差别很大，出于平滑的考虑，避免短时间内会对服务器造成冲击，你可以选择<code>Nginx</code>的算法。</p></li>
+
+<li><p>如果服务器的差别不是很大，可以考虑使用<code>LVS</code>的算法，因为测试可以看到它的性能要好于Nginx的算法。</p></li>
+</ul>
+
+<h2 id="参考资料">参考资料</h2>
+
+<ul>
+<li><a href="http://colobu.com/2016/12/04/smooth-weighted-round-robin-algorithm/">鸟窝-平滑的基于权重的轮询算法</a></li>
+</ul>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <div class="ds-thread" data-thread-key="about-round-robin" data-title="关于Round-Robin - domac博客" data-url="http://localhost"></div>
+            <script type="text/javascript">
+                var duoshuoQuery = {short_name:"phillihq"};
+                (function() {
+                    var ds = document.createElement('script');
+                    ds.type = 'text/javascript';ds.async = true;
+                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+                    ds.charset = 'UTF-8';
+                    (document.getElementsByTagName('head')[0]
+                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+                })();
+            </script>
+        </div>
+    </div>
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
