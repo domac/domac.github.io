@@ -100,11 +100,11 @@ go tool pprof [binary] prof.cpu 来进行分析。</p></li>
 
 <h2 id="go-torch">go-torch</h2>
 
-<p>在没有使用go-torch之前，我们要分析一分profile文件的时候，遇到结构简单的还好，但遇到一些调用关系复杂的，我相信大部分程序员都被吓怕，如下图：</p>
+<p>在没有使用go-torch之前，我们要分析一分profile文件的时候，遇到结构简单的还好，但遇到一些调用关系复杂的，我相信大部分程序员都觉得无从下手，如下图：</p>
 
 <p><img src="http://og0usnhfv.bkt.clouddn.com/hard_profile.png" alt="hard-to-read-profile" /></p>
 
-<p>这样的结构，从心理上已经给我们带来极大的伤害了，我们需要寻求更直观，更简单的分析工具。</p>
+<p>这样的结构，带给我们的是晦涩难懂的感觉，我们需要寻求更直观，更简单的分析工具。</p>
 
 <p>go-torch是<code>Uber</code>公司开源的一款针对Go语言程序的火焰图生成工具，能收集 stack traces,并把它们整理成火焰图，直观地程序给开发人员。</p>
 
@@ -303,7 +303,7 @@ Entering interactive mode (type &quot;help&quot; for commands)
 <p>嗯，这样体验好多了，接下来我们可以基于这个火焰图诊断一下我们的web服务是否是“健康”的！</p>
 
 <blockquote>
-<p>火焰图的y轴表示cpu调用方法的先后，x轴表示在每个采样调用时间内，方法所占的时间百分比</p>
+<p>火焰图的y轴表示cpu调用方法的先后，x轴表示在每个采样调用时间内，方法所占的时间百分比，越宽代表占据cpu时间越多</p>
 </blockquote>
 
 <p>我们发现</p>
