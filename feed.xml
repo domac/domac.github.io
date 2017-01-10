@@ -3,8 +3,8 @@
     <title>domac博客</title>
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
-    <managingEditor>quanix@163.com (lihaoquan)</managingEditor>
-    <pubDate>Mon, 02 Jan 2017 11:04:12 +0800</pubDate>
+    <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
+    <pubDate>Tue, 10 Jan 2017 14:12:08 +0800</pubDate>
     <item>
       <title>Go代码调优利器-火焰图</title>
       <link>http://lihaoquan.me/2017/1/1/Profiling-and-Optimizing-Go-using-go-torch.html</link>
