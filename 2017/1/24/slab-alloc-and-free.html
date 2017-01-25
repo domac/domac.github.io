@@ -266,7 +266,7 @@ func (c *class) Pop() []byte {
 </code></pre>
 
 <p>编译无误后，我们编写基准测试代码：</p>
-<pre><code>package slab
+<pre><code>package memslabs
 
 import (
     &quot;testing&quot;
@@ -274,8 +274,9 @@ import (
 
 //GOMAXPROCS=16 go test -v -bench=. -benchmem
 
-func Benchmark_AtomPool_AllocAndFree_128(b *testing.B) {
-    pool := NewAtomPool(128, 1024, 2, 64*1024)
+//高并发申请128字节的内存,再释放
+func Benchmark_AllocAndFree_128(b *testing.B) {
+    pool := NewMemSlabPool(128, 1024, 2, 64*1024)
     b.ResetTimer()
     b.RunParallel(func(pb *testing.PB) {
         for pb.Next() {
@@ -284,8 +285,9 @@ func Benchmark_AtomPool_AllocAndFree_128(b *testing.B) {
     })
 }
 
-func Benchmark_AtomPool_AllocAndFree_256(b *testing.B) {
-    pool := NewAtomPool(128, 1024, 2, 64*1024)
+//高并发申请256字节的内存,再释放
+func Benchmark_AllocAndFree_256(b *testing.B) {
+    pool := NewMemSlabPool(128, 1024, 2, 64*1024)
     b.ResetTimer()
     b.RunParallel(func(pb *testing.PB) {
         for pb.Next() {
@@ -294,8 +296,9 @@ func Benchmark_AtomPool_AllocAndFree_256(b *testing.B) {
     })
 }
 
-func Benchmark_AtomPool_AllocAndFree_512(b *testing.B) {
-    pool := NewAtomPool(128, 1024, 2, 64*1024)
+//高并发申请512字节的内存,再释放
+func Benchmark_AllocAndFree_512(b *testing.B) {
+    pool := NewMemSlabPool(128, 1024, 2, 64*1024)
     b.ResetTimer()
     b.RunParallel(func(pb *testing.PB) {
         for pb.Next() {
@@ -303,6 +306,7 @@ func Benchmark_AtomPool_AllocAndFree_512(b *testing.B) {
         }
     })
 }
+
 
 </code></pre>
 
