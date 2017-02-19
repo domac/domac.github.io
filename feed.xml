@@ -4,7 +4,7 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Sun, 19 Feb 2017 17:04:41 +0800</pubDate>
+    <pubDate>Sun, 19 Feb 2017 17:06:41 +0800</pubDate>
     <item>
       <title>使用Grafana监控Go应用</title>
       <link>http://lihaoquan.me/2017/2/2/monitor-go-with-influxdb-and-grafana.html</link>
@@ -174,7 +174,7 @@
       <pubDate>Mon, 02 May 2016 15:11:39 +0000</pubDate>
     </item>
     <item>
-      <title>gopherchinabeijing</title>
+      <title>北京GopherChina</title>
       <link>http://lihaoquan.me/2016/4/19/gopherchinabeijing.html</link>
       <description>&lt;p&gt;简单记录下四月份参加 Gopher China Beijing 点滴&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;http://og0usnhfv.bkt.clouddn.com/gcb05.jpg&#34; alt=&#34;gcb&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;http://og0usnhfv.bkt.clouddn.com/gcb07.jpg&#34; alt=&#34;gcb1&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;http://og0usnhfv.bkt.clouddn.com/gcb06.jpg&#34; alt=&#34;gcb2&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;http://og0usnhfv.bkt.clouddn.com/gcb04.jpg&#34; alt=&#34;gcb3&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;http://og0usnhfv.bkt.clouddn.com/gcb03.jpg&#34; alt=&#34;gcb4&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;http://og0usnhfv.bkt.clouddn.com/gcb02.jpg&#34; alt=&#34;gcb5&#34; /&gt;&lt;/p&gt;&#xA;&#xA;&lt;p&gt;&lt;img src=&#34;http://og0usnhfv.bkt.clouddn.com/gcb01.jpg&#34; alt=&#34;gcb6&#34; /&gt;&lt;/p&gt;&#xA;</description>
       <pubDate>Tue, 19 Apr 2016 16:47:48 +0000</pubDate>
