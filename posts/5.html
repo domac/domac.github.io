@@ -50,6 +50,46 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">10</span>
+                            <span class="day">15</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/10/15/rand-in-go.html">聊聊golang的rand</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>使用golang生成随机数的时候，官方提供了两种方式，分别是 <code>math/rand</code> 和 <code>crypo/rand</code> ，那么它们两者之间究竟有什么
+不同呢？如果通过它们来生成我们的随机数呢？下面我们一起来聊聊golang的随机数生成方式。</p>
+
+<blockquote>
+<p>什么是随机数<br />
+很多软件和应用都需要随机数，从纸牌游戏中纸牌的分发到 SSL 安全协议中密钥的产生，到处都有随机数的身影。随机数至少具备两个条件：
+数字序列在统计上是随机的
+不能通过已知序列推算后面的序列
+自从计算机诞生起，寻求用计算机产生高质量的随机数序列的研究就一直是研究者长期关注的课题。<br />
+一般情况下，使用计算机程序产生一个真正的随机数是很难的，因为程序的行为是可预测的，计算机利用设计好的算法结合用户提供的种子产生的随机数序列通常是“伪随机数”（pseudo-random number），伪随机数就是我们平时经常使用的“随机数”。伪随机数可以满足一般应用的需求，但是在对于安全要求比较高的环境和领域中存在明显的缺点：<br />
+例如：<br />
+1.伪随机数是周期性的，当它们足够多时，会重复数字序列<br />
+2.如果提供相同的算法和相同的种子值，将会得出完全一样的随机数序列<br />
+3.可以使用逆向工程，猜测算法与种子值，以便推算后面所有的随机数列<br />
+生成随机数是密码学中的一项基本任务，是生成加密密钥、加密算法和加密协议所必不可少的，随机数的质量对安全性至关重要</p>
+</blockquote>
+
+<p>Go 的rand包：<code>math/rand</code> 和 <code>crypo/rand</code>， 前者是一种伪随机数生成方式，后者是真正意义上的随机数生成方式。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/10/15/rand-in-go.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
                             <span class="day">2</span>
                         </span>
                             </div>
@@ -151,36 +191,6 @@ Dashboard，这样十分不便。</p>
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/8/16/problem-using-vscode-in-go17.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">7</span>
-                            <span class="day">23</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/7/23/debug-golang-using-gdb.html">使用GDB工具调试Go程序</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>对于程序的调试相信程序员并不陌生，不过对于大部分Java和Python的程序员来说，大部分都是依赖IDE进行的。而且目前类似Eclipse和IntelliJ等工具都提供了很方便的调试工具。</p>
-
-<p>不过除了通过IDE，我们其实还可以通过GDB这个工具来辅助我们的代码调试。以看到一些内部的运行机理，对于学习还是挺有好处的。
-GDB是一个由GNU开源组织发布的、UNIX/LINUX操作系统下的、基于命令行的、功能强大的程序调试工具。</p>
-
-<p>详细的GDB命令参数可以参考这篇文章 <a href="http://www.cnblogs.com/ggjucheng/archive/2011/12/14/2288004.html">点击这里</a></p>
-
-<p>这里我主要介绍下如果使用gdb来debug我们的go代码， 我们先写一段简单的代码(命名为main.go)，如下：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/7/23/debug-golang-using-gdb.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
