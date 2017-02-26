@@ -111,10 +111,9 @@ $ vim /etc/sysconfig/docker</li>
  - Kubernetes修改apiserver的配置文件，在/etc/kubernetes/apiserver中
 </code></pre>
 
-<p>$ vim /etc/kubernetes/apiserver</p>
-
-<p>KUBE_ADMISSION_CONTROL=&ldquo;--admission_control=NamespaceLifecycle,NamespaceExists,
-LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota&rdquo;</p>
+<p>$ vim /etc/kubernetes/apiserver
+ KUBE_ADMISSION_CONTROL=&ldquo;--admission_control=NamespaceLifecycle,NamespaceExists,
+ LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota&rdquo;</p>
 <pre><code>
  去掉 `ServiceAccount` 选项。
 
