@@ -101,73 +101,58 @@ $ systemctl enable iptables.service
 
 <p>安装完服务组件后，我们需要修改相关的配置</p>
 
-<ul>
-<li>Docker配置文件 /etc/sysconfig/docker，其中的OPTIONS的内容设置为：
-```
-$ vim /etc/sysconfig/docker</li>
-</ul>
+<p>Docker配置文件 /etc/sysconfig/docker，其中的OPTIONS的内容设置为：</p>
+<pre><code>$ vim /etc/sysconfig/docker
 
-<p>OPTIONS=&lsquo;--selinux-enabled=false --insecure-registry gcr.io&rsquo;</p>
-<pre><code>
- - Kubernetes修改apiserver的配置文件，在/etc/kubernetes/apiserver中
+OPTIONS='--selinux-enabled=false --insecure-registry gcr.io'
 </code></pre>
 
-<p>$ vim /etc/kubernetes/apiserver
- KUBE_ADMISSION_CONTROL=&ldquo;--admission_control=NamespaceLifecycle,NamespaceExists,
- LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota&rdquo;</p>
-<pre><code>
- 去掉 `ServiceAccount` 选项。
-
- 否则会在往后的pod创建中，会出现类似以下的错误：
+<p>Kubernetes修改apiserver的配置文件，在/etc/kubernetes/apiserver中</p>
+<pre><code>$ vim /etc/kubernetes/apiserver
+ KUBE_ADMISSION_CONTROL=&quot;--admission_control=NamespaceLifecycle,NamespaceExists,
+ LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota&quot;
 </code></pre>
 
-<p>Error from server: error when creating &ldquo;mysql-rc.yaml&rdquo;: Pod &ldquo;mysql&rdquo; is forbidden:
- no API token found for service account default/default,
- retry after the token is automatically created and added to the service account</p>
-<pre><code>
-### 切换docker hub 镜像源
-
-在国内为了稳定pull镜像，我们最好使用Daocloud的镜像服务 :)
-
+<p>去掉 <code>ServiceAccount</code> 选项。否则会在往后的pod创建中，会出现类似以下的错误：</p>
+<pre><code> Error from server: error when creating &quot;mysql-rc.yaml&quot;: Pod &quot;mysql&quot; is forbidden:
+ no API token found for service account default/default, 
+ retry after the token is automatically created and added to the service account
 </code></pre>
 
-<p>curl -sSL <a href="https://get.daocloud.io/daotools/set_mirror.sh">https://get.daocloud.io/daotools/set_mirror.sh</a> | sh -s <a href="http://dbe35452.m.daocloud.io">http://dbe35452.m.daocloud.io</a></p>
-<pre><code>
-### 按顺序启动所有服务
+<h3 id="切换docker-hub-镜像源">切换docker hub 镜像源</h3>
 
+<p>在国内为了稳定pull镜像，我们最好使用Daocloud的镜像服务 :)</p>
+<pre><code>curl -sSL https://get.daocloud.io/daotools/set_mirror.sh | sh -s http://dbe35452.m.daocloud.io
 </code></pre>
 
-<p>systemctl start etcd
+<h3 id="按顺序启动所有服务">按顺序启动所有服务</h3>
+<pre><code>systemctl start etcd
 systemctl start docker
 systemctl start kube-apiserver.service
 systemctl start kube-controller-manager.service
 systemctl start kube-scheduler.service
 systemctl start kubelet.service
-systemctl start kube-proxy.service</p>
-<pre><code>
-然后，我们检验下kubernetes的服务是否跑起来
-
+systemctl start kube-proxy.service
 </code></pre>
 
-<p>ps -ef | grep kube</p>
-<pre><code>
-到目前为止，一个单机版的Kubernetes的环境就安装启动完成了。接下来，我就基于这个单机版，撸起袖子，认真干！！！
-
-## 启动MySQL容器服务
-
-我们先拉取mysql的服务镜像 ：
+<p>然后，我们检验下kubernetes的服务是否跑起来</p>
+<pre><code>ps -ef | grep kube
 </code></pre>
 
-<p>sudo docker pull mysql
+<p>到目前为止，一个单机版的Kubernetes的环境就安装启动完成了。接下来，我就基于这个单机版，撸起袖子，认真干！！！</p>
+
+<h2 id="启动mysql容器服务">启动MySQL容器服务</h2>
+
+<p>我们先拉取mysql的服务镜像 ：</p>
+<pre><code>sudo docker pull mysql
 或
-docker pull hub.c.163.com/library/mysql:latest</p>
-<pre><code>
-### 启动MySQL服务
+docker pull hub.c.163.com/library/mysql:latest
+</code></pre>
 
-首先为MySQL服务创建一个RC定义文件：mysql-rc.yaml，下面给出了该文件的完整内容
+<h3 id="启动mysql服务">启动MySQL服务</h3>
 
-```yaml
-apiVersion: v1
+<p>首先为MySQL服务创建一个RC定义文件：mysql-rc.yaml，下面给出了该文件的完整内容</p>
+<pre><code class="language-yaml">apiVersion: v1
 kind: ReplicationController
 metadata:
   name: mysql
