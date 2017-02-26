@@ -114,8 +114,10 @@ $ vim /etc/sysconfig/docker</li>
 
 <p>$ vim /etc/kubernetes/apiserver</p>
 
-<p>KUBE_ADMISSION_CONTROL=&ldquo;--admission_control=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota&rdquo;</p>
-<pre><code> 去掉 `ServiceAccount` 选项。
+<p>KUBE_ADMISSION_CONTROL=&ldquo;--admission_control=NamespaceLifecycle,NamespaceExists,
+LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota&rdquo;</p>
+<pre><code>
+ 去掉 `ServiceAccount` 选项。
 
  否则会在往后的pod创建中，会出现类似以下的错误：
 </code></pre>
@@ -127,6 +129,7 @@ $ vim /etc/sysconfig/docker</li>
 ### 切换docker hub 镜像源
 
 在国内为了稳定pull镜像，我们最好使用Daocloud的镜像服务 :)
+
 </code></pre>
 
 <p>curl -sSL <a href="https://get.daocloud.io/daotools/set_mirror.sh">https://get.daocloud.io/daotools/set_mirror.sh</a> | sh -s <a href="http://dbe35452.m.daocloud.io">http://dbe35452.m.daocloud.io</a></p>
