@@ -58,7 +58,7 @@
                             <a class="tag label label-info" href="/tags/docker.html">docker</a>
                             <a class="tag label label-info" href="/tags/kubernetes.html">kubernetes</a>
                         </aside>
-                        <section class="brief"><p>Kubernetes是Google开源的一种基于容器的开源服务编排解决方案（orchestration system）,它提供的是一种比Fleet更加高度抽象的调度和管理模式，对使用者屏蔽服务部署底层的细节信息，但它的目标不仅仅是一个编排系统，而是提供一个规范，可以让你来描述集群的架构，定义服务的最终状态，它来帮助你的系统达到和维持在这个状态。从这个角度上说，可以将Kubernetes看作是一个平台既服务（Platform as a Service,PaaS）工具。Kubernetes构建于容器之上，使用Go语言开发，为应用提供资源调度、部署运行、服务发现、扩容缩容等一套功能。</p>
+                        <section class="brief"><p><strong><em>Kubernetes</em></strong> 是Google开源的一种基于容器的开源服务编排解决方案（orchestration system）,它提供的是一种比Fleet更加高度抽象的调度和管理模式，对使用者屏蔽服务部署底层的细节信息，但它的目标不仅仅是一个编排系统，而是提供一个规范，可以让你来描述集群的架构，定义服务的最终状态，它来帮助你的系统达到和维持在这个状态。从这个角度上说，可以将Kubernetes看作是一个平台既服务（Platform as a Service,PaaS）工具。Kubernetes构建于容器之上，使用Go语言开发，为应用提供资源调度、部署运行、服务发现、扩容缩容等一套功能。</p>
 
 <p>官网介绍：<a href="https://kubernetes.io/docs/whatisk8s/">《What is Kubernetes》</a></p>
 
@@ -150,9 +150,17 @@
 
 <p>Label通常在资源定义时确定，也可以在对象创建后动态添加或者删除。</p>
 
+<p>K8s使用Label的目的是：面向用户，使之成为用户级别的Kubernetes对象标识属性，因为label应该要包含对象的功能性和特战描述的特性。这样比UUID更加用户友好和更有意义。</p>
+
+<p>label selector是Kubernetes的核心的分组机制</p>
+
+<p>目前，Kubernetes支持两类资源使用label selector来监控和管理它们的pod资源 --- services和replication controller (RC)</p>
+
 <h3 id="replication-controller">Replication Controller</h3>
 
-<p>Replication Controller（简称 RC）是Kubernetes系统中的核心概念之一，简单来说，它其实是定义了一个期望的场景，即声明某种Pod的副本数量在任意时刻都符合某个期望值，所以RC的定义包括如下的几个部分。</p>
+<p>Replication Controller（简称 RC）是Kubernetes系统中的核心概念之一，决定了一个pod有多少个同时运行的副本。简单来说，它其实是定义了一个期望的场景，即声明某种Pod的副本数量在任意时刻都符合某个期望值，所以RC的定义包括如下的几个部分。</p>
+<pre><code>所以，只要创建了一个pod，一般都推荐同时给pod创建一个replacation controller，让这个rc一直守护pod，直到pod删除
+</code></pre>
 
 <ul>
 <li><p>Pod期待的副本数（replicas）</p></li>
@@ -163,6 +171,10 @@
 </ul>
 
 <p>要注意的是，删除RC并不会影响通过该RC已经创建好的Pod。为了删除所有的Pod，可以设置replicas的值为0，然后更新该RC。另外，kubectl提供了stop和delete命令来一次性删除RC和RC控制的全部Pod。</p>
+
+<p>RC 对pod数量和监控情况的控制是通过replica selector， label selector 的一种来实现的。</p>
+
+<p>replica selector定义了RC和它所控制的pod之间的一种松耦合关系。这种松耦合关系可以通过修改pod的label将一个pod从replication controller的控制集中移除。比如可以把出现故障的pod从工作集群中移除，然后对pod进行debug。</p>
 
 <h3 id="deployment">Deployment</h3>
 
@@ -190,9 +202,15 @@
 
 <p>Service这个概念存在的意义在于pod在Kubernetes中的IP地址不是固定的，因此需要一个代理来确保需要使用pod的应用不需要知晓pod的真实IP地址。另外一个原因是当使用rc创建了多个pod副本时，需要一个代理为这些pod做负载均衡。</p>
 
+<p>设计原则：任何一个kube-proxy都能将流量正确导向任何一个被代理的pod，而这个kube-proxy不需要和被代理的pod在同一个宿主机上。</p>
+
+<p>目前，kubernetes主要支持两种service的发现机制：环境变量和DNS。</p>
+
 <h2 id="总结">总结</h2>
 
 <p>上述这些组件是Kubernetes系统的核心组件，它们共同构成了Kubernetes系统的框架和计算模型，通过对它们进行灵活组合，用户就可以快速、方便地对容器集群进行配置、创建和管理。</p>
+
+<p>如果不特别指明Namespace, 用户创建的pod、rc、service都讲被系统创建到这个默认的名为<code>default</code>的Namespace中。</p>
 </section>
                     </div>
                 </div>

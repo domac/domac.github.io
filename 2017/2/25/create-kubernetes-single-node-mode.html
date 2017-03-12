@@ -82,7 +82,9 @@ $ yum makecache
 
 <h3 id="关闭防火墙服务">关闭防火墙服务</h3>
 
-<p>centos7 默认使用firewall为防火墙，这里我们将其更改为iptables，具体步骤如下：</p>
+<p>centos7 默认使用firewall为防火墙，而Kubernetes的Master与工作Node之间会有大量的网络通信，安全的做法是在防火墙上配置各种需要相互通讯的端口号，在一个安全的内部网络环境中可以关闭防火墙服务；</p>
+
+<p>这里我们将其更改为iptables，具体步骤如下：</p>
 <pre><code>$ systemctl disable firewalld.service
 $ systemctl stop firewalld.service
 </code></pre>
