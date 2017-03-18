@@ -433,7 +433,7 @@ func Dumpline(addr uint32, line []byte) {
 
 <h3 id="动态存储分配器">动态存储分配器</h3>
 
-<p>动态存储分配器维护着一个进程的虚拟存储区域，这个区域称为 “堆”，堆可以视为一组大小不同的 “块”（chunk: 连续的虚拟存储片）的集合，并交由动态存储器维护。</p>
+<p>动态存储分配器维护着一个进程的虚拟存储区域，这个区域称为 “堆”，堆可以视为一组大小不同的 “块”（chunk: 连续的虚拟存储片，无论内存分配器和垃圾回收算法都依赖连续地址）的集合，并交由动态存储器维护。</p>
 
 <p>动态分配器主要分为：</p>
 
@@ -442,11 +442,64 @@ func Dumpline(addr uint32, line []byte) {
 <li>隐式：垃圾回收</li>
 </ul>
 
+<p>在Go里头，分配器将其管理（大块 --&gt; 小块）的<code>内存块</code>分为两种：</p>
+
+<ul>
+<li>span：由多个连续的页（page）组成的大块内存</li>
+<li>object：将span按特定大小切分多个小块，每个小块可存储一个对象</li>
+</ul>
+
+<blockquote>
+<p>按照其用途，span面向内部管理，object面向对象分配</p>
+</blockquote>
+
+<p>分配器按页数来区分不同大小的span。比如，以页数为单位将span存放到管理数组中，需要时就以页数为索引进行查找。当然，span大小并非固定不变。在获取闲置span时，如果没找到大小合适的，那就返回页数更多的，此时会引发裁剪操作，多余部分将构成新的span被放回管理数组。分配器还会尝试将地址相邻的空闲span合并，以构建更大的内存块，减少碎片，提供更灵活的分配策略。</p>
+
+<p>我们在go的malloc.go代码中：</p>
+<pre><code class="language-go">const (
+    _PageShift = 13
+    _PageSize  = 1 &lt;&lt; _PageShift
+    _PageMask  = _PageSize - 1
+)
+</code></pre>
+
+<p>可以看到，用于存储对象的object，按照8字节倍数分为n种。这种方式虽然会造成一些内存浪费，但分配器只须面对有限的几种规格的小块内存，优化了分配和复用管理策略。</p>
+
+<blockquote>
+<p>分配器会尝试将多个微小对象组合到一个object快内，以节约内存。</p>
+</blockquote>
+
+<p>我们看到msize.go的部分：</p>
+<pre><code class="language-go">var class_to_size [_NumSizeClasses]int32
+var class_to_allocnpages [_NumSizeClasses]int32
+var class_to_divmagic [_NumSizeClasses]divMagic
+
+var size_to_class8 [1024/8 + 1]int8
+var size_to_class128 [(_MaxSmallSize-1024)/128 + 1]int8
+
+func sizeToClass(size int32) int32 {
+    if size &gt; _MaxSmallSize {
+        throw(&quot;invalid size&quot;)
+    }
+    if size &gt; 1024-8 {
+        return int32(size_to_class128[(size-1024+127)&gt;&gt;7])
+    }
+    return int32(size_to_class8[(size+7)&gt;&gt;3])
+}
+</code></pre>
+
+<p>分配器初始化时，会构建对照表存储大小和规格对应关系，包括用来切分的span页数。</p>
+<pre><code class="language-go">  // Tunable constants.
+_MaxSmallSize = 32 &lt;&lt; 10
+</code></pre>
+
+<p>从上面的代码段，我们大概可以指定若对象大小超出特定阈值限制，会被当做大对象特别对待。</p>
+
 <h3 id="mmap函数">mmap函数</h3>
 
 <p>Unix进程可以使用mmap函数来创建新的虚拟存储区域并将对象映射到这些区域中。</p>
 
-<p>mmap函数要求内核创建一个新的虚拟存储区域，最好是从地址start开始的一个区域，并将文件描述符fd指定的对象的一个连续的片（chunk）映射到新的区域。</p>
+<p>mmap函数要求内核创建一个新的虚拟存储区域，最好是从起始地址start开始的一个区域，并将文件描述符fd指定的对象的一个连续的片（chunk）映射到新的区域。</p>
 
 <h3 id="数据频繁分配与回收">数据频繁分配与回收</h3>
 
@@ -465,10 +518,12 @@ func Dumpline(addr uint32, line []byte) {
 
 <p>Go定义的小块内存，大小上是指32K或以下的对象，go底层会把这些小块内存按照指定规格（大约100种）进行切割：为了避免随意切割，申请任意字节内存时会向上取整到接近的块，将整块分配（从空闲链表）给到申请者。</p>
 
-<p>Go内存分配主要组成：</p>
+<p>Go内存分配主要组件：</p>
 
 <ul>
-<li><p>FixAlloc：目的是用来分配Mcache和Mspan两个特定的对象</p></li>
+<li><p>MCache：层次与MHeap类似，对于每个尺寸的类别都有一个空闲链表。每个M都有自己的局部Mcache(小对象从它取，无需加锁)，这就是Go能够在多线程中高效内存管理的重要原因</p></li>
+
+<li><p>MCentral：在无空闲内存的时候，向Mheap申请一个span,而不是多个，申请的span包含多少个page由central的sizeclass来确定（跨进程复用）</p></li>
 
 <li><p>MHeap：负责将MSpan组织和管理起来。</p>
 
@@ -477,13 +532,6 @@ func Dumpline(addr uint32, line []byte) {
 <li>回收过程：回收一个Mspan时，首选查找它相邻的地址，再通过map映射得到对应的Mspan，如果Mspan的state是未使用，则可以将
 两者进行合并。最后将这页或者合并后的页归还到free[]分配池或者large中。</li>
 </ul></li>
-
-<li><p>MSpan</p></li>
-
-<li><p>MCache：层次与MHeap类似，对于每个尺寸的类别都有一个空闲链表。每个M都有自己的局部Mcache(小对象从它取，无需加锁)，这就是Go能够在
-多线程中高效内存管理的重要原因</p></li>
-
-<li><p>MCentral：在无空闲内存的时候，向Mheap申请一个span,而不是多个，申请的span包含多少个page由central的sizeclass来确定</p></li>
 </ul>
 
 <h3 id="go的内存模型">Go的内存模型</h3>
@@ -496,6 +544,90 @@ func Dumpline(addr uint32, line []byte) {
 <li><p>第二级：MCache为主要组件：相当于一个内存池， 回收采用引用计数器</p></li>
 </ul>
 
+<h3 id="分配场景">分配场景</h3>
+
+<p>为对象分配内存须区分是在栈上分配还是在堆上分配。通常情况下，编译器有责任尽可能使用寄存器和栈来存储对象，这有助于提升性能，减少垃圾回收器的压力。</p>
+
+<p>我们写一个测试例子</p>
+<pre><code class="language-go">package main
+
+func test() *int {
+    x := new(int)
+    *x = 1234
+    return x
+}
+
+func main() {
+    println(*test())
+}
+
+</code></pre>
+
+<p>我们禁止内联优化来编译上面的代码：</p>
+<pre><code class="language-shell">$ go build -gcflags=&quot;-l&quot; -o test main.go
+</code></pre>
+
+<p>得到的结果是</p>
+<pre><code>        main.go:3       0x2040  65488b0c25a0080000      GS MOVQ GS:0x8a0, CX
+        main.go:3       0x2049  483b6110                CMPQ 0x10(CX), SP
+        main.go:3       0x204d  7639                    JBE 0x2088
+        main.go:3       0x204f  4883ec18                SUBQ $0x18, SP
+        main.go:3       0x2053  48896c2410              MOVQ BP, 0x10(SP)
+        main.go:3       0x2058  488d6c2410              LEAQ 0x10(SP), BP
+        main.go:4       0x205d  488d05dc3b0500          LEAQ 0x53bdc(IP), AX
+        main.go:4       0x2064  48890424                MOVQ AX, 0(SP)
+        main.go:4       0x2068  e823a70000              CALL runtime.newobject(SB)
+        main.go:4       0x206d  488b442408              MOVQ 0x8(SP), AX
+        main.go:5       0x2072  48c700d2040000          MOVQ $0x4d2, 0(AX)
+        main.go:6       0x2079  4889442420              MOVQ AX, 0x20(SP)
+        main.go:6       0x207e  488b6c2410              MOVQ 0x10(SP), BP
+        main.go:6       0x2083  4883c418                ADDQ $0x18, SP
+        main.go:6       0x2087  c3                      RET
+        main.go:3       0x2088  e893720400              CALL runtime.morestack_noctxt(SB)
+        main.go:3       0x208d  ebb1                    JMP main.test(SB)
+        :-1             0x208f  cc                      INT $0x3
+</code></pre>
+
+<p>从结果的 <code>CALL runtime.newobject(SB)</code> ，证明我们的对象在堆上进行分配了。</p>
+
+<p>但当使用默认参数，我们观察下结果：</p>
+<pre><code>$ go build  -o test main.go
+</code></pre>
+
+<p>当我们跟上面一样分析test的分配情况时：</p>
+<pre><code>$ go tool objdump -s &quot;main\.test&quot; test
+</code></pre>
+
+<p>命令执行后，并没有输出</p>
+
+<p>我们分析下main方法</p>
+<pre><code>$ go tool objdump -s &quot;main\.main&quot; test
+</code></pre>
+
+<p>得到的结果如下：</p>
+<pre><code>        main.go:9       0x2040  65488b0c25a0080000      GS MOVQ GS:0x8a0, CX
+        main.go:9       0x2049  483b6110                CMPQ 0x10(CX), SP
+        main.go:9       0x204d  763d                    JBE 0x208c
+        main.go:9       0x204f  4883ec18                SUBQ $0x18, SP
+        main.go:9       0x2053  48896c2410              MOVQ BP, 0x10(SP)
+        main.go:9       0x2058  488d6c2410              LEAQ 0x10(SP), BP
+        main.go:10      0x205d  48c7442408d2040000      MOVQ $0x4d2, 0x8(SP)
+        main.go:10      0x2066  e875210200              CALL runtime.printlock(SB)
+        main.go:10      0x206b  48c70424d2040000        MOVQ $0x4d2, 0(SP)
+        main.go:10      0x2073  e8b8280200              CALL runtime.printint(SB)
+        main.go:10      0x2078  e8e3230200              CALL runtime.printnl(SB)
+        main.go:10      0x207d  e8ee210200              CALL runtime.printunlock(SB)
+        main.go:11      0x2082  488b6c2410              MOVQ 0x10(SP), BP
+        main.go:11      0x2087  4883c418                ADDQ $0x18, SP
+        main.go:11      0x208b  c3                      RET
+        main.go:9       0x208c  e83f720400              CALL runtime.morestack_noctxt(SB)
+        main.go:9       0x2091  ebad                    JMP main.main(SB)
+</code></pre>
+
+<p>这表明内联优化后的代码没有调用newobject在堆上分配内存。</p>
+
+<p>编译器这么做的目的是：没有内联时，需要在两个栈帧间传递对象，因此在堆上分配而不是返回一个失效栈帧的数据。而当内联后，实际上就成看main栈帧内的局部变量，无需到堆上操作。</p>
+
 <h3 id="内存分配流程">内存分配流程</h3>
 
 <p>1、将小对象的大小向上取整到一个对应的尺寸类别（大约100种），查找相应的MCache的空闲链表，如果链表不空，直接从上面分配一个对象，这个过程不加锁</p>
@@ -507,7 +639,7 @@ func Dumpline(addr uint32, line []byte) {
 <p>4、如果MHeap空或者没有足够大的页的情况下，从操作系统分配一组新的页面，一般在1MB以上</p>
 
 <p>Go分配流程核心源码实现：</p>
-<pre><code>func mallocgc(size uintptr, typ *_type, flags uint32) unsafe.Pointer {
+<pre><code class="language-go">func mallocgc(size uintptr, typ *_type, flags uint32) unsafe.Pointer {
     if gcphase == _GCmarktermination {
         throw(&quot;mallocgc called with gcphase == _GCmarktermination&quot;)
     }
@@ -726,7 +858,7 @@ func Dumpline(addr uint32, line []byte) {
 <p>所以我们看看下面的例子哪个是有问题的：</p>
 
 <p>例子一：</p>
-<pre><code>var c = make(chan int, 10)
+<pre><code class="language-go">var c = make(chan int, 10)
 var a string
 func f() {
     a = &quot;hello, world&quot; 
@@ -740,7 +872,7 @@ func main() {
 </code></pre>
 
 <p>例子二：</p>
-<pre><code>var c = make(chan int)
+<pre><code class="language-go">var c = make(chan int)
 var a string
 func f() {
     a = &quot;hello, world&quot;
@@ -754,7 +886,7 @@ func main() {
 </code></pre>
 
 <p>例子三：</p>
-<pre><code>var c = make(chan int, 1)
+<pre><code class="language-go">var c = make(chan int, 1)
 var a string
 func f() {
     a = &quot;hello, world&quot; 

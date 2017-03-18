@@ -57,7 +57,11 @@
                         <aside class="aside clearfix">
                             <a class="tag label label-info" href="/tags/go.html">go</a>
                         </aside>
-                        <section class="brief"><blockquote>
+                        <section class="brief"><p>内存回收的源头是垃圾清理操作</p>
+
+<p>之所以说回收而非释放，是因为整个内存分配器的核心是内存复用，不再使用的内存会被放回合适的位置，等下次分配时再次使用。只有当空闲内存资源过多时，才会考虑释放。</p>
+
+<blockquote>
 <p>垃圾回收器：是一种动态存储分配器，它自动释放程序不再需要的<code>已分配块</code>(垃圾);它可以被视为一个和应用并行的线程，不断更新<code>可达图</code>。</p>
 </blockquote>
 
