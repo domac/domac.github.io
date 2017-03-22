@@ -217,23 +217,25 @@ db.runCommand({addShard: 'shard3/192.168.139.139:27003,192.168.139.138:27003,192
         </div>
         
 <section id="comment">
-    
     <div class="row">
         <div class="col-md-10 col-md-offset-1">
-            <div class="ds-thread" data-thread-key="my-mongo-shards" data-title="Mongodb分片部署 - domac博客" data-url="http://localhost"></div>
-            <script type="text/javascript">
-                var duoshuoQuery = {short_name:"phillihq"};
-                (function() {
-                    var ds = document.createElement('script');
-                    ds.type = 'text/javascript';ds.async = true;
-                    ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
-                    ds.charset = 'UTF-8';
-                    (document.getElementsByTagName('head')[0]
-                    || document.getElementsByTagName('body')[0]).appendChild(ds);
+            <div id="disqus_thread"></div>
+            <script>
+                var disqus_config = function () {
+                    this.page.url = "http:\/\/localhost"; 
+                };
+                (function () {
+                    var d = document, s = d.createElement('script');
+                    s.src = '//haoquan.li.disqus.com/embed.js';
+                    s.setAttribute('data-timestamp', +new Date());
+                    (d.head || d.body).appendChild(s);
                 })();
             </script>
+            <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments
+                powered by Disqus.</a></noscript>
         </div>
     </div>
+    
 </section>
 
     </div>
