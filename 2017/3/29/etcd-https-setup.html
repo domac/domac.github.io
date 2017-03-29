@@ -81,7 +81,7 @@ $ chmod +x /usr/bin/{cfssl,cfssljson}
 <h3 id="生成key">生成key</h3>
 
 <p>先编写相关配置</p>
-<pre><code>$ vim ca-config.json
+<pre><code class="language-sh">$ vim ca-config.json
 
 {
   &quot;signing&quot;: {
@@ -101,7 +101,7 @@ $ chmod +x /usr/bin/{cfssl,cfssljson}
   }
 }
 </code></pre>
-<pre><code>$ vim ca-csr.json
+<pre><code class="language-sh">$ vim ca-csr.json
 
 {
   &quot;CN&quot;: &quot;Etcd&quot;,
@@ -122,7 +122,7 @@ $ chmod +x /usr/bin/{cfssl,cfssljson}
 </code></pre>
 
 <p>编写完上面的配置文件后，我们可以开始使用cfssl来生成ca证书</p>
-<pre><code>$ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+<pre><code class="language-sh">$ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
 </code></pre>
 
 <p>执行后，会生成三个文件：</p>
@@ -138,7 +138,7 @@ $ chmod +x /usr/bin/{cfssl,cfssljson}
 <h3 id="生成服务端证书">生成服务端证书</h3>
 
 <p>编写配置文件</p>
-<pre><code>$ vim server-csr.json
+<pre><code class="language-sh">$ vim server-csr.json
 
 {
   &quot;CN&quot;: &quot;etcd-server&quot;,
@@ -166,7 +166,7 @@ $ chmod +x /usr/bin/{cfssl,cfssljson}
 </code></pre>
 
 <p>导出证书</p>
-<pre><code>cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server server-csr.json | cfssljson -bare server
+<pre><code class="language-sh">cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server server-csr.json | cfssljson -bare server
 </code></pre>
 
 <blockquote>
@@ -176,7 +176,7 @@ $ chmod +x /usr/bin/{cfssl,cfssljson}
 <p>生成三个文件：server.pem, server-key.pem和server.csr</p>
 
 <h3 id="产生客户端证书">产生客户端证书</h3>
-<pre><code># vim client-csr.json
+<pre><code class="language-sh">$ vim client-csr.json
 
 {
   &quot;CN&quot;: &quot;etcd-client&quot;,
@@ -200,7 +200,7 @@ $ chmod +x /usr/bin/{cfssl,cfssljson}
 </code></pre>
 
 <p>执行命令生成证书</p>
-<pre><code>cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client client-csr.json | cfssljson -bare client
+<pre><code class="language-sh">cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client client-csr.json | cfssljson -bare client
 </code></pre>
 
 <p>生成三个文件：client.pem, client-key.pem和client.csr</p>
