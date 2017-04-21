@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>RingBuffer的应用 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="ring buffer in go"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">4</span>
+                            <span class="day">21</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/4/21/ring-buffer-in-go.html">RingBuffer的应用</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                        </aside>
+                        <section class="brief"><p>最近团队在某些go开发的项目中, 都不同程度地出现内存暴涨, 计算量特别大的时候,内存一直不下降,且gc很频繁,但按理说GC后内存清理后,依旧不释放就有问题了, 经过pprof分析出的原因是: 写的缓冲层实现,不满足我们数据计算量非常大的场景, 毕竟并发的世界充满意想不到的事情</p>
+
+<p>当然某些中间计算的结果,我们可以加入redis作为缓冲来存放, 但作为一级缓存, 我认为也没必要去加重代码的对第三方服务的依赖, 如果用原生map的时候,效率和手动去lock又会带来上面的回收频繁问题, 所以就想有没有好的算法或者好的手段来简单快速解决问题</p>
+
+<p>然后看了很多技术文章, 跟我们目前情况差不多的团队,他们都用了很多基于RingBuffer的思路来解决问题.</p>
+
+<h2 id="概念">概念</h2>
+
+<p>Ring Buffer在维基百科的解析是:</p>
+<pre><code>圆形缓冲区（circular buffer），也称作圆形队列（circular queue），循环缓冲区（cyclic buffer），环形缓冲区（ring buffer），是一种用于表示一个固定尺寸、头尾相连的缓冲区的数据结构，适合缓存数据流。
+</code></pre>
+
+<p>简单概况, 它的基本特点:</p>
+
+<ul>
+<li>FIFO</li>
+<li>读指针</li>
+<li>写指针</li>
+<li>固定尺寸、头尾相连的结构</li>
+</ul>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/rb1.png" alt="rb1" /></p>
+
+<p>基本结构示意</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/rb2.png" alt="rb2" /></p>
+
+<p>存储操作示意</p>
+
+<p>RingBUffer之所以ringbuffer采用这种数据结构，是因为它在可靠消息传递方面有很好的性能:</p>
+
+<p>首先，因为它是数组，所以插入要比链表快</p>
+
+<p>其次，你可以为数组预先分配内存，使得数组对象一直存在, 这就意味着不需要花大量的时间用于垃圾回收。此外，不像链表那样，需要为每一个添加到其上面的对象创造节点对象—对应的，当删除节点时，需要执行相应的内存清理操作。</p>
+
+<h2 id="实现">实现</h2>
+
+<p>了解RingBuffer的原理后,我们可以自己来写一个简单的RingBuffer的<code>Golang</code>实现</p>
+
+<p>我们先定义最基本的RingBuffer结构体</p>
+<pre><code class="language-go">type RingBuffer struct {
+    data         []byte
+    size         int64
+    writeCursor  int64
+    writtenCount int64
+}
+</code></pre>
+
+<p>提供初始化的方法: 由于rb的特定是大小需要预先固定,所以我们在初始化的时候,把尺寸都给预分配好</p>
+<pre><code class="language-go">//size 必须大于0
+func NewBuffer(size int64) (*RingBuffer, error) {
+    if size &lt;= 0 {
+        return nil, errors.New(&quot;Size must be positive&quot;)
+    }
+
+    b := &amp;RingBuffer{
+        size: size,
+        data: make([]byte, size)}
+
+    return b, nil
+}
+</code></pre>
+
+<p>RingBuffer最重要的功能就是要写数据, 由于ringbuffer的形态特殊, 我们必须写数据的时候,要移动我们的 <code>&quot;写指针&quot;</code>, 再根据fifo的特点来进行数据填充</p>
+<pre><code class="language-go">//写入buf到ringbuffer内部
+//如果需要会覆盖旧数据(fifo)
+func (b *RingBuffer) Write(buf []byte) (int, error) {
+
+    n := len(buf)
+    b.writtenCount += int64(n)
+
+    //如果buf的大小超过容量限制,根据fifo原则
+    //我们只关注最近最新的部分数据
+    if int64(n) &gt; b.size {
+        buf = buf[int64(n)-b.size:]
+    }
+
+    remain := b.size - b.writeCursor
+    copy(b.data[b.writeCursor:], buf)
+    if int64(len(buf)) &gt; remain {
+        copy(b.data, buf[remain:])
+    }
+
+    b.writeCursor = ((b.writeCursor + int64(len(buf))) % b.size)
+    return n, nil
+}
+</code></pre>
+
+<p>关于读的方法实现, 这里就简单实现一个输出所有数据的方法, 当然我们也可以根据具体位置读取的方法实现, 这个大家可以根据自己的需要去扩展.</p>
+<pre><code class="language-go">//读出buffer所有数据
+func (b *RingBuffer) ReadAll() []byte {
+
+    switch {
+    case b.writtenCount &gt;= b.size &amp;&amp; b.writeCursor == 0:
+        return b.data
+    case b.writtenCount &gt; b.size:
+        out := make([]byte, b.size)
+        copy(out, b.data[b.writeCursor:])
+        copy(out[b.size-b.writeCursor:], b.data[:b.writeCursor])
+        return out
+    default:
+        return b.data[:b.writeCursor]
+    }
+
+    return nil
+}
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<ol>
+<li><p>ring buffer在网络编程各种语言很多场景下都有不同的应用和用法，一次性开块大内存是生产环境下的常用做法</p></li>
+
+<li><p>使用 ring buffer 的优势是内存使用率很高，不会造成内存碎片，几乎没有浪费（比如传统动态内存分配需要的 cookie）,业务处理的同一时间，访问的内存数据段集中。可以更好的适应不同系统，取得较高的性能。</p></li>
+
+<li><p>内存的物理布局简单单一，不太容易发生内存越界、悬空指针等 bug,出了问题也容易在内存级别分析调试。做出来的系统容易保持健壮。</p></li>
+</ol>
+
+<h3 id="参考资料">参考资料</h3>
+
+<p><a href="http://blog.codingnow.com/2012/02/ring_buffer.html">云风的blog : RingBuffer的应用</a></p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
