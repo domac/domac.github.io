@@ -4,7 +4,7 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Tue, 23 May 2017 16:03:51 +0800</pubDate>
+    <pubDate>Tue, 23 May 2017 16:15:04 +0800</pubDate>
     <item>
       <title>RingBuffer的应用</title>
       <link>http://lihaoquan.me/2017/4/21/ring-buffer-in-go.html</link>
