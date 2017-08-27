@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?><rss version="2.0">
   <channel>
-    <title>domac空间</title>
+    <title>domac博客</title>
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Wed, 09 Aug 2017 23:42:30 +0800</pubDate>
+    <pubDate>Sun, 27 Aug 2017 17:11:59 +0800</pubDate>
     <item>
       <title>Golang版protobuf的安装与使用</title>
       <link>http://lihaoquan.me/2017/6/29/how-to-use-protobuf.html</link>
