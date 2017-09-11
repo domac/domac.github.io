@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>最近工作点滴 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="distributed cache"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">9</span>
+                            <span class="day">11</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/9/11/distributed-cache.html">最近工作点滴</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/%e5%b7%a5%e4%bd%9c%e6%84%9f%e6%82%9f.html">工作感悟</a>
+                        </aside>
+                        <section class="brief"><p>在目前这家电商公司刚好满两年，我觉得是时候简单总结一下最近的一些工作吧：</p>
+
+<p>最近公司内部人员调整算是比较大的, 按照leader的想法, 我这边下半年开始往基础架构的建设上下更大的功夫。 而且临近双十一，相关挑战也接踵而来：目前一个&rdquo;水深火热&rdquo;的问题是我们内部某个基础底层的服务需要增加更可靠的分布式缓存支持日益整张的业务请求压力；</p>
+
+<p>虽然说目前市面上的分布式缓存手段繁多,每个大厂分享的思路好像都很有道理，但能结合目前我们的问题的方案可就显得力不从心了,比方说当今的后端开发人员，一说到分布式缓存，不把memcache/redis挂在嘴上，都不好意思说自己懂后端开发了，但被问到如何解决实际的问题与策略，很多人就吞吞吐吐了。所以我们内部也开始研究乃至自己编写相关分布式缓存技术的组件, 希望能抗住目前项目所带来的巨大请求压力.</p>
+
+<p>典型的分布式缓存思路无非就是使用类似KV形式存储和访问数据，在内存中维护一张巨大的HashTable，然后根据相关的路由算法将key进行Hash，使得在读数据是首先读缓存(内存)。如果缓存中没有数据，那么再去读存储(磁盘)，并且把数据写入缓存。最终对数据查询的时间复杂度降低到O(1)，保证了对数据的高性能访问。这种手段放之四海而皆准。但忘深地想会发现这都是很表面的，一个健壮的分布式缓存需要同时解决以下的问题：</p>
+
+<ul>
+<li><p>扩容问题</p></li>
+
+<li><p>故障恢复</p></li>
+
+<li><p>存储一致性</p></li>
+
+<li><p>高效的读写</p></li>
+
+<li><p>过载保护</p></li>
+
+<li><p>预热功能</p></li>
+</ul>
+
+<p>上述的问题，我先抛出来，主要做一个记录，先不详细说明，这段时间我会结合不断的实践，到时如果有所收获的话，再提炼相关经验分享出来吧。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>
