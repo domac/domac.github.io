@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>Page 1 - domac博客</title>
+    <title>squid安装与部署 - domac博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.me is my blog"/>
+    <meta name="description" content="setup squid"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,11 +39,8 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
-            
-            
-            
-            <article class="article" style="margin-bottom: 4em;">
+        <div id="article-single">
+            <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -57,6 +54,9 @@
                                 <a href="/2017/9/20/setup-squid.html">squid安装与部署</a>
                             </h5>
                         </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/%e5%88%86%e5%b8%83%e5%bc%8f%e5%ad%98%e5%82%a8.html">分布式存储</a>
+                        </aside>
                         <section class="brief"><p>前阵子开始构思用go+leveldb实现一个分布式缓存方案，顺便调研了一下squid，下面是这阵子对squid的一些总结：</p>
 
 <p>代理缓存服务很多，squid是其中一个比较成熟的工具（类似的有：varnish、ATS、nginx-proxycache等）。Squid用途广泛的，可以作为缓存服务器，可以过滤流量帮助网络安全，也可以作为代理服务器链中的一环，向上级代理转发数据或直接连接互联网。</p>
@@ -800,355 +800,16 @@ net.ipv4.tcp_max_tw_buckets = 5000
 <li><p><a href="http://ask.apelearn.com/question/15">squid优化及配置参数</a></p></li>
 </ul>
 </section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/9/20/setup-squid.html">继续阅读</a>
-                        </aside>
                     </div>
                 </div>
             </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">9</span>
-                            <span class="day">11</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/9/11/distributed-cache.html">最近工作点滴</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>在目前这家电商公司刚好满两年，我觉得是时候简单总结一下最近的一些工作吧：</p>
-
-<p>最近公司内部人员调整算是比较大的, 按照leader的想法, 我这边下半年开始往基础架构的建设上下更大的功夫。 而且临近双十一，相关挑战也接踵而来：目前一个&rdquo;水深火热&rdquo;的问题是我们内部某个基础底层的服务需要增加更可靠的分布式缓存支持日益递增的业务请求压力；</p>
-
-<p>虽然说目前市面上的分布式缓存手段繁多,外面每个大厂分享的&rdquo;PPT&rdquo;描述得好像都很有道理，但能结合目前我们的问题的方案可就显得力不从心了，更何况当今的后端研发人员，一说到分布式缓存，不把memcache/redis挂在嘴上，都不好意思说自己懂后端开发了，但被问到如何解决实际的问题与策略，很多人就吞吞吐吐了。所以我们内部也开始研究乃至自己编写相关分布式缓存技术的组件, 希望能抗住目前项目所带来的巨大请求压力.</p>
-
-<p>典型的分布式缓存思路无非就是使用类似KV形式存储和访问数据，在内存中维护一张巨大的HashTable，然后根据相关的路由算法将key进行Hash，使得在读数据是首先读缓存(内存)。如果缓存中没有数据，那么再去读存储(磁盘)，并且把数据写入缓存。最终对数据查询的时间复杂度降低到O(1)，保证了对数据的高性能访问。</p>
-
-<p>这种手段放之四海而皆准。但往深入想一下，会发现这都是很表面的套路，一个健壮的分布式缓存应该需要同时解决以下的问题：</p>
-
-<ul>
-<li><p>扩容问题</p></li>
-
-<li><p>故障恢复</p></li>
-
-<li><p>存储一致性</p></li>
-
-<li><p>高效的读写</p></li>
-
-<li><p>过载保护</p></li>
-
-<li><p>预热功能</p></li>
-</ul>
-
-<p>上述的问题，我先抛出来，主要做一个记录，先不详细说明，这段时间我会结合不断的实践，到时如果有所收获的话，再提炼相关经验分享出来吧。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/9/11/distributed-cache.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">6</span>
-                            <span class="day">29</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/6/29/how-to-use-protobuf.html">Golang版protobuf的安装与使用</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="protobuf-介绍">Protobuf 介绍</h2>
-
-<p>序列化库在网络传输，RPC，数据库访问等环境中经常用到，它的性能的好坏直接影响着整个产品的性能, 所以我们有必要对一些优秀的序列化库进一步的学习与掌握.</p>
-
-<p><code>protobuf</code>是Google开发的一种数据描述语言语言，能够将结构化的数据序列化，可用于数据存储，通信协议等方面,官方版本支持 Go,  C++, Java, Python，社区版本支持更多语言.</p>
-
-<p>相对于JSON和XML具有以下优点：</p>
-
-<ul>
-<li><p>简洁</p></li>
-
-<li><p>体积小:消息大小只需要XML的1/10 ~ <sup>1</sup>&frasl;<sub>3</sub></p></li>
-
-<li><p>速度快:解析速度比XML快20 ~ 100倍</p></li>
-
-<li><p>使用Protobuf的编译器,可以生成更容易在编程中使用的数据访问代码</p></li>
-
-<li><p>更好的兼容性,Protobuf设计的一个原则就是要能够很好的支持向下或向上兼容</p></li>
-</ul>
-
-<p>本文主要以Go语言的方式来具体讲述如何使用Pb进行数据的定义与传输</p>
-
-<h2 id="protobuf-使用">Protobuf 使用</h2>
-
-<h3 id="安装">安装</h3>
-
-<p>1.从 <a href="https://github.com/google/protobuf/releases">https://github.com/google/protobuf/releases</a> 获取 Protobuf 编译器 protoc</p>
-<pre><code class="language-bash">wget https://github.com/google/protobuf/releases/download/v2.6.1/protobuf-2.6.1.tar.gztar zxvf protobuf-2.6.1.tar.gz
-cd protobuf-2.6.1./configure
-make
-make install
-protoc   -h
-</code></pre>
-
-<p>2.获取 goprotobuf 提供的 Protobuf 插件 protoc-gen-go（被放置于 $GOPATH/bin 下，$GOPATH/bin 应该被加入 PATH 环境变量，以便 protoc 能够找到 protoc-gen-go）</p>
-
-<p>此插件被 protoc 使用，用于编译 .proto 文件为 Golang 源文件，通过此源文件可以使用定义在 .proto 文件中的消息。</p>
-<pre><code class="language-bash">go get github.com/golang/protobuf/protoc-gen-go
- 
-cd github.com/golang/protobuf/protoc-gen-go
- 
-go build
- 
-go install
- 
-vi /etc/profile 将$GOPATH/bin 加入环境变量
- 
-source profile
-</code></pre>
-
-<p>3.获取 goprotobuf 提供的支持库，包含诸如编码（marshaling）、解码（unmarshaling）等功能</p>
-<pre><code class="language-bash">go get github.com/golang/protobuf/proto
-cd github.com/golang/protobuf/proto
-go build
-go install
-</code></pre>
-
-<h2 id="使用-go-protobuf">使用 go protobuf</h2>
-
-<p>接着, 我们进行数据格式的定义, 写一个简单的例子:
-我们在 $GOPATH下新建一个测试项目 pblearn/packet
-在 $GOPATH/pblearn/packet 下, 创建一个名为 packet.proto 的文件, 然后编写如下的内容</p>
-<pre><code class="language-proto">package packet;
-message Header{
-    required string messageId = 1;
-    required string topic = 2; //topic类型
-}
-//byte类消息
-message BytesMessage{
-    required Header  header= 1;
-    required  bytes body = 2;    
-}
-//string类型的message
-message StringMessage{
-    required Header header = 1;
-    required string body = 2;
-}
-</code></pre>
-
-<p>然后通过 –go_out 来使用 goprotobuf 提供的 Protobuf 插件 protoc-gen-go。这时候我们会生成一个名为 test.pb.go 的源文件, 参考如下</p>
-<pre><code class="language-bash">protoc --go_out=. *.proto
-</code></pre>
-
-<p>命令执行后, pblearn/packet 下会生成一个go的文件 packet.pb.go, 这个就是我们消息操作对象</p>
-
-<p>最后,我们可以编写测试例子, 在 在 $GOPATH/pblearn/ 下,我们编写 main.go</p>
-<pre><code class="language-go">package main
- 
-import (
-    // 辅助库
-    &quot;github.com/golang/protobuf/proto&quot;
-    // test.pb.go 的路径
-    &quot;pblearn/packet&quot;
-)
- 
-func main() {
- 
-    bodyData := &quot;guangzhou/fangcun/vip/company&quot;
- 
-    p := &amp;packet.StringMessage{
-        Body: proto.String(bodyData),
-        Header: &amp;packet.Header{
-            MessageId: proto.String(&quot;20-05&quot;),
-            Topic:     proto.String(&quot;golang&quot;),
-        },
-    }
- 
-    pData, err := proto.Marshal(p)
- 
-    if err != nil {
-        println(err.Error())
-    }
-    println(string(pData))
- 
-    p2 := &amp;packet.StringMessage{}
-    proto.Unmarshal(pData, p2)
- 
-    println(p2.GetHeader().GetTopic())
-}
-</code></pre>
-
-<p>通过运行例子 go run main.go  可以发现, 我们的数据格式可以正常的序列化和反序列化了.</p>
-
-<p>这样,我们日后可以根据自己的业务需要, 进行高效的数据传输</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/6/29/how-to-use-protobuf.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">4</span>
-                            <span class="day">21</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/4/21/ring-buffer-in-go.html">RingBuffer的应用</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>最近团队在某些go开发的项目中, 都不同程度地出现内存暴涨, 计算量特别大的时候,内存一直不下降,且gc很频繁,但按理说GC后内存清理后,依旧不释放就有问题了, 经过pprof分析出的原因是: 写的缓冲层实现,不满足我们数据计算量非常大的场景, 毕竟并发的世界充满意想不到的事情</p>
-
-<p>当然某些中间计算的结果,我们可以加入redis作为缓冲来存放, 但作为一级缓存, 我认为也没必要去加重代码的对第三方服务的依赖, 如果用原生map的时候,效率和手动去lock又会带来上面的回收频繁问题, 所以就想有没有好的算法或者好的手段来简单快速解决问题</p>
-
-<p>然后看了很多技术文章, 跟我们目前情况差不多的团队,他们都用了很多基于RingBuffer的思路来解决问题.</p>
-
-<h2 id="概念">概念</h2>
-
-<p>Ring Buffer在维基百科的解析是:</p>
-<pre><code>圆形缓冲区（circular buffer），也称作圆形队列（circular queue），循环缓冲区（cyclic buffer），环形缓冲区（ring buffer），是一种用于表示一个固定尺寸、头尾相连的缓冲区的数据结构，适合缓存数据流。
-</code></pre>
-
-<p>简单概况, 它的基本特点:</p>
-
-<ul>
-<li>FIFO</li>
-<li>读指针</li>
-<li>写指针</li>
-<li>固定尺寸、头尾相连的结构</li>
-</ul>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/rb1.png" alt="rb1" /></p>
-
-<p>基本结构示意</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/rb2.png" alt="rb2" /></p>
-
-<p>存储操作示意</p>
-
-<p>RingBUffer之所以ringbuffer采用这种数据结构，是因为它在可靠消息传递方面有很好的性能:</p>
-
-<p>首先，因为它是数组，所以插入要比链表快</p>
-
-<p>其次，你可以为数组预先分配内存，使得数组对象一直存在, 这就意味着不需要花大量的时间用于垃圾回收。此外，不像链表那样，需要为每一个添加到其上面的对象创造节点对象—对应的，当删除节点时，需要执行相应的内存清理操作。</p>
-
-<h2 id="实现">实现</h2>
-
-<p>了解RingBuffer的原理后,我们可以自己来写一个简单的RingBuffer的<code>Golang</code>实现</p>
-
-<p>我们先定义最基本的RingBuffer结构体</p>
-<pre><code class="language-go">type RingBuffer struct {
-    data         []byte
-    size         int64
-    writeCursor  int64
-    writtenCount int64
-}
-</code></pre>
-
-<p>提供初始化的方法: 由于rb的特定是大小需要预先固定,所以我们在初始化的时候,把尺寸都给预分配好</p>
-<pre><code class="language-go">//size 必须大于0
-func NewBuffer(size int64) (*RingBuffer, error) {
-    if size &lt;= 0 {
-        return nil, errors.New(&quot;Size must be positive&quot;)
-    }
-
-    b := &amp;RingBuffer{
-        size: size,
-        data: make([]byte, size)}
-
-    return b, nil
-}
-</code></pre>
-
-<p>RingBuffer最重要的功能就是要写数据, 由于ringbuffer的形态特殊, 我们必须写数据的时候,要移动我们的 <code>&quot;写指针&quot;</code>, 再根据fifo的特点来进行数据填充</p>
-<pre><code class="language-go">//写入buf到ringbuffer内部
-//如果需要会覆盖旧数据(fifo)
-func (b *RingBuffer) Write(buf []byte) (int, error) {
-
-    n := len(buf)
-    b.writtenCount += int64(n)
-
-    //如果buf的大小超过容量限制,根据fifo原则
-    //我们只关注最近最新的部分数据
-    if int64(n) &gt; b.size {
-        buf = buf[int64(n)-b.size:]
-    }
-
-    remain := b.size - b.writeCursor
-    copy(b.data[b.writeCursor:], buf)
-    if int64(len(buf)) &gt; remain {
-        copy(b.data, buf[remain:])
-    }
-
-    b.writeCursor = ((b.writeCursor + int64(len(buf))) % b.size)
-    return n, nil
-}
-</code></pre>
-
-<p>关于读的方法实现, 这里就简单实现一个输出所有数据的方法, 当然我们也可以根据具体位置读取的方法实现, 这个大家可以根据自己的需要去扩展.</p>
-<pre><code class="language-go">//读出buffer所有数据
-func (b *RingBuffer) ReadAll() []byte {
-
-    switch {
-    case b.writtenCount &gt;= b.size &amp;&amp; b.writeCursor == 0:
-        return b.data
-    case b.writtenCount &gt; b.size:
-        out := make([]byte, b.size)
-        copy(out, b.data[b.writeCursor:])
-        copy(out[b.size-b.writeCursor:], b.data[:b.writeCursor])
-        return out
-    default:
-        return b.data[:b.writeCursor]
-    }
-
-    return nil
-}
-</code></pre>
-
-<h2 id="总结">总结</h2>
-
-<ol>
-<li><p>ring buffer在网络编程各种语言很多场景下都有不同的应用和用法，一次性开块大内存是生产环境下的常用做法</p></li>
-
-<li><p>使用 ring buffer 的优势是内存使用率很高，不会造成内存碎片，几乎没有浪费（比如传统动态内存分配需要的 cookie）,业务处理的同一时间，访问的内存数据段集中。可以更好的适应不同系统，取得较高的性能。</p></li>
-
-<li><p>内存的物理布局简单单一，不太容易发生内存越界、悬空指针等 bug,出了问题也容易在内存级别分析调试。做出来的系统容易保持健壮。</p></li>
-</ol>
-
-<h3 id="参考资料">参考资料</h3>
-
-<p><a href="http://blog.codingnow.com/2012/02/ring_buffer.html">云风的blog : RingBuffer的应用</a></p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/4/21/ring-buffer-in-go.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            
-            <div class="article-pager text-center">
-                
-                <a class="btn btn-lg btn-info" href="/posts/2.html">后一页</a>
-            </div>
         </div>
+        
+<section id="comment">
+    
+    
+</section>
+
     </div>
 </section>
 <footer id="footer">

@@ -49,6 +49,189 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">2</span>
+                            <span class="day">2</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/2/2/monitor-go-with-influxdb-and-grafana.html">使用Grafana监控Go应用</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>互联网企业背后，依靠的是成千上万台服务器日夜不停运转，以支撑其业务的运转，宕机对于互联网企业来说，代价是
+沉重的，轻则影响用户体验，重则直接影响交易，特别给我们这些做电商的造成不可挽回的损失。对于这些机器队友的
+开发和运维人员来说，依靠人力是不可能完成24小时不间断盯着服务器的。所以对于互联网公司，监控工作的地位
+已经越来越重要了，作为Devops也是需要掌握各种技术方案的监控。</p>
+
+<p>Go语言在过去的2016年成为了年度的最佳语言，这说明在国内甚至全球范围内，越来越多公司都在使用Go来开发他们的产品。
+Go具备高并发，部署方便等特点，已经成为很多后端开发工程师的首选语言。</p>
+
+<p>本文会以Go为入口，利用目前在监控工具中很火的Grafana和infuxDB作为例子，介绍下我们如何数据可视化的方式实时监控我们的
+go应用。</p>
+
+<h2 id="环境准备">环境准备</h2>
+
+<h4 id="influxdb-和-grafana">influxDB 和 grafana</h4>
+
+<p>Grafana一般是和一些时间序列数据库进行配合来展示数据的，例如：Graphite、OpenTSDB、InfluxDB等，主要特点：</p>
+
+<ul>
+<li><p>grafana是用于可视化大型测量数据的开源程序，他提供了强大和优雅的方式去创建、共享、浏览数据。dashboard中显示了你不同metric数据源中的数据。</p></li>
+
+<li><p>grafana最常用于因特网基础设施和应用分析，但在其他领域也有机会用到，比如：工业传感器、家庭自动化、过程控制等等。</p></li>
+
+<li><p>grafana有热插拔控制面板和可扩展的数据源，目前已经支持Graphite、InfluxDB、OpenTSDB、Elasticsearch。</p></li>
+</ul>
+
+<p>本次实验， 我们需要使用<code>influxDB</code>存储我们的指标数据，由于我们的指标数据是时序性的，所以influxDB比较合适，当然也可以使用
+<code>prometheus</code> 作为时序数据持久化方案。</p>
+
+<p>由于我想快速搭建环境，我就不拘束于常规的安装方式，这里直接使用Docker来构建我们的influxDB容器</p>
+<pre><code>sudo docker run -d -p 8083:8083 -p 8086:8086 tutum/influxdb:latest
+</code></pre>
+
+<p>同样，我们也用Docker开构建我们的grafana容器</p>
+<pre><code>sudo docker run -d -p 9090:3000/tcp --name=grafana grafana/grafana:latest
+</code></pre>
+
+<p>上面的容器构建并启动后，我们可以在浏览器完成一些相关的配置：</p>
+
+<h4 id="初始化influxdb">初始化influxDB</h4>
+
+<p>我们在浏览器访问 8083端口地址，如下图</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-1.png" alt="go-monitor-1" /></p>
+
+<p>接着我们在Query框输入以下命令，完成测试数据库的创建</p>
+<pre><code>CREATE DATABASE &quot;helloWorld&quot;
+</code></pre>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-2.png" alt="go-monitor-2" /></p>
+
+<p>这样我们的测试数据库就创建完成了。</p>
+
+<h4 id="grafana设置">grafana设置</h4>
+
+<p>我们需要访问grafana,进行一些参数和环境的设置</p>
+
+<p>用户名和密码默认为 admin / admin</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-3.png" alt="go-monitor-3" /></p>
+
+<p>登陆成功后，进入主页面</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-4.png" alt="go-monitor-4" /></p>
+
+<p>在上面的主页面，点击一下 “Add data source”的绿色按钮，点击后，进入创建数据源的信息填写表单：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-5.png" alt="go-monitor-5" /></p>
+
+<p>现在，我们填写我们influxDB的一些关键信息，如上图，然后点击“保存” ，这样我们在Grafana就完成了数据源的关联工作。</p>
+
+<p>在进一步配置我们的监控面板之前，我们先实现我们指标监控测试代码</p>
+
+<h2 id="数据埋点">数据埋点</h2>
+
+<p>我们先实现一个用于测试的代码， 本代码是模拟在随机的时间内申请内存，用于参数内存和GC等监控指标。</p>
+
+<p>这些指标会发送到influxDB中，最后，我们可以再Grafana中完成对指标数据的监控观察。</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;fmt&quot;
+    &quot;math/rand&quot;
+    &quot;time&quot;
+
+    &quot;github.com/rcrowley/go-metrics&quot;
+    &quot;github.com/vrischmann/go-metrics-influxdb&quot;
+)
+
+//使用内存
+func useMemory() {
+    a := rand.Intn(100)
+    m := make([]int, a*1e6)
+
+    d := time.Second * time.Duration(rand.Intn(15))
+    fmt.Printf(&quot;Generated something with size %dMB, sleeping for %s\n&quot;, len(m)/1e6, d)
+    time.Sleep(d)
+    fmt.Printf(&quot;Done using %dMB\n&quot;, len(m)/1e6)
+}
+
+func main() {
+
+    r := metrics.NewRegistry()
+    metrics.RegisterDebugGCStats(r)
+    metrics.RegisterRuntimeMemStats(r)
+
+    go metrics.CaptureDebugGCStats(r, time.Second*5)
+    go metrics.CaptureRuntimeMemStats(r, time.Second*5)
+
+    go influxdb.InfluxDB(
+        r,                             // metrics registry
+        time.Second*5,                 // 时间间隔
+        &quot;http://192.168.139.140:8086&quot;, // InfluxDB url
+        &quot;helloWorld&quot;,                  // InfluxDB 数据库名
+        &quot;&quot;,                            // InfluxDB user
+        &quot;&quot;,                            // InfluxDB password
+    )
+
+    time.Sleep(time.Second * 10)
+
+    for {
+        go useMemory()
+        time.Sleep(time.Duration(rand.Intn(15)) * time.Second)
+    }
+}
+
+</code></pre>
+
+<p>我们在终端启动我们的测试代码：</p>
+<pre><code>go run main.go
+</code></pre>
+
+<h2 id="创建监控面板">创建监控面板</h2>
+
+<p>一旦我们的DataSource完成配置后，在Grafana我们可以开始造一个监控面板，我们继续点击左上角的logo图案，在Dashboards中
+选择<code>New</code>,来创建一个新的panel，如下图：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-6.png" alt="go-monitor-6" /></p>
+
+<p>然后我们选择“Graph”，如下图：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-7.png" alt="go-monitor-7" /></p>
+
+<p>当panel出现后，我们鼠标点击标题，当出现一个选择创建的时候，我们继续选择“Edit”, 如下图：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-8.png" alt="go-monitor-8" /></p>
+
+<p>接下来，我们需要创建查询Query的组合语句，如下图</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-10.png" alt="go-monitor-10" /></p>
+
+<p>注意：如果我们想更多了解我们有哪些的指标项，我们还可以再浏览器进行相关查询，例如：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-9.png" alt="go-monitor-9" /></p>
+
+<p>再设置X轴和Y轴的数据展示单位</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-11.png" alt="go-monitor-11" /></p>
+
+<p>上述主要的设置完成后，保存并刷新页面，可以看到我们的监控数据已经出现在我们的监控面板上：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-12.png" alt="go-monitor-12" /></p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/2/2/monitor-go-with-influxdb-and-grafana.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">1</span>
                             <span class="day">24</span>
                         </span>
@@ -1073,443 +1256,6 @@ ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName 
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/1/1/Profiling-and-Optimizing-Go-using-go-torch.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">12</span>
-                            <span class="day">19</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/12/19/about-round-robin.html">关于Round-Robin</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="背景">背景</h2>
-
-<p>之前写过一篇关于 <a href="http://lihaoquan.me/2016/7/17/using-vulcand.html">vulcand的文章</a> ,
-里面理解介绍了vulcand作为服务负载的相关信息。</p>
-
-<p>它的功能处理架构如下：</p>
-<pre><code>               +----------------------------------------^------+
-               |                       +---------------v+ etcd |
-               |                       |                +-----^+
-               |                       |                      |
-               |       +-----------+   |                      |
-               |       |           |   |                      |
-     +----------------^+  vulcand  +^---------------+         |
-     |         |       |           |   |            |         |
-     |         |       +-----+-----+   |            |         |
-     |         |             ^         |            |         |
-     |         |             |         |            |         |
-     |         |             |         |            |         |
-     |         |             |         |            |         |
-     |         |             |         |            |         |
-     |         |             |         |            |         |
-+----+-----+   |        +----+-----+   |      +-----+----+    |
-|          +---+---+    |          +---+---+  |          +----+--+
-|  Server  |       |    |  Server  |       |  |  Server  |       |
-|          | regis |    |          | regis |  |          | regis |
-|          |       |    |          |       |  |          |       |
-+----------+-------+    +----------+-------+  +----------+-------+
-
-</code></pre>
-
-<p>可以看到 vulcand 支持弹性部署的同时，面向服务的角度，它还提供了负载均衡的处理。查看 vulcand 的源码，我们不难发现它背后是自己实现了一套 RR 的算法 ：<a href="https://github.com/mailgun/vulcan/blob/master/loadbalance/roundrobin/roundrobin.go">代码文件</a></p>
-
-<h2 id="weighted-round-robin-scheduling">Weighted Round-Robin Scheduling</h2>
-
-<p><code>Round-Robin</code>，轮询调度，通信中信道调度的一种策略，该调度策略使用户轮流使用共享资源，不会考虑瞬时信道条件。轮询调度算法的原理是每一次把来自用户的请求轮流分配给内部中的服务器，从1开始，直到N(内部服务器个数)，然后重新开始循环。</p>
-
-<p>算法的优点是其简洁性，它无需记录当前所有连接的状态，所以它是一种无状态调度。</p>
-
-<p><code>Weighted Round-Robin</code> 顾名思义就是带权重的RR调度方式。
-上面所讲的轮询调度算法并没有考虑每台服务器的处理能力，在实际情况中，可能并不是这种情况。由于每台服务器的配置、安装的业务应用等不同，其处理能力会不一样。所以，我们根据服务器的不同处理能力，给每个服务器分配不同的权值，使其能够接受相应权值数的服务请求。</p>
-
-<h2 id="nginx的负载方式">Nginx的负载方式</h2>
-
-<p>nginx的upstream的负载策略其实也是wrr的算法的实现。</p>
-
-<p>下面我们看下它其中的issue:</p>
-<pre><code>Upstream: smooth weighted round-robin balancing.
-For edge case weights like { 5, 1, 1 } we now produce { a, a, b, a, c, a, a }
-sequence instead of { c, b, a, a, a, a, a } produced previously.
-
-Algorithm is as follows: on each peer selection we increase current_weight
-of each eligible peer by its weight, select peer with greatest current_weight
-and reduce its current_weight by total number of weight points distributed
-among peers.
-
-In case of { 5, 1, 1 } weights this gives the following sequence of
-current_weight's:
-
-     a  b  c
-     0  0  0  (initial state)
-
-     5  1  1  (a selected)
-    -2  1  1
-
-     3  2  2  (a selected)
-    -4  2  2
-
-     1  3  3  (b selected)
-     1 -4  3
-
-     6 -3  4  (a selected)
-    -1 -3  4
-
-     4 -2  5  (c selected)
-     4 -2 -2
-
-     9 -1 -1  (a selected)
-     2 -1 -1
-
-     7  0  0  (a selected)
-     0  0  0
-
-To preserve weight reduction in case of failures the effective_weight
-variable was introduced, which usually matches peer's weight, but is
-reduced temporarily on peer failures.
-
-This change also fixes loop with backup servers and proxy_next_upstream
-http_404 (ticket #47), and skipping alive upstreams in some cases if there
-are multiple dead ones (ticket #64).
-
-
-git-svn-id: svn://svn.nginx.org/nginx/trunk@4622 73f98a42-aea0-e011-b76d-00259023448c
-</code></pre>
-
-<p>上述描述可能不太直观，来看个例子。</p>
-
-<p>现在使用以下的upstream配置块：</p>
-<pre><code>upstream backend {
-    server a weight=4;
-    server b weight=2;
-    server c weight=1;
-}
-</code></pre>
-
-<p>按照这个配置，每7个客户端请求中，a会被选中4次、b会被选中2次、c会被选中1次，且分布平滑。
-我们来算算看是不是这样子的。
-initial current_weight of a, b, c is { 0, 0, 0 }</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/rr.png" alt="pprr" /></p>
-
-<p>通过上述过程，可得以下结论：</p>
-
-<ol>
-<li><p>7个请求中，a、b、c分别被选取了4、2、1次，符合它们的权重值。</p></li>
-
-<li><p>7个请求中，a、b、c被选取的顺序为a, b, a, c, a, b, a，分布均匀，权重大的后端a没有被连续选取。</p></li>
-
-<li><p>每经过7个请求后，a、b、c的current_weight又回到初始值{ 0, 0, 0 }，因此上述流程是不断循环的。</p></li>
-</ol>
-
-<p>这种算法不但实现了基于权重的轮询算法，而且还实现了平滑的算法：所谓平滑，就是在一段时间内，不仅服务器被选择的次数的分布和它们的权重一致，而且调度算法还比较均匀的选择服务器，而不会集中一段时间之内只选择某一个权重比较高的服务器。如果使用随机算法选择或者普通的基于权重的轮询算法，就比较容易造成某个服务集中被调用压力过大。</p>
-
-<h2 id="lvs的负载方式">LVS的负载方式</h2>
-
-<p>LVS使用的另外一种算法。</p>
-
-<p>设计思路可以查看 <a href="http://www.linuxvirtualserver.org/docs/scheduling.html">Job Scheduling Algorithms in Linux Virtual Server</a></p>
-
-<p>主要实现算法如下：</p>
-<pre><code>Supposing that there is a server set S = {S0, S1, …, Sn-1};
-W(Si) indicates the weight of Si;
-i indicates the server selected last time, and i is initialized with -1;
-cw is the current weight in scheduling, and cw is initialized with zero; 
-max(S) is the maximum weight of all the servers in S;
-gcd(S) is the greatest common divisor of all server weights in S;
-
-while (true) {
-    i = (i + 1) mod n;
-    if (i == 0) {
-        cw = cw - gcd(S); 
-        if (cw &lt;= 0) {
-            cw = max(S);
-            if (cw == 0)
-            return NULL;
-        }
-    } 
-    if (W(Si) &gt;= cw) 
-        return Si;
-}
-</code></pre>
-
-<h2 id="go代码实现">Go代码实现</h2>
-
-<p>我们抽离vulcand的rr实现，利用其思想我们实现了一个简单高效的WRR实现</p>
-<pre><code class="language-go">
-package roundrobin
-
-// RR: 基于 权重round robin算法的接口
-type RR interface {
-    Next() interface{}
-    Add(node interface{}, weight int)
-    RemoveAll()
-    Reset()
-}
-
-const (
-    RR_NGINX = 0 //Nginx算法
-    RR_LVS   = 1 //LVS算法
-)
-
-//算法实现工厂类
-func NewWeightedRR(rtype int) RR {
-    if rtype == RR_NGINX {
-        return &amp;WNGINX{}
-    } else if rtype == RR_LVS {
-        return &amp;WLVS{}
-    }
-    return nil
-}
-
-
-//节点结构
-type WeightNginx struct {
-    Node            interface{}
-    Weight          int
-    CurrentWeight   int
-    EffectiveWeight int
-}
-
-func (ww *WeightNginx) fail() {
-    ww.EffectiveWeight -= ww.Weight
-    if ww.EffectiveWeight &lt; 0 {
-        ww.EffectiveWeight = 0
-    }
-}
-
-//nginx算法实现类
-type WNGINX struct {
-    nodes []*WeightNginx
-    n     int
-}
-
-//增加权重节点
-func (w *WNGINX) Add(node interface{}, weight int) {
-    weighted := &amp;WeightNginx{
-        Node:            node,
-        Weight:          weight,
-        EffectiveWeight: weight}
-    w.nodes = append(w.nodes, weighted)
-    w.n++
-}
-
-func (w *WNGINX) RemoveAll() {
-    w.nodes = w.nodes[:0]
-    w.n = 0
-}
-
-//下次轮询事件
-func (w *WNGINX) Next() interface{} {
-    if w.n == 0 {
-        return nil
-    }
-    if w.n == 1 {
-        return w.nodes[0].Node
-    }
-
-    return nextWeightedNode(w.nodes).Node
-}
-
-func nextWeightedNode(nodes []*WeightNginx) (best *WeightNginx) {
-    total := 0
-
-    for i := 0; i &lt; len(nodes); i++ {
-        w := nodes[i]
-
-        if w == nil {
-            continue
-        }
-
-        w.CurrentWeight += w.EffectiveWeight
-        total += w.EffectiveWeight
-        if w.EffectiveWeight &lt; w.Weight {
-            w.EffectiveWeight++
-        }
-
-        if best == nil || w.CurrentWeight &gt; best.CurrentWeight {
-            best = w
-        }
-    }
-
-    if best == nil {
-        return nil
-    }
-    best.CurrentWeight -= total
-    return best
-}
-
-func (w *WNGINX) Reset() {
-    for _, s := range w.nodes {
-        s.EffectiveWeight = s.Weight
-        s.CurrentWeight = 0
-    }
-}
-
-
-//节点结构
-type WeightLvs struct {
-    Node   interface{}
-    Weight int
-}
-
-//lvs算法实现类
-type WLVS struct {
-    nodes []*WeightLvs
-    n     int
-    gcd   int //通用的权重因子
-    maxW  int //最大权重
-    i     int //被选择的次数
-    cw    int //当前的权重值
-}
-
-//下次轮询事件
-func (w *WLVS) Next() interface{} {
-    if w.n == 0 {
-        return nil
-    }
-
-    if w.n == 1 {
-        return w.nodes[0].Node
-    }
-
-    for {
-        w.i = (w.i + 1) % w.n
-        if w.i == 0 {
-            w.cw = w.cw - w.gcd
-            if w.cw &lt;= 0 {
-                w.cw = w.maxW
-                if w.cw == 0 {
-                    return nil
-                }
-            }
-        }
-        if w.nodes[w.i].Weight &gt;= w.cw {
-            return w.nodes[w.i].Node
-        }
-    }
-}
-
-//增加权重节点
-func (w *WLVS) Add(node interface{}, weight int) {
-    weighted := &amp;WeightLvs{Node: node, Weight: weight}
-    if weight &gt; 0 {
-        if w.gcd == 0 {
-            w.gcd = weight
-            w.maxW = weight
-            w.i = -1
-            w.cw = 0
-        } else {
-            w.gcd = gcd(w.gcd, weight)
-            if w.maxW &lt; weight {
-                w.maxW = weight
-            }
-        }
-    }
-    w.nodes = append(w.nodes, weighted)
-    w.n++
-}
-
-func gcd(x, y int) int {
-    var t int
-    for {
-        t = (x % y)
-        if t &gt; 0 {
-            x = y
-            y = t
-        } else {
-            return y
-        }
-    }
-}
-func (w *WLVS) RemoveAll() {
-    w.nodes = w.nodes[:0]
-    w.n = 0
-    w.gcd = 0
-    w.maxW = 0
-    w.i = -1
-    w.cw = 0
-}
-func (w *WLVS) Reset() {
-    w.i = -1
-    w.cw = 0
-}
-
-</code></pre>
-
-<p>有了上面的代码示例go，我们可以看下测试的例子：</p>
-<pre><code class="language-go">package roundrobin
-
-import (
-    &quot;math/rand&quot;
-    &quot;strconv&quot;
-    &quot;testing&quot;
-    &quot;time&quot;
-)
-
-func BenchmarkW1_Next(b *testing.B) {
-    b.ReportAllocs()
-    rand.Seed(time.Now().UnixNano())
-    w := NewWeightedRR(RR_NGINX)
-    for i := 0; i &lt; 10; i++ {
-        w.Add(&quot;server&quot;+strconv.Itoa(i), rand.Intn(100))
-    }
-
-    b.StartTimer()
-    for i := 0; i &lt; b.N; i++ {
-        w.Next()
-    }
-}
-
-func BenchmarkW2_Next(b *testing.B) {
-    b.ReportAllocs()
-    rand.Seed(time.Now().UnixNano())
-    w := NewWeightedRR(RR_LVS)
-    for i := 0; i &lt; 10; i++ {
-        w.Add(&quot;server&quot;+strconv.Itoa(i), rand.Intn(100))
-    }
-
-    b.StartTimer()
-    for i := 0; i &lt; b.N; i++ {
-        w.Next()
-    }
-}
-
-</code></pre>
-
-<p>基准测试报告：</p>
-<pre><code class="language-sh">BenchmarkNginx-4        30000000                53.6 ns/op             0 B/op          0 allocs/op
-BenchmarkLVS-4          30000000                34.7 ns/op             0 B/op          0 allocs/op
-</code></pre>
-
-<h2 id="总结">总结</h2>
-
-<p>轮询调度算法以及权重轮询调度算法的特点是实现起来比较简洁，并且实用。目前几乎所有的负载均衡设备均提供这种功能。</p>
-
-<ul>
-<li><p>如果服务器的权重差别很大，出于平滑的考虑，避免短时间内会对服务器造成冲击，你可以选择<code>Nginx</code>的算法。</p></li>
-
-<li><p>如果服务器的差别不是很大，可以考虑使用<code>LVS</code>的算法，因为测试可以看到它的性能要好于Nginx的算法。</p></li>
-</ul>
-
-<h2 id="参考资料">参考资料</h2>
-
-<ul>
-<li><a href="http://colobu.com/2016/12/04/smooth-weighted-round-robin-algorithm/">鸟窝-平滑的基于权重的轮询算法</a></li>
-</ul>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/12/19/about-round-robin.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

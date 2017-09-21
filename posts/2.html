@@ -50,6 +50,270 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">3</span>
+                            <span class="day">29</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/3/29/etcd-https-setup.html">深入学习Kubernetes(四):Etcd启用https服务</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>kubernetes依靠etcd来存储docker集群的配置信息，进一步说etcd作为一个受到ZooKeeper与doozer启发而催生的项目，除了拥有与之类似的功能外，更专注于以下四点：</p>
+
+<ul>
+<li>简单：基于HTTP+JSON的API让你用curl就可以轻松使用</li>
+<li>安全：可选SSL客户认证机制</li>
+<li>快速：每个实例每秒支持一千次写操作</li>
+<li>可信：使用Raft算法充分实现了分布式</li>
+</ul>
+
+<p>由于在分布式环境中，安全性已经成为互联网技术团队非常看重的部分，所以本文主要介绍如何搭建一个支持证书的https Etcd集群。</p>
+
+<h2 id="生成证书">生成证书</h2>
+
+<h3 id="下载-cfssl">下载 cfssl</h3>
+<pre><code class="language-sh">$ curl -s -L -o /usr/bin/cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+$ curl -s -L -o /usr/bin/cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+
+$ chmod +x /usr/bin/{cfssl,cfssljson}
+</code></pre>
+
+<h3 id="生成key">生成key</h3>
+
+<p>先编写相关配置</p>
+<pre><code class="language-sh">$ vim ca-config.json
+
+{
+  &quot;signing&quot;: {
+    &quot;default&quot;: {
+      &quot;expiry&quot;: &quot;100000h&quot;
+    },
+    &quot;profiles&quot;: {
+      &quot;server&quot;: {
+        &quot;usages&quot;: [&quot;signing&quot;, &quot;key encipherment&quot;, &quot;server auth&quot;, &quot;client auth&quot;],
+        &quot;expiry&quot;: &quot;100000h&quot;
+      },
+      &quot;client&quot;: {
+        &quot;usages&quot;: [&quot;signing&quot;, &quot;key encipherment&quot;, &quot;server auth&quot;, &quot;client auth&quot;],
+        &quot;expiry&quot;: &quot;8760h&quot;
+      }
+    }
+  }
+}
+</code></pre>
+<pre><code class="language-sh">$ vim ca-csr.json
+
+{
+  &quot;CN&quot;: &quot;Etcd&quot;,
+  &quot;key&quot;: {
+    &quot;algo&quot;: &quot;rsa&quot;,
+    &quot;size&quot;: 4096
+  },
+  &quot;names&quot;: [
+    {
+      &quot;C&quot;: &quot;CN&quot;,
+      &quot;L&quot;: &quot;Guangzhou&quot;,
+      &quot;O&quot;: &quot;Gopher&quot;,
+      &quot;OU&quot;: &quot;PaaS&quot;,
+      &quot;ST&quot;: &quot;Guangzhou&quot;
+    }
+  ]
+}
+</code></pre>
+
+<p>编写完上面的配置文件后，我们可以开始使用cfssl来生成ca证书</p>
+<pre><code class="language-sh">$ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+</code></pre>
+
+<p>执行后，会生成三个文件：</p>
+
+<ul>
+<li><p>ca-key.pem - private key for the CA</p></li>
+
+<li><p>ca.pem - certificate for the CA</p></li>
+
+<li><p>ca.csr - certificate signing request for the CA</p></li>
+</ul>
+
+<h3 id="生成服务端证书">生成服务端证书</h3>
+
+<p>编写配置文件</p>
+<pre><code class="language-sh">$ vim server-csr.json
+
+{
+  &quot;CN&quot;: &quot;etcd-server&quot;,
+  &quot;hosts&quot;: [
+    &quot;localhost&quot;,
+    &quot;0.0.0.0&quot;,
+    &quot;127.0.0.1&quot;,
+    &quot;192.168.139.1&quot;,
+    &quot;192.168.139.134&quot;
+  ],
+  &quot;key&quot;: {
+    &quot;algo&quot;: &quot;rsa&quot;,
+    &quot;size&quot;: 4096
+  },
+  &quot;names&quot;: [
+    {
+      &quot;C&quot;: &quot;CN&quot;,
+      &quot;L&quot;: &quot;Guangzhou&quot;,
+      &quot;O&quot;: &quot;Gopher&quot;,
+      &quot;OU&quot;: &quot;PaaS&quot;,
+      &quot;ST&quot;: &quot;Guangzhou&quot;
+    }
+  ]
+}
+</code></pre>
+
+<p>导出证书</p>
+<pre><code class="language-sh">cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server server-csr.json | cfssljson -bare server
+</code></pre>
+
+<blockquote>
+<p>注意：hosts需要包括允许访问ETCD Cluster的IP或者FQDN</p>
+</blockquote>
+
+<p>生成三个文件：server.pem, server-key.pem和server.csr</p>
+
+<h3 id="产生客户端证书">产生客户端证书</h3>
+<pre><code class="language-sh">$ vim client-csr.json
+
+{
+  &quot;CN&quot;: &quot;etcd-client&quot;,
+  &quot;hosts&quot;: [
+    &quot;&quot;
+  ],
+  &quot;key&quot;: {
+    &quot;algo&quot;: &quot;rsa&quot;,
+    &quot;size&quot;: 4096
+  },
+  &quot;names&quot;: [
+    {
+      &quot;C&quot;: &quot;CN&quot;,
+      &quot;L&quot;: &quot;Guangzhou&quot;,
+      &quot;ST&quot;: &quot;Guangzhou&quot;,
+      &quot;O&quot;: &quot;Gopher&quot;,
+      &quot;OU&quot;: &quot;PaaS&quot;
+    }
+  ]
+}
+</code></pre>
+
+<p>执行命令生成证书</p>
+<pre><code class="language-sh">cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client client-csr.json | cfssljson -bare client
+</code></pre>
+
+<p>生成三个文件：client.pem, client-key.pem和client.csr</p>
+
+<h2 id="配置etcd-集群">配置etcd 集群</h2>
+
+<p>下面会以一个五个节点的集群为例</p>
+
+<h4 id="节点一启动脚本">节点一启动脚本</h4>
+<pre><code class="language-sh">/data/services/etcd-v3.1.4-linux-amd64/etcd --name cn0 --initial-advertise-peer-urls https://127.0.0.1:1080 --listen-peer-urls https://127.0.0.1:1080 --listen-client-urls https://192.168.139.134:1079,https://127.0.0.1:1079 --advertise-client-urls https://192.168.139.134:1079,https://127.0.0.1:1079 --initial-cluster-token etcd-cluster-token --initial-cluster cn0=https://127.0.0.1:1080,cn1=https://127.0.0.1:1180,cn2=https://127.0.0.1:1280,cn3=https://127.0.0.1:1380,cn4=https://127.0.0.1:1480 --initial-cluster-state new --cert-file=/home/lihaoquan/etcd/https/keygen/server.pem --key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem --peer-cert-file=/home/lihaoquan/etcd/https/keygen/server.pem --peer-key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem --trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem --peer-trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem --data-dir=./nodes/cn0 --peer-client-cert-auth=true --client-cert-auth=true
+</code></pre>
+
+<h4 id="节点二启动脚本">节点二启动脚本</h4>
+<pre><code class="language-sh">/data/services/etcd-v3.1.4-linux-amd64/etcd \
+  --name cn1 \
+  --initial-advertise-peer-urls https://127.0.0.1:1180 \
+  --listen-peer-urls https://127.0.0.1:1180 \
+  --listen-client-urls https://192.168.139.134:1179,https://127.0.0.1:1179 \
+  --advertise-client-urls https://192.168.139.134:1179,https://127.0.0.1:1179 \
+  --initial-cluster-token etcd-cluster-token \
+  --initial-cluster cn0=https://127.0.0.1:1080,cn1=https://127.0.0.1:1180,cn2=https://127.0.0.1:1280,cn3=https://127.0.0.1:1380,cn4=https://127.0.0.1:1480 \
+  --initial-cluster-state new \
+  --cert-file=/home/lihaoquan/etcd/https/keygen/server.pem  \
+  --key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem  \
+  --peer-cert-file=/home/lihaoquan/etcd/https/keygen/server.pem  \
+  --peer-key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem \ 
+  --trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem  \
+  --peer-trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem  \
+  --data-dir=./nodes/cn1  \
+  --peer-client-cert-auth=true  \
+  --client-cert-auth=true 
+</code></pre>
+
+<h4 id="节点三启动脚本">节点三启动脚本</h4>
+<pre><code class="language-sh">/data/services/etcd-v3.1.4-linux-amd64/etcd \
+  --name cn2 \
+  --initial-advertise-peer-urls https://127.0.0.1:1280 \
+  --listen-peer-urls https://127.0.0.1:1280 \
+  --listen-client-urls https://192.168.139.134:1279,https://127.0.0.1:1279 \
+  --advertise-client-urls https://192.168.139.134:1279,https://127.0.0.1:1279 \
+  --initial-cluster-token etcd-cluster-token \
+  --initial-cluster cn0=https://127.0.0.1:1080,cn1=https://127.0.0.1:1180,cn2=https://127.0.0.1:1280,cn3=https://127.0.0.1:1380,cn4=https://127.0.0.1:1480 \
+  --initial-cluster-state new \
+  --cert-file=/home/lihaoquan/etcd/https/keygen/server.pem  \
+  --key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem  \
+  --peer-cert-file=/home/lihaoquan/etcd/https/keygen/server.pem  \
+  --peer-key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem \ 
+  --trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem \ 
+  --peer-trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem  \
+  --data-dir=./nodes/cn2 \
+  --peer-client-cert-auth=true  \
+  --client-cert-auth=true 
+</code></pre>
+
+<h4 id="节点四启动脚本">节点四启动脚本</h4>
+<pre><code class="language-sh">/data/services/etcd-v3.1.4-linux-amd64/etcd \
+  --name cn3 \
+  --initial-advertise-peer-urls https://127.0.0.1:1380 \
+  --listen-peer-urls https://127.0.0.1:1380 \
+  --listen-client-urls https://192.168.139.134:1379,https://127.0.0.1:1379 \
+  --advertise-client-urls https://192.168.139.134:1379,https://127.0.0.1:1379 \
+  --initial-cluster-token etcd-cluster-token \
+  --initial-cluster cn0=https://127.0.0.1:1080,cn1=https://127.0.0.1:1180,cn2=https://127.0.0.1:1280,cn3=https://127.0.0.1:1380,cn4=https://127.0.0.1:1480 \
+  --initial-cluster-state new \
+  --cert-file=/home/lihaoquan/etcd/https/keygen/server.pem \ 
+  --key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem \ 
+  --peer-cert-file=/home/lihaoquan/etcd/https/keygen/server.pem \ 
+  --peer-key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem \ 
+  --trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem  \
+  --peer-trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem  \
+  --data-dir=./nodes/cn3 \
+  --peer-client-cert-auth=true  \
+  --client-cert-auth=true 
+</code></pre>
+
+<h4 id="节点五启动脚本">节点五启动脚本</h4>
+<pre><code class="language-sh">/data/services/etcd-v3.1.4-linux-amd64/etcd \
+  --name cn4 \
+  --initial-advertise-peer-urls https://127.0.0.1:1480 \
+  --listen-peer-urls https://127.0.0.1:1480 \
+  --listen-client-urls https://192.168.139.134:1479,https://127.0.0.1:1479 \
+  --advertise-client-urls https://192.168.139.134:1479,https://127.0.0.1:1479 \
+  --initial-cluster-token etcd-cluster-token \
+  --initial-cluster cn0=https://127.0.0.1:1080,cn1=https://127.0.0.1:1180,cn2=https://127.0.0.1:1280,cn3=https://127.0.0.1:1380,cn4=https://127.0.0.1:1480 \
+  --initial-cluster-state new \
+  --cert-file=/home/lihaoquan/etcd/https/keygen/server.pem  \
+  --key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem  \
+  --peer-cert-file=/home/lihaoquan/etcd/https/keygen/server.pem  \
+  --peer-key-file=/home/lihaoquan/etcd/https/keygen/server-key.pem  \
+  --trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem  \
+  --peer-trusted-ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem \ 
+  --data-dir=./nodes/cn4 \
+  --peer-client-cert-auth=true  \
+  --client-cert-auth=true 
+</code></pre>
+
+<h3 id="验证集群的健康情况">验证集群的健康情况</h3>
+<pre><code>/data/services/etcd-v3.1.4-linux-amd64/etcdctl --cert-file=/home/lihaoquan/etcd/https/keygen/client.pem  --key-file=/home/lihaoquan/etcd/https/keygen/client-key.pem --ca-file=/home/lihaoquan/etcd/https/keygen/ca.pem --endpoints=https://0.0.0.0:1179,https://0.0.0.0:1279,https://0.0.0.0:1379,https://0.0.0.0:1479 cluster-health
+</code></pre>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/3/29/etcd-https-setup.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">3</span>
                             <span class="day">12</span>
                         </span>
                             </div>
@@ -913,189 +1177,6 @@ myweb        10.254.18.53    &lt;nodes&gt;       8080/TCP   57s
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/2/25/create-kubernetes-single-node-mode.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">2</span>
-                            <span class="day">2</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/2/2/monitor-go-with-influxdb-and-grafana.html">使用Grafana监控Go应用</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>互联网企业背后，依靠的是成千上万台服务器日夜不停运转，以支撑其业务的运转，宕机对于互联网企业来说，代价是
-沉重的，轻则影响用户体验，重则直接影响交易，特别给我们这些做电商的造成不可挽回的损失。对于这些机器队友的
-开发和运维人员来说，依靠人力是不可能完成24小时不间断盯着服务器的。所以对于互联网公司，监控工作的地位
-已经越来越重要了，作为Devops也是需要掌握各种技术方案的监控。</p>
-
-<p>Go语言在过去的2016年成为了年度的最佳语言，这说明在国内甚至全球范围内，越来越多公司都在使用Go来开发他们的产品。
-Go具备高并发，部署方便等特点，已经成为很多后端开发工程师的首选语言。</p>
-
-<p>本文会以Go为入口，利用目前在监控工具中很火的Grafana和infuxDB作为例子，介绍下我们如何数据可视化的方式实时监控我们的
-go应用。</p>
-
-<h2 id="环境准备">环境准备</h2>
-
-<h4 id="influxdb-和-grafana">influxDB 和 grafana</h4>
-
-<p>Grafana一般是和一些时间序列数据库进行配合来展示数据的，例如：Graphite、OpenTSDB、InfluxDB等，主要特点：</p>
-
-<ul>
-<li><p>grafana是用于可视化大型测量数据的开源程序，他提供了强大和优雅的方式去创建、共享、浏览数据。dashboard中显示了你不同metric数据源中的数据。</p></li>
-
-<li><p>grafana最常用于因特网基础设施和应用分析，但在其他领域也有机会用到，比如：工业传感器、家庭自动化、过程控制等等。</p></li>
-
-<li><p>grafana有热插拔控制面板和可扩展的数据源，目前已经支持Graphite、InfluxDB、OpenTSDB、Elasticsearch。</p></li>
-</ul>
-
-<p>本次实验， 我们需要使用<code>influxDB</code>存储我们的指标数据，由于我们的指标数据是时序性的，所以influxDB比较合适，当然也可以使用
-<code>prometheus</code> 作为时序数据持久化方案。</p>
-
-<p>由于我想快速搭建环境，我就不拘束于常规的安装方式，这里直接使用Docker来构建我们的influxDB容器</p>
-<pre><code>sudo docker run -d -p 8083:8083 -p 8086:8086 tutum/influxdb:latest
-</code></pre>
-
-<p>同样，我们也用Docker开构建我们的grafana容器</p>
-<pre><code>sudo docker run -d -p 9090:3000/tcp --name=grafana grafana/grafana:latest
-</code></pre>
-
-<p>上面的容器构建并启动后，我们可以在浏览器完成一些相关的配置：</p>
-
-<h4 id="初始化influxdb">初始化influxDB</h4>
-
-<p>我们在浏览器访问 8083端口地址，如下图</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-1.png" alt="go-monitor-1" /></p>
-
-<p>接着我们在Query框输入以下命令，完成测试数据库的创建</p>
-<pre><code>CREATE DATABASE &quot;helloWorld&quot;
-</code></pre>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-2.png" alt="go-monitor-2" /></p>
-
-<p>这样我们的测试数据库就创建完成了。</p>
-
-<h4 id="grafana设置">grafana设置</h4>
-
-<p>我们需要访问grafana,进行一些参数和环境的设置</p>
-
-<p>用户名和密码默认为 admin / admin</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-3.png" alt="go-monitor-3" /></p>
-
-<p>登陆成功后，进入主页面</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-4.png" alt="go-monitor-4" /></p>
-
-<p>在上面的主页面，点击一下 “Add data source”的绿色按钮，点击后，进入创建数据源的信息填写表单：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-5.png" alt="go-monitor-5" /></p>
-
-<p>现在，我们填写我们influxDB的一些关键信息，如上图，然后点击“保存” ，这样我们在Grafana就完成了数据源的关联工作。</p>
-
-<p>在进一步配置我们的监控面板之前，我们先实现我们指标监控测试代码</p>
-
-<h2 id="数据埋点">数据埋点</h2>
-
-<p>我们先实现一个用于测试的代码， 本代码是模拟在随机的时间内申请内存，用于参数内存和GC等监控指标。</p>
-
-<p>这些指标会发送到influxDB中，最后，我们可以再Grafana中完成对指标数据的监控观察。</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;fmt&quot;
-    &quot;math/rand&quot;
-    &quot;time&quot;
-
-    &quot;github.com/rcrowley/go-metrics&quot;
-    &quot;github.com/vrischmann/go-metrics-influxdb&quot;
-)
-
-//使用内存
-func useMemory() {
-    a := rand.Intn(100)
-    m := make([]int, a*1e6)
-
-    d := time.Second * time.Duration(rand.Intn(15))
-    fmt.Printf(&quot;Generated something with size %dMB, sleeping for %s\n&quot;, len(m)/1e6, d)
-    time.Sleep(d)
-    fmt.Printf(&quot;Done using %dMB\n&quot;, len(m)/1e6)
-}
-
-func main() {
-
-    r := metrics.NewRegistry()
-    metrics.RegisterDebugGCStats(r)
-    metrics.RegisterRuntimeMemStats(r)
-
-    go metrics.CaptureDebugGCStats(r, time.Second*5)
-    go metrics.CaptureRuntimeMemStats(r, time.Second*5)
-
-    go influxdb.InfluxDB(
-        r,                             // metrics registry
-        time.Second*5,                 // 时间间隔
-        &quot;http://192.168.139.140:8086&quot;, // InfluxDB url
-        &quot;helloWorld&quot;,                  // InfluxDB 数据库名
-        &quot;&quot;,                            // InfluxDB user
-        &quot;&quot;,                            // InfluxDB password
-    )
-
-    time.Sleep(time.Second * 10)
-
-    for {
-        go useMemory()
-        time.Sleep(time.Duration(rand.Intn(15)) * time.Second)
-    }
-}
-
-</code></pre>
-
-<p>我们在终端启动我们的测试代码：</p>
-<pre><code>go run main.go
-</code></pre>
-
-<h2 id="创建监控面板">创建监控面板</h2>
-
-<p>一旦我们的DataSource完成配置后，在Grafana我们可以开始造一个监控面板，我们继续点击左上角的logo图案，在Dashboards中
-选择<code>New</code>,来创建一个新的panel，如下图：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-6.png" alt="go-monitor-6" /></p>
-
-<p>然后我们选择“Graph”，如下图：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-7.png" alt="go-monitor-7" /></p>
-
-<p>当panel出现后，我们鼠标点击标题，当出现一个选择创建的时候，我们继续选择“Edit”, 如下图：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-8.png" alt="go-monitor-8" /></p>
-
-<p>接下来，我们需要创建查询Query的组合语句，如下图</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-10.png" alt="go-monitor-10" /></p>
-
-<p>注意：如果我们想更多了解我们有哪些的指标项，我们还可以再浏览器进行相关查询，例如：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-9.png" alt="go-monitor-9" /></p>
-
-<p>再设置X轴和Y轴的数据展示单位</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-11.png" alt="go-monitor-11" /></p>
-
-<p>上述主要的设置完成后，保存并刷新页面，可以看到我们的监控数据已经出现在我们的监控面板上：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/monitor-go-12.png" alt="go-monitor-12" /></p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/2/2/monitor-go-with-influxdb-and-grafana.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
