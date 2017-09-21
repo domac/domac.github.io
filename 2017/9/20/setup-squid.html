@@ -559,52 +559,52 @@ $ service squid start # 服务器启动squid服务
 <p>然后，我们需要让sibling1存储指定的缓存数据先</p>
 
 <p>我们在 172.17.0.1 的hosts文件中，增加以下配置：</p>
-<pre><code>172.17.0.5 a.vip.com
-172.17.0.5 b.vip.com
+<pre><code>172.17.0.5 a.test.com
+172.17.0.5 b.test.com
 </code></pre>
 
 <p>我们在172.17.0.1上进行以下请求：</p>
-<pre><code>curl http://a.vip.com/t1.html
+<pre><code>curl http://a.test.com/t1.html
 </code></pre>
 
 <p>我们可以看到 sibling1 的访问日志立刻会有反应了：</p>
 <pre><code>$ tail -30f /var/log/squid/access.log
 
 ... ...
-1505976565.994      0 172.17.0.1 TCP_MEM_HIT/200 392 GET http://a.vip.com/t1.html - NONE/- text/html
+1505976565.994      0 172.17.0.1 TCP_MEM_HIT/200 392 GET http://a.test.com/t1.html - NONE/- text/html
 </code></pre>
 
 <p>这个时候，sibling1的缓存中存放了t1.html的资源数据。</p>
 
 <p>我们再次修改 172.17.0.1 的hosts文件中，调整以下配置</p>
-<pre><code>172.17.0.6 a.vip.com
-172.17.0.6 b.vip.com
+<pre><code>172.17.0.6 a.test.com
+172.17.0.6 b.test.com
 </code></pre>
 
 <p>用类似的方式请求 sibling2：</p>
-<pre><code>curl http://b.vip.com/t2.html
+<pre><code>curl http://b.test.com/t2.html
 </code></pre>
 
 <p>查看sibling2的访问日志，可以看到请求的信息：</p>
 <pre><code>... ...
-1505976785.040      0 172.17.0.1 TCP_MEM_HIT/200 397 GET http://b.vip.com/t2.html - NONE/- text/html
+1505976785.040      0 172.17.0.1 TCP_MEM_HIT/200 397 GET http://b.test.com/t2.html - NONE/- text/html
 </code></pre>
 
 <p>这样，sibling1和sibling2就分别缓存了t1.html和t2.html的资源</p>
 
 <p>我们再次调整 172.17.0.1的hosts文件，修改如下：</p>
-<pre><code>172.17.0.2 a.vip.com
-172.17.0.2 b.vip.com
+<pre><code>172.17.0.2 a.test.com
+172.17.0.2 b.test.com
 </code></pre>
 
 <p>这样，我们把请求都分发到proxy上，接下来我们把上面的t1.html和h2.html在请求一次：</p>
-<pre><code>curl http://a.vip.com/t1.html
-curl http://b.vip.com/t2.html
+<pre><code>curl http://a.test.com/t1.html
+curl http://b.test.com/t2.html
 </code></pre>
 
 <p>可以看到proxy节点的访问日志出现以下的信息：</p>
-<pre><code>1505977060.498      7 172.17.0.1 TCP_MISS/200 502 GET http://a.vip.com/t1.html - SIBLING_HIT/172.17.0.5 text/html
-1505977072.654      1 172.17.0.1 TCP_MISS/200 508 GET http://b.vip.com/t2.html - SIBLING_HIT/172.17.0.6 text/html
+<pre><code>1505977060.498      7 172.17.0.1 TCP_MISS/200 502 GET http://a.test.com/t1.html - SIBLING_HIT/172.17.0.5 text/html
+1505977072.654      1 172.17.0.1 TCP_MISS/200 508 GET http://b.test.com/t2.html - SIBLING_HIT/172.17.0.6 text/html
 </code></pre>
 
 <p>这些信息表示，如果proxy没有请求的相关缓存数据，它会去自己的邻居节点（sibling1和sibling2）去“借”数据，然后自己缓存起来（注：如果proxy的sibling配置中设置了proxy-only,自己不会缓存起来，每次都去借数据）</p>
@@ -612,12 +612,12 @@ curl http://b.vip.com/t2.html
 <p>那问题是，如果邻居节点也没有对应的缓存信息呢？</p>
 
 <p>我们尝试进行以下请求：</p>
-<pre><code>curl http://b.vip.com/q.html
+<pre><code>curl http://b.test.com/q.html
 </code></pre>
 
 <p>可以看到proxy节点的日志反馈：</p>
-<pre><code>1505977429.726      8 172.17.0.1 TCP_MISS/200 3150 GET http://b.vip.com/uu1.html - FIRST_PARENT_MISS/bb text/html
-1505977433.183      0 172.17.0.1 TCP_MEM_HIT/200 3156 GET http://b.vip.com/uu1.html - NONE/- text/html
+<pre><code>1505977429.726      8 172.17.0.1 TCP_MISS/200 3150 GET http://b.test.com/uu1.html - FIRST_PARENT_MISS/bb text/html
+1505977433.183      0 172.17.0.1 TCP_MEM_HIT/200 3156 GET http://b.test.com/uu1.html - NONE/- text/html
 </code></pre>
 
 <p>这表示，如果邻居节点没数据命中，proxy会去自己的“上层节点（parent）“去请求。</p>
