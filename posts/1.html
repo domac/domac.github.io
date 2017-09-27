@@ -87,7 +87,75 @@ char *pmessage = &quot;now is the time&quot;;  /* 定义一个指针 */
 
 <p>上述声明中，amessage是一个仅仅足以存放初始化字符串以及空字符<code>'\0'</code>的一维数组。数组中的单个字符可以进行修改。但amessage始终指向同一个存储位置。另一当面，pmessage是一个指针，其初始指向一个字符串常量，之后它可以被修改以指向其他地址，但如果试图修改字符串的内容，结果是没有定义的。</p>
 
-<p>为了更进一步地讨论指针和数组其他方面的问题，下面以标准库中两个有用的函数为例来研究它们的不同实现版本。第一个函数<code>strcpy(s,t)</code>把指针<code>t</code>指向的字符串复制到指针<code>s</code>指向的位置。如果使用语句 s=t 实现该功能，其实实质上</p>
+<p>为了更进一步地讨论指针和数组其他方面的问题，下面以标准库中两个有用的函数为例来研究它们的不同实现版本。第一个函数<code>strcpy(s,t)</code>把指针<code>t</code>指向的字符串复制到指针<code>s</code>指向的位置。如果使用语句 s=t 实现该功能，其实实质上只是拷贝了指针，而并没有复制字符。为了进行字符的复制，这里使用了一个循环语句。strcpy函数的第1个版本是通过数组方法实现的，如下所示：</p>
+<pre><code class="language-c">/* strcpy函数：将指针t指向的字符串复制到指针s指向的位置；使用数组下标实现的版本 */
+void strcpy(char *s, char *t)
+{
+    int i;
+    i = 0;
+    while((s[i] = t[i]) != '\0')
+        i++;
+}
+</code></pre>
+
+<p>为了进行比较，下面是用指针方法实现的strcpy函数：</p>
+<pre><code class="language-c">/* strcpy函数：将指针t指向的字符串复制到指针s指向的位置；使用指针方式实现的版本1 */
+void strcpy(char *s, char *t)
+{
+    while((*s = *t) != '\0')
+        s++;
+        t++;
+}
+</code></pre>
+
+<p>因为参数是通过值传递的，所以在strcpy函数中可以以任何方式使用参数s和t。在此，s和t是方便地进行了初始化的指针，循环每执行一次，它们就沿着相应的数组前进一个字符，直到将t的结束符<code>'\0'</code>复制到s为止。</p>
+
+<p>实际上，strcpy函数并不会按照上面的这些方式编写。经验丰富的程序员更喜欢将它编写成下列形式：</p>
+<pre><code class="language-c">/* strcpy函数：将指针t指向的字符串复制到指针s指向的位置；使用指针方式实现的版本2 */
+void strcpy(char *s, char *t)
+{
+    while((*s++ = *t++) != '\0')
+        ;
+}
+</code></pre>
+
+<p>在该版本中，s和t的自增运算放到了循环的测试部分中。表达式<code>*t++</code>的值是执行自增运算之前t所指向的字符。后缀运算符<code>++</code>表示在读取该字符之后才改变t的值。同样的道理，在s执行自增运算之前，字符就被存储到指针s指向的旧位置。该字符值同时也可以用来和空字符<code>'\0'</code>进行比较运算，以控制循环的执行。最后的结果是依次将t指向的字符复制到s指向的位置，直到遇到结束符<code>'\0'</code>为止（同时也复制该结束符）。</p>
+
+<p>为了更进一步精炼程序，我们注意到，表达式<code>'\0'</code>的比较是多余的，因为只需要判断表达式的值是否0即可。因此，该函数可进一步写成下列形式：</p>
+<pre><code class="language-c">/* strcpy函数：将指针t指向的字符串复制到指针s指向的位置；使用指针方式实现的版本2 */
+void strcpy(char *s, char *t)
+{
+    while(*s++ = *t++)
+        ;
+}
+</code></pre>
+
+<p>该函数初看起来不太容易理解，但这种表示方法是很有好处的，我们应该掌握这种方法，C语句程序中经常会参与这种写法。</p>
+
+<p>标准库 <code>&lt;string.h&gt;</code> 中提供的函数 <code>strcpy</code>把目标字符串作为函数值返回。</p>
+<pre><code class="language-c">/* strcmp函数：根据s按照字典顺序小于、等于或大于t的结果分别返回负整数、0或正整数 */
+int strcmp(char *s, char *t)
+{
+    int i;
+    for (i = 0; s[i] == t[i]; i++)
+        if (s[i] == '\0')
+            return 0;
+    return s[i] - t[i];
+}
+</code></pre>
+
+<p>下面是用指针方式实现的strcmp函数</p>
+<pre><code class="language-c">/* strcmp函数：根据s按照字典顺序小于、等于或大于t的结果分别返回负整数、0或正整数 */
+int strcmp(char *s, char *t)
+{
+    for ( ; *s == *t; s++,t++)
+        if (*s == '\0')
+            return 0;
+    return *s - *t;
+}
+</code></pre>
+
+<p>第二个函数是字符串的比较函数<code>strcmp(s,t)</code>。该函数比较字符串s和t，并且根据s按照字典顺序小于、等于或大于t的结果分别返回负整数、0或正整数。该返回值是s和t由前向后逐字符比较时遇到的第一个不相等字符处的字符的差值。</p>
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/9/27/string-tips-in-c.html">继续阅读</a>
