@@ -101,7 +101,7 @@ const char ar1[] = &quot;Something is pointing at me.&quot;;
 
 <h2 id="数组和指针">数组和指针</h2>
 
-<p>数组形式和指针形式有何不同？以上面的声明为例，数组形式（ar1[]）在计算机的内存中分配为一个内含29个元素的数组（每个元素对应一个字符，还加上一个末尾的空字符‘\0’）,每个元素被初始化为字符串字面量对应的字符。通常，字符串都作为可执行文件的一部分存储在数据段中。当把程序载入内存时，也载入了程序中的字符串。字符串存储在静态存储区（static memory）中。但是，程序开始运行时才会为该数组分配内存。此时，才将字符串拷贝到数组中。注意：此时字符串有两个副本。一个是在静态内存中的字符串字面量，另外一个是存储在ar1数组中的字符串。</p>
+<p>数组（字符串就是字符数组的表现形式）形式和指针形式有何不同？以上面的声明为例，数组形式（ar1[]）在计算机的内存中分配为一个内含29个元素的数组（每个元素对应一个字符，还加上一个末尾的空字符‘\0’）,每个元素被初始化为字符串字面量对应的字符。通常，字符串都作为可执行文件的一部分存储在数据段中。当把程序载入内存时，也载入了程序中的字符串。字符串存储在静态存储区（static memory）中。但是，程序开始运行时才会为该数组分配内存。此时，才将字符串拷贝到数组中。注意：此时字符串有两个副本。一个是在静态内存中的字符串字面量，另外一个是存储在ar1数组中的字符串。</p>
 
 <p>此后，编译器便把数组名ar1识别为该数组首元素地址（&amp;ar1[0]）的别名。这里关键要理解，在数组形式中，ar1是地址常量，不能更改ar1，如果ar1被改变了，则意味了改变了数组的存储位置（即地址）。可以进行类似ar1+1这样的操作，识别数组的下一个元素。但是不允许进行++ar1这样的操作。递增运算只能用于变量名前，不能用于常量。</p>
 
@@ -182,6 +182,57 @@ int strcmp(char *s, char *t)
 </code></pre>
 
 <p>第二个函数是字符串的比较函数<code>strcmp(s,t)</code>。该函数比较字符串s和t，并且根据s按照字典顺序小于、等于或大于t的结果分别返回负整数、0或正整数。该返回值是s和t由前向后逐字符比较时遇到的第一个不相等字符处的字符的差值。</p>
+
+<h3 id="指针-数组-的分配释放问题">指针（数组）的分配释放问题</h3>
+
+<p>上面针对字符指针的示例中，我们演示了如何使用指针定义字符串（字符数组）。</p>
+
+<p>如果通过指针实现数组的情景下，其实我们还可以使用malloc和free的配套使用，通过动态分配的方式初始化我们的指针，这比变长数组要灵活，举个例子：</p>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+int main(void)
+{
+    double * ptd;
+    int max;
+    int i = 0;
+    int number;
+
+    puts(&quot;What is the maximim number of type double entries ?&quot;);
+    if (scanf(&quot;%d&quot;, &amp;max)!=1 )
+    {
+        puts(&quot;Number not correctly entered -- byte&quot;);
+        exit(EXIT_FAILURE);
+    }
+
+    ptd = (double *) malloc(max * sizeof(double));
+    if (ptd == NULL) 
+    {
+        puts(&quot;Memory allocation failed, Goodbye .&quot;);
+        exit(EXIT_FAILURE);
+    }
+
+    puts(&quot;Enter the values （q to quit）:&quot;);
+    while(i &lt; max &amp;&amp; scanf(&quot;%lf&quot;, &amp;ptd[i]) == 1)
+        ++i;
+    printf(&quot;Here are your %d entries: \n&quot;, number = i);
+    for (i = 0; i &lt; number; i++)
+    {
+        printf(&quot;%7.2f &quot;, ptd[i]);
+        if (i % 7 == 6)
+            putchar('\n');
+    }
+
+    if (i % 7 !=0 )
+        putchar('\n');
+
+    puts(&quot;Done.&quot;);
+    free(ptd);
+    return 0;
+}
+</code></pre>
+
+<p>这种情况下，可以使用一个动态数组调整程序以适应不同的情况。</p>
 </section>
                     </div>
                 </div>
