@@ -49,6 +49,514 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">12</span>
+                            <span class="day">4</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/12/4/go-memory-alloc.html">Go的内存分配</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="内存分配知识">内存分配知识</h2>
+
+<ul>
+<li>计算机系统的主存被组织成一个由M个连续的字节大小的单元组成的数组，每个字节都有一个唯一的物理地址（PA）</li>
+<li>现代处理器使用的是一种为虚拟寻址（VA）的寻址形式，最少的寻址单位是字</li>
+<li>虚拟地址映射物理地址是通过读取页表（page table）进行地址翻译完成的：页表存放在物理存储器中</li>
+<li>MMU（内核吧物理页作为内存管理的基本单位）以页（page）大小为单位来管理系统中的页表</li>
+<li>在虚拟存储器的习惯说法中，DRAM缓存不命中的成为：缺页</li>
+<li>page的结构与物理页相关，而非与虚拟页相关</li>
+<li>系统中的每个物理页都要分配一个page结构体</li>
+</ul>
+
+<p>在了解Go的内存分配器原理之前，我们先了解一下“动态存储分配器”</p>
+
+<h3 id="动态存储分配器">动态存储分配器</h3>
+
+<p>动态存储分配器维护着一个进程的虚拟存储区域，这个区域称为 “堆”，堆可以视为一组大小不同的 “块”（chunk: 连续的虚拟存储片，无论内存分配器和垃圾回收算法都依赖连续地址）的集合，并交由动态存储器维护。</p>
+
+<p>动态分配器主要分为：</p>
+
+<ul>
+<li>显式：常见的malloc</li>
+<li>隐式：垃圾回收</li>
+</ul>
+
+<p>在Go里头，分配器将其管理（大块 --&gt; 小块）的<code>内存块</code>分为两种：</p>
+
+<ul>
+<li>span：由多个连续的页（page）组成的大块内存</li>
+<li>object：将span按特定大小切分多个小块，每个小块可存储一个对象</li>
+</ul>
+
+<blockquote>
+<p>按照其用途，span面向内部管理，object面向对象分配</p>
+</blockquote>
+
+<p>分配器按页数来区分不同大小的span。比如，以页数为单位将span存放到管理数组中，需要时就以页数为索引进行查找。当然，span大小并非固定不变。在获取闲置span时，如果没找到大小合适的，那就返回页数更多的，此时会引发裁剪操作，多余部分将构成新的span被放回管理数组。分配器还会尝试将地址相邻的空闲span合并，以构建更大的内存块，减少碎片，提供更灵活的分配策略。</p>
+
+<p>我们在go的malloc.go代码中：</p>
+<pre><code class="language-go">const (
+    _PageShift = 13
+    _PageSize  = 1 &lt;&lt; _PageShift
+    _PageMask  = _PageSize - 1
+)
+</code></pre>
+
+<p>可以看到，用于存储对象的object，按照8字节倍数分为n种。这种方式虽然会造成一些内存浪费，但分配器只须面对有限的几种规格的小块内存，优化了分配和复用管理策略。</p>
+
+<blockquote>
+<p>分配器会尝试将多个微小对象组合到一个object快内，以节约内存。</p>
+</blockquote>
+
+<p>我们看到msize.go的部分：</p>
+<pre><code class="language-go">var class_to_size [_NumSizeClasses]int32
+var class_to_allocnpages [_NumSizeClasses]int32
+var class_to_divmagic [_NumSizeClasses]divMagic
+
+var size_to_class8 [1024/8 + 1]int8
+var size_to_class128 [(_MaxSmallSize-1024)/128 + 1]int8
+
+func sizeToClass(size int32) int32 {
+    if size &gt; _MaxSmallSize {
+        throw(&quot;invalid size&quot;)
+    }
+    if size &gt; 1024-8 {
+        return int32(size_to_class128[(size-1024+127)&gt;&gt;7])
+    }
+    return int32(size_to_class8[(size+7)&gt;&gt;3])
+}
+</code></pre>
+
+<p>分配器初始化时，会构建对照表存储大小和规格对应关系，包括用来切分的span页数。</p>
+<pre><code class="language-go">  // Tunable constants.
+_MaxSmallSize = 32 &lt;&lt; 10
+</code></pre>
+
+<p>从上面的代码段，我们大概可以指定若对象大小超出特定阈值限制，会被当做大对象特别对待。</p>
+
+<h3 id="mmap函数">mmap函数</h3>
+
+<p>Unix进程可以使用mmap函数来创建新的虚拟存储区域并将对象映射到这些区域中。</p>
+
+<p>mmap函数要求内核创建一个新的虚拟存储区域，最好是从起始地址start开始的一个区域，并将文件描述符fd指定的对象的一个连续的片（chunk）映射到新的区域。</p>
+
+<h3 id="数据频繁分配与回收">数据频繁分配与回收</h3>
+
+<p>对于有效地进行数据频繁分配与回收，减少碎片，一般有两种手段：</p>
+
+<ul>
+<li>空闲链表: 提供直接可供使用，已分配的结构块，缺点是不能全局控制</li>
+<li>slab：linux提供的，可以把不同的对象划分为所谓高速缓存组</li>
+</ul>
+
+<h2 id="go的内存分配">Go的内存分配</h2>
+
+<p>Go的内存分配器是采用google自家的tcmalloc，tcmalloc是一个带内存池的分配器，底层直接调用mmap函数，并使用bestfit进行动态分配。</p>
+
+<p>Go为每个系统线程分配了一个本地MCache,少量的地址分配就是从MCache分配的，并且定期进行垃圾回收，所以可见go的分配器包含了显式与隐式的调用。</p>
+
+<p>Go定义的小块内存，大小上是指32K或以下的对象，go底层会把这些小块内存按照指定规格（大约100种）进行切割：为了避免随意切割，申请任意字节内存时会向上取整到接近的块，将整块分配（从空闲链表）给到申请者。</p>
+
+<p>Go内存分配主要组件：</p>
+
+<ul>
+<li><p>MCache：层次与MHeap类似，对于每个尺寸的类别都有一个空闲链表。每个M都有自己的局部Mcache(小对象从它取，无需加锁)，这就是Go能够在多线程中高效内存管理的重要原因</p></li>
+
+<li><p>MCentral：在无空闲内存的时候，向Mheap申请一个span,而不是多个，申请的span包含多少个page由central的sizeclass来确定（跨进程复用）</p></li>
+
+<li><p>MHeap：负责将MSpan组织和管理起来。</p>
+
+<ul>
+<li>分配过程：从free[]中分配，如果发生切割则将剩余的部分放回到free[]中</li>
+<li>回收过程：回收一个Mspan时，首选查找它相邻的地址，再通过map映射得到对应的Mspan，如果Mspan的state是未使用，则可以将
+两者进行合并。最后将这页或者合并后的页归还到free[]分配池或者large中。</li>
+</ul></li>
+</ul>
+
+<h3 id="go的内存模型">Go的内存模型</h3>
+
+<p>Go的内存模型可以视为两级的内存模型：</p>
+
+<ul>
+<li><p>第一级：Mheap为主要组件：分配的单位是页，但管理的单位是MSpan,每次分配都是用bestFit的原则分配连续的页，回收是采用位图的方式。</p></li>
+
+<li><p>第二级：MCache为主要组件：相当于一个内存池， 回收采用引用计数器</p></li>
+</ul>
+
+<h3 id="分配场景">分配场景</h3>
+
+<p>为对象分配内存须区分是在栈上分配还是在堆上分配。通常情况下，编译器有责任尽可能使用寄存器和栈来存储对象，这有助于提升性能，减少垃圾回收器的压力。</p>
+
+<p>我们写一个测试例子</p>
+<pre><code class="language-go">package main
+
+func test() *int {
+    x := new(int)
+    *x = 1234
+    return x
+}
+
+func main() {
+    println(*test())
+}
+
+</code></pre>
+
+<p>我们禁止内联优化来编译上面的代码：</p>
+<pre><code class="language-shell">$ go build -gcflags=&quot;-l&quot; -o test main.go
+</code></pre>
+
+<p>得到的结果是</p>
+<pre><code>        main.go:3       0x2040  65488b0c25a0080000      GS MOVQ GS:0x8a0, CX
+        main.go:3       0x2049  483b6110                CMPQ 0x10(CX), SP
+        main.go:3       0x204d  7639                    JBE 0x2088
+        main.go:3       0x204f  4883ec18                SUBQ $0x18, SP
+        main.go:3       0x2053  48896c2410              MOVQ BP, 0x10(SP)
+        main.go:3       0x2058  488d6c2410              LEAQ 0x10(SP), BP
+        main.go:4       0x205d  488d05dc3b0500          LEAQ 0x53bdc(IP), AX
+        main.go:4       0x2064  48890424                MOVQ AX, 0(SP)
+        main.go:4       0x2068  e823a70000              CALL runtime.newobject(SB)
+        main.go:4       0x206d  488b442408              MOVQ 0x8(SP), AX
+        main.go:5       0x2072  48c700d2040000          MOVQ $0x4d2, 0(AX)
+        main.go:6       0x2079  4889442420              MOVQ AX, 0x20(SP)
+        main.go:6       0x207e  488b6c2410              MOVQ 0x10(SP), BP
+        main.go:6       0x2083  4883c418                ADDQ $0x18, SP
+        main.go:6       0x2087  c3                      RET
+        main.go:3       0x2088  e893720400              CALL runtime.morestack_noctxt(SB)
+        main.go:3       0x208d  ebb1                    JMP main.test(SB)
+        :-1             0x208f  cc                      INT $0x3
+</code></pre>
+
+<p>从结果的 <code>CALL runtime.newobject(SB)</code> ，证明我们的对象在堆上进行分配了。</p>
+
+<p>但当使用默认参数，我们观察下结果：</p>
+<pre><code>$ go build  -o test main.go
+</code></pre>
+
+<p>当我们跟上面一样分析test的分配情况时：</p>
+<pre><code>$ go tool objdump -s &quot;main\.test&quot; test
+</code></pre>
+
+<p>命令执行后，并没有输出</p>
+
+<p>我们分析下main方法</p>
+<pre><code>$ go tool objdump -s &quot;main\.main&quot; test
+</code></pre>
+
+<p>得到的结果如下：</p>
+<pre><code>        main.go:9       0x2040  65488b0c25a0080000      GS MOVQ GS:0x8a0, CX
+        main.go:9       0x2049  483b6110                CMPQ 0x10(CX), SP
+        main.go:9       0x204d  763d                    JBE 0x208c
+        main.go:9       0x204f  4883ec18                SUBQ $0x18, SP
+        main.go:9       0x2053  48896c2410              MOVQ BP, 0x10(SP)
+        main.go:9       0x2058  488d6c2410              LEAQ 0x10(SP), BP
+        main.go:10      0x205d  48c7442408d2040000      MOVQ $0x4d2, 0x8(SP)
+        main.go:10      0x2066  e875210200              CALL runtime.printlock(SB)
+        main.go:10      0x206b  48c70424d2040000        MOVQ $0x4d2, 0(SP)
+        main.go:10      0x2073  e8b8280200              CALL runtime.printint(SB)
+        main.go:10      0x2078  e8e3230200              CALL runtime.printnl(SB)
+        main.go:10      0x207d  e8ee210200              CALL runtime.printunlock(SB)
+        main.go:11      0x2082  488b6c2410              MOVQ 0x10(SP), BP
+        main.go:11      0x2087  4883c418                ADDQ $0x18, SP
+        main.go:11      0x208b  c3                      RET
+        main.go:9       0x208c  e83f720400              CALL runtime.morestack_noctxt(SB)
+        main.go:9       0x2091  ebad                    JMP main.main(SB)
+</code></pre>
+
+<p>这表明内联优化后的代码没有调用newobject在堆上分配内存。</p>
+
+<p>编译器这么做的目的是：没有内联时，需要在两个栈帧间传递对象，因此在堆上分配而不是返回一个失效栈帧的数据。而当内联后，实际上就成看main栈帧内的局部变量，无需到堆上操作。</p>
+
+<h3 id="内存分配流程">内存分配流程</h3>
+
+<p>1、将小对象的大小向上取整到一个对应的尺寸类别（大约100种），查找相应的MCache的空闲链表，如果链表不空，直接从上面分配一个对象，这个过程不加锁</p>
+
+<p>2、如果MCache自由链表是空的，通过MCentral的自由链表取一些对象进行补充</p>
+
+<p>3、如果MCentral的自由链表是空的，则往MHeap中取用一些页对MCentral进行补充，然后将这些内存截断成特定规格</p>
+
+<p>4、如果MHeap空或者没有足够大的页的情况下，从操作系统分配一组新的页面，一般在1MB以上</p>
+
+<p>Go分配流程核心源码实现：</p>
+<pre><code class="language-go">func mallocgc(size uintptr, typ *_type, flags uint32) unsafe.Pointer {
+    if gcphase == _GCmarktermination {
+        throw(&quot;mallocgc called with gcphase == _GCmarktermination&quot;)
+    }
+
+    if size == 0 {
+        return unsafe.Pointer(&amp;zerobase)
+    }
+
+    if flags&amp;flagNoScan == 0 &amp;&amp; typ == nil {
+        throw(&quot;malloc missing type&quot;)
+    }
+
+    if debug.sbrk != 0 {
+        align := uintptr(16)
+        if typ != nil {
+            align = uintptr(typ.align)
+        }
+        return persistentalloc(size, align, &amp;memstats.other_sys)
+    }
+
+    // assistG is the G to charge for this allocation, or nil if
+    // GC is not currently active.
+    var assistG *g
+    if gcBlackenEnabled != 0 {
+        // Charge the current user G for this allocation.
+        assistG = getg()
+        if assistG.m.curg != nil {
+            assistG = assistG.m.curg
+        }
+        // Charge the allocation against the G. We'll account
+        // for internal fragmentation at the end of mallocgc.
+        assistG.gcAssistBytes -= int64(size)
+
+        if assistG.gcAssistBytes &lt; 0 {
+            // This G is in debt. Assist the GC to correct
+            // this before allocating. This must happen
+            // before disabling preemption.
+            gcAssistAlloc(assistG)
+        }
+    }
+
+    // Set mp.mallocing to keep from being preempted by GC.
+    mp := acquirem()
+    if mp.mallocing != 0 {
+        throw(&quot;malloc deadlock&quot;)
+    }
+    if mp.gsignal == getg() {
+        throw(&quot;malloc during signal&quot;)
+    }
+    mp.mallocing = 1
+
+    shouldhelpgc := false
+    dataSize := size
+    c := gomcache()
+    var s *mspan
+    var x unsafe.Pointer
+    if size &lt;= maxSmallSize {
+        if flags&amp;flagNoScan != 0 &amp;&amp; size &lt; maxTinySize {
+            //小对象分配
+            off := c.tinyoffset
+            // Align tiny pointer for required (conservative) alignment.
+            if size&amp;7 == 0 {
+                off = round(off, 8)
+            } else if size&amp;3 == 0 {
+                off = round(off, 4)
+            } else if size&amp;1 == 0 {
+                off = round(off, 2)
+            }
+            if off+size &lt;= maxTinySize &amp;&amp; c.tiny != 0 {
+                // The object fits into existing tiny block.
+                x = unsafe.Pointer(c.tiny + off)
+                c.tinyoffset = off + size
+                c.local_tinyallocs++
+                mp.mallocing = 0
+                releasem(mp)
+                return x
+            }
+            // Allocate a new maxTinySize block.
+            s = c.alloc[tinySizeClass]
+            v := s.freelist
+            if v.ptr() == nil {
+                systemstack(func() {
+                    c.refill(tinySizeClass)
+                })
+                shouldhelpgc = true
+                s = c.alloc[tinySizeClass]
+                v = s.freelist
+            }
+            s.freelist = v.ptr().next
+            s.ref++
+            // prefetchnta offers best performance, see change list message.
+            prefetchnta(uintptr(v.ptr().next))
+            x = unsafe.Pointer(v)
+            (*[2]uint64)(x)[0] = 0
+            (*[2]uint64)(x)[1] = 0
+            // See if we need to replace the existing tiny block with the new one
+            // based on amount of remaining free space.
+            if size &lt; c.tinyoffset || c.tiny == 0 {
+                c.tiny = uintptr(x)
+                c.tinyoffset = size
+            }
+            size = maxTinySize
+        } else {
+            var sizeclass int8
+            if size &lt;= 1024-8 {
+                sizeclass = size_to_class8[(size+7)&gt;&gt;3]
+            } else {
+                sizeclass = size_to_class128[(size-1024+127)&gt;&gt;7]
+            }
+            size = uintptr(class_to_size[sizeclass])
+            s = c.alloc[sizeclass]
+            v := s.freelist
+            if v.ptr() == nil {
+                systemstack(func() {
+                    c.refill(int32(sizeclass))
+                })
+                shouldhelpgc = true
+                s = c.alloc[sizeclass]
+                v = s.freelist
+            }
+            s.freelist = v.ptr().next
+            s.ref++
+            // prefetchnta offers best performance, see change list message.
+            prefetchnta(uintptr(v.ptr().next))
+            x = unsafe.Pointer(v)
+            if flags&amp;flagNoZero == 0 {
+                v.ptr().next = 0
+                if size &gt; 2*sys.PtrSize &amp;&amp; ((*[2]uintptr)(x))[1] != 0 {
+                    memclr(unsafe.Pointer(v), size)
+                }
+            }
+        }
+    } else {
+        var s *mspan
+        shouldhelpgc = true
+        systemstack(func() {
+            s = largeAlloc(size, flags)
+        })
+        x = unsafe.Pointer(uintptr(s.start &lt;&lt; pageShift))
+        size = s.elemsize
+    }
+
+    if flags&amp;flagNoScan != 0 {
+        // All objects are pre-marked as noscan. Nothing to do.
+    } else {
+        if typ == deferType {
+            dataSize = unsafe.Sizeof(_defer{})
+        }
+        heapBitsSetType(uintptr(x), size, dataSize, typ)
+        if dataSize &gt; typ.size {
+            // Array allocation. If there are any
+            // pointers, GC has to scan to the last
+            // element.
+            if typ.ptrdata != 0 {
+                c.local_scan += dataSize - typ.size + typ.ptrdata
+            }
+        } else {
+            c.local_scan += typ.ptrdata
+        }
+        publicationBarrier()
+    }
+    if gcphase == _GCmarktermination || gcBlackenPromptly {
+        systemstack(func() {
+            gcmarknewobject_m(uintptr(x), size)
+        })
+    }
+
+    if raceenabled {
+        racemalloc(x, size)
+    }
+    if msanenabled {
+        msanmalloc(x, size)
+    }
+
+    mp.mallocing = 0
+    releasem(mp)
+
+    if debug.allocfreetrace != 0 {
+        tracealloc(x, size, typ)
+    }
+
+    if rate := MemProfileRate; rate &gt; 0 {
+        if size &lt; uintptr(rate) &amp;&amp; int32(size) &lt; c.next_sample {
+            c.next_sample -= int32(size)
+        } else {
+            mp := acquirem()
+            profilealloc(mp, x, size)
+            releasem(mp)
+        }
+    }
+
+    if assistG != nil {
+        // Account for internal fragmentation in the assist
+        // debt now that we know it.
+        assistG.gcAssistBytes -= int64(size - dataSize)
+    }
+
+    if shouldhelpgc &amp;&amp; gcShouldStart(false) {
+        gcStart(gcBackgroundMode, false)
+    }
+
+    return x
+}
+</code></pre>
+
+<h3 id="go也有happens-before">Go也有happens-before</h3>
+
+<p>go happens-before常用的三原则是：</p>
+
+<ul>
+<li>对于不带缓冲区的channel，对其写happens-before对其读</li>
+<li>对于带缓冲区的channel,对其读happens-before对其写</li>
+<li>对于不带缓冲的channel的接收操作 happens-before 相应channel的发送操作完成</li>
+</ul>
+
+<p>所以我们看看下面的例子哪个是有问题的：</p>
+
+<p>例子一：</p>
+<pre><code class="language-go">var c = make(chan int, 10)
+var a string
+func f() {
+    a = &quot;hello, world&quot; 
+    c &lt;- 0 
+}
+func main() {
+    go f()
+    &lt;-c  
+    print(a)
+}
+</code></pre>
+
+<p>例子二：</p>
+<pre><code class="language-go">var c = make(chan int)
+var a string
+func f() {
+    a = &quot;hello, world&quot;
+    &lt;-c 
+}
+func main() {
+    go f()
+    c &lt;- 0 
+    print(a)
+}
+</code></pre>
+
+<p>例子三：</p>
+<pre><code class="language-go">var c = make(chan int, 1)
+var a string
+func f() {
+    a = &quot;hello, world&quot; 
+    &lt;-c   
+}
+func main() {
+    go f()
+    c &lt;- 0 
+    print(a)
+}
+</code></pre>
+
+<h3 id="参考资料">参考资料</h3>
+
+<p><a href="https://tiancaiamao.gitbooks.io/go-internals/content/zh//10.1.html">go内存模型</a><br />
+<a href="http://blog.csdn.net/hguisu/article/details/5713164">操作系统内存管理</a></p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/12/4/go-memory-alloc.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">11</span>
                             <span class="day">29</span>
                         </span>
@@ -809,189 +1317,6 @@ main.go:8    0x20b6    eba8            JMP main.main(SB)
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/11/8/go-concurrence.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">6</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/11/6/google-snappy.html">snappy试玩</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="背景">背景</h2>
-
-<p>今天在看nsq源码的时候，发现client_v2.go里面有一段代码引起了我的注意</p>
-<pre><code class="language-go">func (c *clientV2) UpgradeSnappy() error {
-
-    c.Reader = bufio.NewReaderSize(snappystream.NewReader(conn, snappystream.SkipVerifyChecksum), defaultBufferSize)
-    c.Writer = bufio.NewWriterSize(snappystream.NewWriter(conn), c.OutputBufferSize)
-
-    ...
-}
-</code></pre>
-
-<p>我大概知道它是用于对我的数据在传输前进行压缩的，我之前了解过<a href="http://lz4.github.io/lz4/">LZ4</a>,
-但，snappy我了解甚少，于是我顺着snappystream，找到了一个库 <a href="https://github.com/mreiferson/go-snappystream">go-snappystream</a></p>
-
-<p>里面是这样定义的：</p>
-<pre><code>This package wraps snappy-go and supplies a Reader and Writer for the snappy framed stream format.
-</code></pre>
-
-<p>这个库是nsq的作者mreiferson基于google的snappy进行封装的工具。</p>
-
-<h2 id="snappy-介绍">Snappy 介绍</h2>
-
-<p>Snappy（以前称Zippy）是Google基于<a href="https://zh.wikipedia.org/wiki/LZ77%E4%B8%8ELZ78">LZ77</a>
-的思路用C++语言编写的快速数据压缩与解压程序库，并在2011年开源。它的目标并非最大压缩率或与其他压缩程序库的兼容性，
-而是非常高的速度和合理的压缩率。使用一个运行在64位模式下的酷睿i7处理器的单个核心，
-压缩速度250 MB/s，解压速度500 MB/s。压缩率比gzip低20-100%</p>
-
-<p>Snappy广泛应用在Google的项目，例如BigTable、MapReduce和Google内部RPC系统的压缩数据。
-它可在开源项目中使用，例如Cassandra、Hadoop、LevelDB、MongoDB、RocksDB和Lucene。
-解压缩时会检测压缩流中是否存在错误。Snappy不使用内联汇编并且可移植。</p>
-
-<p>Snappy是一个C++的库，你可以在产品中使用，不过也有一些其他语言的版本，例如Haskell、Java、Perl、Python和Ruby。</p>
-
-<p>golang版snappy可以查看<a href="https://github.com/golang/snappy">这里</a></p>
-
-<h2 id="使用">使用</h2>
-
-<p>先看第一个例子，我们采用snappy+gob来处理我们的文件</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;encoding/gob&quot;
-    &quot;fmt&quot;
-    &quot;github.com/mreiferson/go-snappystream&quot;
-    &quot;os&quot;
-)
-
-type FileCompress struct {
-    Classifier interface{}
-}
-
-func (t *FileCompress) SaveFile(filename string) error {
-    fi, err := os.Create(filename)
-    if err != nil {
-        return err
-    }
-    defer fi.Close()
-
-    fs := snappystream.NewBufferedWriter(fi)
-    encoder := gob.NewEncoder(fs)
-    err = encoder.Encode(t.Classifier)
-    if err != nil {
-        return err
-    }
-    err = fs.Close()
-    if err != nil {
-        return err
-    }
-
-    return nil
-}
-
-func main() {
-    obj := FileCompress{Classifier: &quot;it works&quot;}
-    err := obj.SaveFile(&quot;test.sz&quot;)
-    if err != nil {
-        fmt.Println(err)
-    }
-}
-
-</code></pre>
-
-<p>第二个例子 ，我们写一个命令交互的工具 snappy2.go，它介绍我们的输入并进行snappy处理</p>
-<pre><code class="language-go">package main
-
-import snap &quot;github.com/mreiferson/go-snappystream&quot;
-import &quot;os&quot;
-import &quot;io&quot;
-import &quot;flag&quot;
-
-type Options struct {
-    Encode bool
-    Decode bool
-}
-
-func check(err error) {
-    if err != nil {
-        panic(err)
-    }
-}
-
-var en = flag.Bool(&quot;encode&quot;, false, &quot;encode stdin (the default)&quot;)
-var de = flag.Bool(&quot;decode&quot;, false, &quot;decode stdin&quot;)
-
-func main() {
-    flag.Parse()
-    opts := &amp;Options{
-        Decode: *en,
-        Encode: *de,
-    }
-
-    if opts.Decode {
-        decode()
-    } else {
-        encode()
-    }
-}
-
-func encode() {
-    _, err := io.Copy(snap.NewWriter(os.Stdout), os.Stdin)
-    check(err)
-}
-
-func decode() {
-    _, err := io.Copy(os.Stdout, snap.NewReader(os.Stdin, snap.VerifyChecksum))
-    check(err)
-}
-
-</code></pre>
-
-<p>我们可以再终端输入命令进行使用</p>
-<pre><code>go run snappy2.go &lt; test.txt | go run snappy2.go --decode
-</code></pre>
-
-<p>总的来说，snappy对比其它压缩算法的工具，具备以下的特定：</p>
-
-<ul>
-<li>快</li>
-<li>稳定</li>
-<li>鲁棒性强</li>
-<li>开源</li>
-</ul>
-
-<p>下面附加一份我机器上用go-snappy的一个基准测试报告，仅供参考</p>
-<pre><code>BenchmarkWordsDecode1e1-4       50000000            25.6 ns/op     390.89 MB/s
-BenchmarkWordsDecode1e2-4       20000000            96.5 ns/op    1036.03 MB/s
-BenchmarkWordsDecode1e3-4        2000000           822 ns/op    1216.36 MB/s
-BenchmarkWordsDecode1e4-4         200000          9008 ns/op    1110.06 MB/s
-BenchmarkWordsDecode1e5-4          10000        205258 ns/op     487.19 MB/s
-BenchmarkWordsDecode1e6-4           1000       1644589 ns/op     608.05 MB/s
-BenchmarkWordsEncode1e1-4       100000000            21.5 ns/op     465.78 MB/s
-BenchmarkWordsEncode1e2-4       10000000           217 ns/op     459.67 MB/s
-BenchmarkWordsEncode1e3-4        1000000          2038 ns/op     490.50 MB/s
-BenchmarkWordsEncode1e4-4          50000         29909 ns/op     334.35 MB/s
-BenchmarkWordsEncode1e5-4           5000        355186 ns/op     281.54 MB/s
-BenchmarkWordsEncode1e6-4            500       3387786 ns/op     295.18 MB/s
-BenchmarkRandomEncode-4            10000        107681 ns/op    9737.75 MB/s
-BenchmarkExtendMatch-4            200000         10816 ns/op
-PASS
-</code></pre>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/11/6/google-snappy.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

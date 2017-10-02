@@ -1,9 +1,13 @@
 html, body {
-    font-family: "PingHei", "Lucida Grande", "Lucida Sans Unicode", Helvetica, Tahoma, Arial, "Hiragino Sans GB", "Hiragino Sans GB W3", "Microsoft YaHei", STXihei, STHeiti, Heiti, SimSun, sans-serif;
+    font-family: Helvetica, Tahoma, Arial,"PingHei", "Lucida Grande", "Lucida Sans Unicode",  "Hiragino Sans GB", "Hiragino Sans GB W3", "Microsoft YaHei", STXihei, STHeiti, Heiti, SimSun, sans-serif;
 }
 
 pre code {
-    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei", Helvetica, Arial, sans-serif;
+    font-family: Helvetica, Arial, sans-serif,Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei";
+    font-size: 13px;
+    line-height: 1.846;
+    color: #1D1C1C;
+    background-color: #ffffff;
 }
 
 body {

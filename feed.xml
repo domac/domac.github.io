@@ -4,7 +4,13 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Sun, 01 Oct 2017 14:36:34 +0800</pubDate>
+    <pubDate>Mon, 02 Oct 2017 14:24:36 +0800</pubDate>
+    <item>
+      <title>Lua入门学习</title>
+      <link>http://lihaoquan.me/2017/10/2/beginning-lua.html</link>
+      <description>&lt;p&gt;write you post content in beginning-lua.md&lt;/p&gt;&#xA;</description>
+      <pubDate>Mon, 02 Oct 2017 14:03:20 +0000</pubDate>
+    </item>
     <item>
       <title>C语言字符指针与函数</title>
       <link>http://lihaoquan.me/2017/9/27/string-tips-in-c.html</link>
