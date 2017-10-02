@@ -57,7 +57,426 @@
                                 <a href="/2017/10/2/beginning-lua.html">Lua入门学习</a>
                             </h5>
                         </header>
-                        <section class="brief"></section>
+                        <section class="brief"><p>了解到<code>Lua</code>(一种轻量级、可嵌入式的脚本语言)，其实是很早之前和一些做游戏的朋友聊天的时候知道的，他们在项目中广泛地使用到这个语言。于是自己上网也看了一些lua开发中的一些特定发现，Lua 被运用的领域远不止游戏。特别最近很火的Redis和<code>OpenResty</code>(一个基于Nginx 与Lua 的高性能Web 平台）其内部集成了大量精良的Lua 库、第三方模块以及大多数的依赖项，开发人员使用Lua编写脚本就能非常轻松开发出高性能的服务了。</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/lua.png" alt="lua" /></p>
+
+<p>若要了解一下lua在行业更深的应用，可以阅读云风的相关文章：<a href="https://blog.codingnow.com/eo/luaoeeeaeau/">点击这里</a></p>
+
+<p>下面着重的还是Lua入门级别的学习总结</p>
+
+<h2 id="特性">特性</h2>
+
+<p>Lua是一个<code>动态弱类型</code>语言，支持增量式垃圾收集策略。有内建的，与操作系统无关的协作式多线程（coroutine）支持。</p>
+
+<ul>
+<li>可以很方便的和用C/C++互相调用</li>
+<li>很简单，不涉及任何复杂的编程概念，对数据结构的描述能力强</li>
+<li>轻量级，库体积很小，只有几百K。</li>
+<li>学习很容易，开发效率高</li>
+<li>性能好， 支持协程，闭包等简化实现的手段</li>
+</ul>
+
+<h2 id="安装">安装</h2>
+
+<p>lua的安装非常简单，直接参考下面的命令</p>
+
+<p>Linux环境</p>
+<pre><code>curl -R -O http://www.lua.org/ftp/lua-5.3.4.tar.gz
+tar zxf lua-5.3.4.tar.gz
+cd lua-5.3.4
+make linux test
+make install
+</code></pre>
+
+<p>Mac环境</p>
+<pre><code>curl -R -O http://www.lua.org/ftp/lua-5.3.4.tar.gz
+tar zxf lua-5.3.4.tar.gz
+cd lua-5.3.4
+make macosx test
+make install
+</code></pre>
+
+<p>安装完成后，我们在终端里面敲入lua，接口进入lua的命令交互模式</p>
+<pre><code>$ lua
+
+Lua 5.3.4  Copyright (C) 1994-2017 Lua.org, PUC-Rio
+&gt; print(&quot;go&quot;)
+go
+</code></pre>
+
+<h2 id="内置类型">内置类型</h2>
+
+<p>既然是动态类型的脚本语言，这说明同一个变量可以在不同时刻指向不同类型的数据</p>
+
+<p>lua的类型主要包含 字符串、函数、布尔、数字、空（nil）、表</p>
+
+<p>1、lua内置函数 <code>type</code> 能够返回一个值或一个变量所属的类型:</p>
+
+<p>testtype.lua</p>
+<pre><code>#!/usr/local/bin/lua
+print(type(&quot;golang&quot;)) 
+print(type(print))         
+print(type(true))          
+print(type(1.9))         
+print(type(nil))          
+</code></pre>
+
+<p>执行输出</p>
+<pre><code>./testtype.lua
+
+string
+function
+boolean
+number
+nil
+</code></pre>
+
+<p>2、字符串</p>
+
+<p>字符串你可以用单引号，也可以用双引号，还支持C类型的转义，比如：</p>
+<pre><code>‘\a’ （响铃）， 
+‘\b’ （退格）， 
+‘\f’ （表单）， 
+‘\n’ （换行）， 
+‘\r’ （回车）， 
+‘\t’ （横向制表）， 
+‘\v’ （纵向制表）， 
+‘\\’ （反斜杠）， 
+‘\”‘ （双引号）， 
+‘\” （单引号)
+</code></pre>
+
+<p>下面的四种方式定义了完全相同的字符串（其中的两个中括号可以用于定义有换行的字符串）</p>
+<pre><code>#!/usr/local/bin/lua
+a = 'go\n1.9&quot;'
+print(a)  
+a = &quot;alo\n1.9\&quot;&quot;
+print(a)  
+a = [[go
+1.9&quot;]]    
+print(a) 
+</code></pre>
+
+<blockquote>
+<p>使用前缀运算符&rsquo;＃&rsquo;（也称为长度运算符）可以得到字符串的长度。</p>
+</blockquote>
+<pre><code>#!/usr/local/bin/lua
+a = &quot;golang&quot;
+print(#a)            
+print(#&quot;123\0xyz&quot;) 
+
+输出：
+6
+7
+</code></pre>
+
+<p>3、数值</p>
+
+<p>Lua 默认只有一种 number 类型：double（双精度）</p>
+
+<blockquote>
+<p>Lua没有整数类型</p>
+</blockquote>
+<pre><code>#!/usr/local/bin/lua
+a = 10
+b = 20
+c = (a+b)/2
+print(c)
+print(type(c))
+</code></pre>
+
+<p>输出</p>
+<pre><code>15.0
+number
+</code></pre>
+
+<p>4、空值</p>
+
+<p>nil是单值类型，即空值，其主要属性就是区别于其他任何值。Lua用空值来表示无值，表示一个值不存在。我们已经知道，一个全局变量在首次赋值之前，其默认值为空值，所以你可以将一个全局变量赋值为nil来删除该变量。</p>
+
+<p>5、布尔类型</p>
+
+<p>布尔值有两个值：false和true，表示通常意义的布尔值。但是，布尔值不是唯一的条件值：在Lua中，任何值都代表了一个条件。条件判断测试（如控制结构中的条件）将布尔值false和空值(nil)计为false，其他任何值均计为true。</p>
+
+<blockquote>
+<p>Lua在条件判断测试中将零(0)和空字符串(&ldquo;&rdquo;)计为true。</p>
+</blockquote>
+<pre><code>#!/usr/local/bin/lua
+a = 0
+if a then
+    print(&quot;yes&quot;)
+end
+
+b = &quot;&quot;
+if b then
+    print(&quot;yes&quot;)
+end
+
+结果输出都是 yes
+</code></pre>
+
+<p>6、表</p>
+
+<p>Lua表分为数组和散列表，其中数组部分不像其它语言那样从0开始作为第一个索引，而是从1开始。散列部分其实就是一个Key Value的数据结构，相当于Go里面的map或者python里面的dict。</p>
+
+<blockquote>
+<p>使用Lua表，可以模拟出其它各种数据结构：数组、链表、树等。</p>
+</blockquote>
+<pre><code>book = {name=&quot;go in action&quot;, price=256, desc=&quot;programming language book&quot;}
+</code></pre>
+
+<p>可以直接操作book表</p>
+<pre><code>book.name = &quot;go web programming&quot;
+book.price = &quot;100&quot;
+</code></pre>
+
+<p>你也可以定义成不同的类型的数组，比如</p>
+
+<p>数组是表的一种表现形式：</p>
+<pre><code>books = {10,20,30,40,50}
+</code></pre>
+
+<p>这样看上去就像数组了。但其实其等价于：</p>
+<pre><code>books = {[1]=10, [2]=20, [3]=30, [4]=40, [5]=50}
+</code></pre>
+
+<p>所以，你也可以定义成不同的类型的数组，比如：</p>
+<pre><code>books = {&quot;string&quot;, 100, &quot;golang&quot;, function() print(&quot;golang.org&quot;) end}
+</code></pre>
+
+<blockquote>
+<p>注：其中的函数可以这样调用：<code>arr[4]()</code>。</p>
+</blockquote>
+
+<p>我们可以看到Lua的下标<code>不是从0开始的，是从1开始的</code>。</p>
+<pre><code>for i=1, #books do
+    print(books[i])
+end
+</code></pre>
+
+<h2 id="控制流">控制流</h2>
+
+<h4 id="while循环">while循环</h4>
+<pre><code>sum = 0
+num = 1
+while num &lt;= 100 do
+    sum = sum + num
+    num = num + 1
+end
+print(&quot;sum =&quot;,sum)
+</code></pre>
+
+<h4 id="if-else分支">if-else分支</h4>
+<pre><code>a = 50
+if a ==1  then
+    print(&quot;start&quot;)
+elseif a ~= 100 then
+    print(&quot;half&quot;)
+else
+    print(&quot;finish&quot;)
+end
+</code></pre>
+
+<p>另外，条件表达式中的与或非为分是：and, or, not关键字。</p>
+
+<h4 id="for-循环">for 循环</h4>
+
+<p>从1加到100</p>
+<pre><code>sum = 0
+for i = 1, 100 do
+    sum = sum + i
+end
+</code></pre>
+
+<h4 id="until循环">until循环</h4>
+<pre><code>sum = 2
+repeat
+   sum = sum ^ 2
+   print(sum)
+until sum &gt;1000
+</code></pre>
+
+<h2 id="结构">结构</h2>
+
+<p>先简单看一个自定义的Person结构</p>
+
+<blockquote>
+<p>在 Lua 中，我们可以使用表和函数实现面向对象。将函数和相关的数据放置于同一个表中就形成了一个对象。</p>
+</blockquote>
+
+<p>person.lua</p>
+<pre><code>#!/usr/local/bin/lua
+
+local _Person = {}
+
+local mt = { __index = _Person }
+
+function _Person.func1 (self, v)
+    self.cardno = self.cardno + v
+end
+
+function _Person.func2 (self, v)
+    if self.cardno &gt; v then
+        self.cardno = self.cardno - v
+    else
+        error(&quot;insufficient funds&quot;)
+    end
+end
+
+function _Person.new (self, cardno)
+    cardno = cardno or 0
+    return setmetatable({cardno = cardno}, mt)
+end
+
+return _Person
+</code></pre>
+
+<p>上面这段代码 &ldquo;setmetatable({cardno = cardno}, mt)&ldquo;，其中 mt 代表 { __index = _M }，setmetatable 将 _M 作为新建表的原型(protype)，所以在自己的表内找不到 &lsquo;func1&rsquo;、&rsquo;func2&rsquo; 这些方法和变量的时候，便会到 __index 所指定的 _M 类型中去寻找</p>
+
+<p>创建引用测试文件 demo.lua</p>
+<pre><code>#!/usr/local/bin/lua
+local person = require(&quot;person&quot;)
+local a = person:new()
+a:func1(100)
+
+local b = person:new()
+b:func1(50)
+
+print(a.cardno)  
+print(b.cardno)
+</code></pre>
+
+<p>输出</p>
+<pre><code>100
+50
+</code></pre>
+
+<h2 id="函数">函数</h2>
+
+<p>跟go一样，函数在Lua中属于一等公民（程序将函数存在变量中，把函数作为参数传递给其他函数，返回函数作为返回结果）这些功能使语言有很大的灵活性；程序可以对函数进行重新定义，来增加新功能，或者在运行一段不信任的代码（比如从网上得到的代码）时简单地删除一个函数，从而创造安全的环境。</p>
+
+<p>Lua可以调用在Lua里写的函数，以及在C语言里的函数。一般使用C语言函数，既可以实现更好的性能，还可以使用从Lua中难以直接方便地访问的功能，比如系统操作的硬件。所有的Lua标准库都是写在C语言里的，其中包括的函数用于字符串操作、表操作、I/O、访问操作系统设备、科学计算函数以及调试</p>
+
+<h4 id="定义">定义</h4>
+
+<p>Lua 使用关键字 function 定义函数，语法如下</p>
+<pre><code>function function_name (arc)
+   -- body
+end
+</code></pre>
+
+<blockquote>
+<p>arc 表示参数列表，函数的参数列表可以为空</p>
+</blockquote>
+
+<p>上面的语法定义了一个全局函数，名为 function_name. 全局函数本质上就是函数类型的值赋给了一个全局变量，即上面的语法等价于</p>
+<pre><code>function_name = function (arc)
+  -- body
+end
+</code></pre>
+
+<p>这种定义方式跟我们平常写javascript很像</p>
+
+<p>由于全局变量一般会污染全局名字空间，同时也有性能损耗（即查询全局环境表的开销），因此我们应当尽量使用<code>“局部函数”</code>：</p>
+<pre><code>local function function_name (arc)
+  -- body
+end
+</code></pre>
+
+<p>由于函数定义本质上就是变量赋值，而变量的定义总是应放置在变量使用之前，所以函数的定义也需要放置在函数调用之前</p>
+<pre><code>local function max(a, b)  
+   local temp = nil  
+   if(a &gt; b) then
+      temp = a
+   else
+      temp = b
+   end
+   return temp          
+end
+
+local m = max(-12, 20)  
+print(m)
+</code></pre>
+
+<p>如果参数列表为空，必须使用 () 表明是函数调用。</p>
+<pre><code>local function func()
+    print(&quot;no parameter&quot;)
+end
+
+func()
+</code></pre>
+
+<p>由于函数定义等价于变量赋值，我们也可以把函数名替换为某个 Lua 表的某个字段，例如</p>
+<pre><code>function foo.bar(a, b, c)
+    -- body ...
+end
+</code></pre>
+
+<p>此时我们是把一个函数类型的值赋给了 foo 表的 bar 字段。换言之，上面的定义等价于</p>
+<pre><code>foo.bar = function (a, b, c)
+    print(a, b, c)
+end
+</code></pre>
+
+<p>对于此种形式的函数定义，不能再使用 local 修饰符了，因为不存在定义新的局部变量了。</p>
+
+<h4 id="传参">传参</h4>
+
+<p>Lua 函数的参数大部分是按值传递的。值传递就是调用函数时，实参把它的值通过赋值运算传递给形参，然后形参的改变和实参就没有关系了。在这个过程中，实参是通过它在参数表中的位置与形参匹配起来的</p>
+<pre><code>local function swap(a, b)
+   local temp = a
+   a = b
+   b = temp
+   print(a, b)
+end
+
+local x = &quot;hello&quot;
+local y = 20
+print(x, y)
+swap(x, y)    
+print(x, y)
+</code></pre>
+
+<p>调用swap函数后，x和y的值并没有交换，证明函数调用中x、y是按值传递</p>
+
+<p>变长参数</p>
+
+<p>Lua 还支持变长参数。若形参为 <code>...</code> , 表示该函数可以接收不同长度的参数。</p>
+
+<blockquote>
+<p>访问参数的时候也要使用 <code>...</code></p>
+</blockquote>
+<pre><code>local function func( ... )
+
+   local temp = {...}
+   local ans = table.concat(temp, &quot; &quot;)
+   print(ans)
+end
+
+func(1, 2)
+func(1, 2, 3, 4)
+
+</code></pre>
+
+<p>输出：</p>
+<pre><code>1 2
+1 2 3 4
+</code></pre>
+
+<h4 id="返回值">返回值</h4>
+
+<p>和Go语言一样，可以一条语句上赋多个值，如：</p>
+<pre><code>function getBookInfo(id)
+    print(id)
+    return &quot;go in action&quot;, 100, &quot;SN123232323&quot;, &quot;golang.org&quot;
+end
+ 
+bookname, price, sn, website = getBookInfo()
+</code></pre>
+
+<p>值得一提的是，如果实参列表中某个函数会返回多个值，同时调用者又没有显式地使用括号运算符来筛选和过滤，则这样的表达式是不能被 LuaJIT 2 所 JIT 编译的，而只能被解释执行。</p>
+</section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/10/2/beginning-lua.html">继续阅读</a>
                         </aside>
