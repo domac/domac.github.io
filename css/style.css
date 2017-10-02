@@ -1,5 +1,5 @@
 html, body {
-    font-family: "PingHei", "Lucida Grande", "Lucida Sans Unicode", Helvetica, Tahoma, Arial, "Hiragino Sans GB", "Hiragino Sans GB W3", "Microsoft YaHei", STXihei, STHeiti, Heiti, SimSun, sans-serif;
+    font-family: Helvetica, Tahoma, Arial,"PingHei", "Lucida Grande", "Lucida Sans Unicode",  "Hiragino Sans GB", "Hiragino Sans GB W3", "Microsoft YaHei", STXihei, STHeiti, Heiti, SimSun, sans-serif;
 }
 
 pre code {
@@ -9,7 +9,9 @@ pre code {
 body {
     padding-top: 24px;
     /*background: url("../img/bg.jpg") no-repeat top center;*/
-    background-color: #FCFCFC;
+    font-family: Helvetica, Arial, sans-serif,Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei";
+    font-size: 13px;
+    color: #1D1C1C;
 }
 
 #main {
