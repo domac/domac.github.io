@@ -3,17 +3,17 @@ html, body {
 }
 
 pre code {
-    font-family: Helvetica, Arial, sans-serif,Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei";
-    font-size: 13px;
-    line-height: 1.846;
-    color: #1D1C1C;
-    background-color: #ffffff;
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei", Helvetica, Arial, sans-serif;
 }
 
 body {
     padding-top: 24px;
     /*background: url("../img/bg.jpg") no-repeat top center;*/
     background-color: #FCFCFC;
+    font-family: Helvetica, Arial, sans-serif,Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei";
+    font-size: 13px;
+    line-height: 1.846;
+    color: #1D1C1C;
 }
 
 #main {
