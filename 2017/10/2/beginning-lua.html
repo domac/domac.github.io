@@ -379,6 +379,10 @@ end
 <p>这种定义方式跟我们平常写javascript很像</p>
 
 <p>由于全局变量一般会污染全局名字空间，同时也有性能损耗（即查询全局环境表的开销），因此我们应当尽量使用<code>“局部函数”</code>：</p>
+
+<blockquote>
+<p>lua中的全局变量使用需谨慎，可以使用 <a href="https://github.com/openresty/openresty-devel-utils/blob/master/lua-releng">lua-releng-tool</a> 脚本check非预期的global variable，尽量使用local 申明变量</p>
+</blockquote>
 <pre><code>local function function_name (arc)
   -- body
 end
@@ -476,6 +480,50 @@ bookname, price, sn, website = getBookInfo()
 </code></pre>
 
 <p>值得一提的是，如果实参列表中某个函数会返回多个值，同时调用者又没有显式地使用括号运算符来筛选和过滤，则这样的表达式是不能被 LuaJIT 2 所 JIT 编译的，而只能被解释执行。</p>
+
+<h2 id="一些坑">一些坑</h2>
+
+<h4 id="table-sort">table.sort</h4>
+
+<p>table.sort是lua自带的排序函数，但传入的compare函数可能会出现某些问题。例如:</p>
+<pre><code>#!/usr/local/bin/lua
+local demolist = { 9,8,3,7,0,4,5,1,5 }
+table.sort(demolist,function(a,b) return a&gt;=b end )
+
+for i=1,#demolist do
+    print(demolist[i])
+end
+</code></pre>
+
+<p>上面代码执行的时候报错了：</p>
+<pre><code>invalid order function for sorting
+stack traceback:
+        [C]: in function 'table.sort'
+        ./keng.lua:3: in main chunk
+        [C]: in ?
+</code></pre>
+
+<p>原因在于lua的compare函数中不能出现等于（<code>=</code>），如果使用了=，当数组中出现两个权重一样的元素时，就会报错。具体原因你可以看table.sort的官方文档，有句话：</p>
+<pre><code>If comp is given, then it must be a function that receives two list elements and returns true when the first element must come before the second in the final order (so that, after the sort, i &lt; j implies not comp(list[j],list[i]))
+</code></pre>
+
+<p>只能把代码改回以下的形式，结果执行就正常了</p>
+<pre><code>#!/usr/local/bin/lua
+local demolist = { 9,8,3,7,0,4,5,1,5 }
+table.sort(demolist,function(a,b) return a&gt;b end )
+
+for i=1,#demolist do
+    print(demolist[i])
+end
+</code></pre>
+
+<h4 id="顺序">顺序</h4>
+
+<p>lua的table结构背后有一套自己的结构，这样能够保证对数据做快速的查询操作。所以key被做了hash处理，所以最后变量table的时候， key不一定都是安装预期的插入顺序进行排列的。</p>
+
+<h4 id="错误">错误</h4>
+
+<p>LUA代码执行如果出现错误会停止执行函数后面的代码，会导致需要严格控制的流程只执行了一部分，产生逻辑错误。</p>
 </section>
                     </div>
                 </div>
