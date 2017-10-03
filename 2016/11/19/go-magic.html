@@ -66,6 +66,12 @@
 <p>字符串（string）作为一种不可变类型，在与字节数组（slice, [ ]byte）转换时需付出 “沉重” 代价，
 根本原因是对底层字节数组的复制。这种代价会在以万为单位的高并发压力下迅速放大，所以对它的优化常变成 “必须” 行为。</p>
 
+<p>所有的string在底层都是这样的一个结构体</p>
+<pre><code>stringStruct{str: str_point, len: str_len}
+</code></pre>
+
+<p>string结构体的str指针指向的是一个字符常量的地址， 这个地址里面的内容是不可以被改变的，因为它是只读的，但是这个指针可以指向不同的地址，因为string的指针指向的内容是不可以更改的，所以每更改一次字符串，就得重新分配一次内存，之前分配空间的还得由gc回收，这是导致string操作低效的根本原因.</p>
+
 <p>Go字符串的指针，它本质上是一个reflect.StringHeader，我们先看下go源码的定义：</p>
 
 <p><code>reflect/value.go 1734行</code></p>
@@ -173,6 +179,20 @@ BenchmarkTestBlock-4    500000000                3.87 ns/op            0 B/op   
 </ul>
 
 <p>正常情况下，追求数据质量的项目，以上这个技巧我觉得要慎用。</p>
+
+<p>那什么时候使用字符串，什么时候用[]byte？</p>
+
+<ul>
+<li><p>string可以直接比较，而[]byte不可以，所以[]byte不可以当map的key值。</p></li>
+
+<li><p>因为无法修改string中的某个字符，需要粒度小到操作一个字符时，用[]byte。</p></li>
+
+<li><p>string值不可为nil，所以如果你想要通过返回nil表达额外的含义，就用[]byte。</p></li>
+
+<li><p>[]byte切片灵活，想要用切片的特性就用[]byte。</p></li>
+
+<li><p>需要大量字符串处理的时候用[]byte</p></li>
+</ul>
 
 <h2 id="二-struct与byte数组">二、struct与byte数组</h2>
 
