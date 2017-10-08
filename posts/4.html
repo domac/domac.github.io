@@ -50,6 +50,80 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">1</span>
+                            <span class="day">24</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/1/24/slab-alloc-and-free.html">用Go实现内存分配与释放的优化</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="背景">背景</h2>
+
+<p>动态的内存分配策略对我们并不陌生,Go中的slice是运行时动态申请内存, 所以我们一般操纵slice,往往都需要设置len和cap的属性。
+但如果我们分配的场景是那些高度频繁而且处于高并发的环境下，普通的对象内存分配是否能满足性能上的要求呢？</p>
+
+<p>站在内核的角度，内核中普通对象进行初始化所需要的时间超过了对其分配和释放所需要的时间，我们设计上其实不应该将内存释放回一个全局的
+内存池，而是将内存保持为特定的初始化状态。例如：如果内存被分配为一个互斥锁，那么只需要在互斥锁首次分配内存进行一次初始化函数即可，后续
+的内存分配不需要执行这个初始化函数。</p>
+
+<p>站在编程人员的角度，处理数据的频繁分配和回收，第一反应基本都是利用空闲链表：包含可供使用并已经分配好的数据结构块。空闲链表在编程上，可以理解
+为高速缓存，能快速存储频繁使用的对象类型， 也就是说当代码需要一个新的数据结构实例时，就可以从空闲链表中抓取一个，而
+不需要分配内存，再把数据放进去；以后不再需要这个数据结构的时候，就把它放回空闲链表，而不是释放它。</p>
+
+<h2 id="slab基本概念">Slab基本概念</h2>
+
+<p>空闲链表的做法有个问题：因为当可用内存变得紧缺时， 内核无法通知每个空闲链表，让其收缩缓存的大小以便释放出一些内存来，换句话说，Linux内核
+根本就不知道存在任何的所谓空闲链表</p>
+
+<p>有见及此，Linux出现了Slab层：slab由一个或多个物理上连续的页组成，把不同的对象划分为所谓的高速缓存组，这些缓存组存放不同的对象类型，每个高速
+缓存可以由多个slab组成。</p>
+
+<p>slab层所起的主要作用就像是一个专用的分配器一样，可以为具体的对象类型进行分配。</p>
+
+<p>结构示意图：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/slab_struct.gif" alt="slab-struct" /></p>
+
+<p>每个缓存都包含了一个 slabs 列表，这是一段连续的内存块（通常都是页面）。</p>
+
+<p>存在 3 种 slab:</p>
+
+<ul>
+<li><p>slabs_full 完全分配的 slab</p></li>
+
+<li><p>slabs_partial 部分分配的 slab</p></li>
+
+<li><p>slabs_empty 空 slab，或者没有对象被分配</p></li>
+</ul>
+
+<blockquote>
+<p>注意 slabs_empty 列表中的 slab 是进行回收（reaping）的主要备选对象。正是通过此过程，slab 所使用的内存被返回给操作系统供其他用户使用。</p>
+</blockquote>
+
+<p>slab 列表中的每个 slab 都是一个连续的内存块（一个或多个连续页），它们被划分成一个个对象。
+这些对象是从特定缓存中进行分配和释放的基本元素。注意 slab 是 slab 分配器进行操作的最小分配单位，
+因此如果需要对 slab 进行扩展，这也就是所扩展的最小值。通常来说，每个 slab 被分配为多个对象。</p>
+
+<p>由于对象是从 slab 中进行分配和释放的，因此单个 slab 可以在 slab 列表之间进行移动。例如，当一个 slab 中的所有对象都被使用完时，就从 slabs_partial 列表中移动到 slabs_full 列表中。当一个 slab 完全被分配并且有对象被释放后，就从 slabs_full 列表中移动到 slabs_partial 列表中。当所有对象都被释放之后，就从 slabs_partial 列表移动到 slabs_empty 列表中。</p>
+
+<h3 id="优点">优点</h3>
+
+<p>与传统的内存管理模式相比， slab 缓存分配器提供了很多优点。首先，内核通常依赖于对小对象的分配，它们会在系统生命周期内进行无数次分配。slab 缓存分配器通过对类似大小的对象进行缓存而提供这种功能，从而避免了常见的碎片问题。slab 分配器还支持通用对象的初始化，从而避免了为同一目而对一个对象重复进行初始化。最后，slab 分配器还可以支持硬件缓存对齐和着色，这允许不同缓存中的对象占用相同的缓存行，从而提高缓存的利用率并获得更好的性能。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/1/24/slab-alloc-and-free.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">1</span>
                             <span class="day">10</span>
                         </span>
                             </div>
@@ -1436,366 +1510,6 @@ BenchmarkLVS-4          30000000                34.7 ns/op             0 B/op   
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/12/19/about-round-robin.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">12</span>
-                            <span class="day">13</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/12/13/writing-tcpdump-like-tool-with-go-and-pcap.html">基于pcap写一个简单的tcpdump</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="pcap">PCAP</h2>
-
-<p>pcap (packet capture) 通涵盖两个概念：API 和 库(libpcap)，其中API是使用C进行编写的；
-pcap的用途很广，我们常见的工具例如tcpdump、netstat、wireshark、gor等跟网络嗅探相关的都离不开libpcap库的支持。</p>
-
-<p>libpcap的开发常见主要有以下几种：</p>
-
-<ul>
-<li>数据包捕获：捕获流经网卡的原始数据包</li>
-<li>自定义数据包发送：构造任何格式的原始数据包</li>
-<li>流量采集与统计：采集网络中的流量信息</li>
-<li>规则过滤：提供自带规则过滤功能，按需要选择过滤规则</li>
-</ul>
-
-<p>它的应用范围非常广泛，典型应用包括玩罗协议分析器，网络流量发生器，网络入侵检测系统，网络扫描器和其他安全工具。</p>
-
-<h2 id="libpcap工作原理">libpcap工作原理</h2>
-
-<p>作为捕捉网络数据包的库，它是一个独立于系统的用户级的API接口，为底层网络检测提供了一个可移植的框架。</p>
-
-<p>一个包的捕捉分为三个主要部分，包括面向底层包捕获、面向中间层的数据包过滤和面向应用层的用户接口。
-这与Linux操作系统对数据包的处理流程是相同的（网卡-&gt;网卡驱动-&gt;数据链路层-&gt;IP层-&gt;传输层-&gt;应用程序）。</p>
-
-<p>工作流程图：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/libpcap.png" alt="pcap" /></p>
-
-<p>包捕获机制是在数据链路层增加一个旁路处理（并不干扰系统自身的网络协议栈的处理），对发送和接收的数据包通过Linux内核做过滤和缓冲处理，最后直接传递给上层应用程序。</p>
-
-<p>接下来我们归纳下libpcap的流程：</p>
-
-<ul>
-<li><p>查找网络设备：目的是发现可用的网卡，实现的函数为pcap_lookupdev()，如果当前有多个网卡，函数就会返回一个网络设备名的指针列表。</p></li>
-
-<li><p>打开网络设备：利用上一步中的返回值，可以决定使用哪个网卡，通过函数pcap_open_live()打开网卡，返回用于捕捉网络数据包的秒数字。</p></li>
-
-<li><p>获得网络参数：这里是利用函数pcap_lookupnet()，可以获得指定网络设备的IP地址和子网掩码。</p></li>
-
-<li><p>编译过滤策略：Lipcap的主要功能就是提供数据包的过滤，函数pcap_compile()来实现。</p></li>
-
-<li><p>设置过滤器：在上一步的基础上利用pcap_setfilter()函数来设置。</p></li>
-
-<li><p>利用回调函数，捕获数据包：函数pcap_loop()和pcap_dispatch()来抓去数据包，也可以利用函数pcap_next()和pcap_next_ex()来完成同样的工作。</p></li>
-
-<li><p>关闭网络设备：pcap_close()函数关系设备，释放资源。</p></li>
-</ul>
-
-<h2 id="代码实现">代码实现</h2>
-
-<p>了解了原理和工作流程后，我们可以自己尝试做一个嗅探工具。</p>
-
-<p>我们以原生的tcpdump为参考，用Go语言来做一个“轮子”</p>
-
-<p>代码如下：</p>
-<pre><code class="language-go">package main
-
-import (
-    &quot;bufio&quot;
-    &quot;flag&quot;
-    &quot;fmt&quot;
-    &quot;github.com/gophil/pcap&quot;
-    &quot;os&quot;
-    &quot;os/signal&quot;
-    &quot;strconv&quot;
-    &quot;time&quot;
-)
-
-const (
-    TYPE_IP  = 0x0800
-    TYPE_ARP = 0x0806
-    TYPE_IP6 = 0x86DD
-
-    IP_ICMP = 1
-    IP_INIP = 4
-    IP_TCP  = 6
-    IP_UDP  = 17
-)
-
-var (
-    device  = flag.String(&quot;i&quot;, &quot;&quot;, &quot;interface&quot;)      //设备名: en0,bond0
-    ofile   = flag.String(&quot;d&quot;, &quot;&quot;, &quot;dump file path&quot;) //生成离线文件
-    read    = flag.String(&quot;r&quot;, &quot;&quot;, &quot;read dump file&quot;) //生成离线文件
-    snaplen = flag.Int(&quot;s&quot;, 65535, &quot;snaplen&quot;)
-    hexdump = flag.Bool(&quot;X&quot;, false, &quot;hexdump&quot;)
-    help    = flag.Bool(&quot;h&quot;, false, &quot;help&quot;)
-    count   = flag.String(&quot;c&quot;, &quot;&quot;, &quot;capture count of the dump line&quot;)
-    timeout = flag.String(&quot;t&quot;, &quot;&quot;, &quot;timeout&quot;)
-)
-
-func main() {
-    expr := &quot;&quot;
-
-    flag.Usage = func() {
-        fmt.Fprintf(os.Stderr,
-            &quot;usage: %s \n [ -i interface ] \n [ -t timeout ] \n [ -c count ] \n [ -s snaplen ] \n [ -X hexdump ] \n [ -d dump file ] \n [ -r read file ] \n [ -h show usage] \n [ expression ] \n&quot;, os.Args[0])
-        os.Exit(1)
-    }
-
-    flag.Parse()
-
-    if len(flag.Args()) &gt; 0 {
-        expr = flag.Arg(0)
-    }
-
-    if *help {
-        flag.Usage()
-    }
-
-    if *read != &quot;&quot; {
-        src := *read
-        f, err := os.Open(src)
-        if err != nil {
-            fmt.Printf(&quot;couldn't open %q: %v\n&quot;, src, err)
-            return
-        }
-        defer f.Close()
-        reader, err := pcap.NewReader(bufio.NewReader(f))
-        if err != nil {
-            fmt.Printf(&quot;couldn't create reader: %v\n&quot;, err)
-            return
-        }
-        for {
-            pkt := reader.Next()
-            if pkt == nil {
-                break
-            }
-            pkt.Decode()
-            fmt.Println(pkt)
-            if *hexdump {
-                Hexdump(pkt)
-            }
-        }
-        return
-    }
-
-    if *device == &quot;&quot; {
-        devs, err := pcap.FindAllDevs()
-        if err != nil {
-            fmt.Fprintln(os.Stderr, &quot;tinydump: couldn't find any devices:&quot;, err)
-        }
-        if 0 == len(devs) {
-            flag.Usage()
-        }
-        *device = devs[0].Name
-    }
-
-    //在线方式读取
-    h, err := pcap.OpenLive(*device, int32(*snaplen), true, 500)
-    if h == nil {
-        fmt.Fprintf(os.Stderr, &quot;tinydump:&quot;, err)
-        return
-    }
-    defer h.Close()
-
-    //设置过滤
-    if expr != &quot;&quot; {
-        fmt.Println(&quot;tinydump: setting filter to&quot;, expr)
-        ferr := h.SetFilter(expr)
-        if ferr != nil {
-            fmt.Println(&quot;tinydump:&quot;, ferr)
-        }
-    }
-
-    cs := *count
-    lineCoint := 1
-    useCount := false
-    if cs != &quot;&quot; {
-        useCount = true
-        lineCoint, err = strconv.Atoi(cs)
-        if err != nil {
-            lineCoint = 1
-        }
-    }
-
-    //生成离线分析文件
-    if *ofile != &quot;&quot; {
-        dumper, oerr := h.DumpOpen(ofile)
-        signalNotify(h, dumper)
-        if oerr != nil {
-            fmt.Fprintln(os.Stderr, &quot;tinydump: couldn't write to file:&quot;, oerr)
-        }
-        _, lerr := h.PcapLoop(lineCoint-1, dumper)
-        if lerr != nil {
-            fmt.Fprintln(os.Stderr, &quot;tinydump: loop error:&quot;, lerr, h.Geterror())
-        }
-        defer h.PcapDumpClose(dumper)
-        return
-    }
-
-    //超时处理
-    ts := *timeout
-    if ts != &quot;&quot; {
-        t, err := strconv.Atoi(ts)
-        if err == nil {
-            time.AfterFunc(time.Second*time.Duration(t), func() {
-                h.Close()
-                os.Exit(1)
-            })
-        }
-    }
-
-    //监听事件消息输出
-    for pkt, r := h.NextEx(); r &gt;= 0; pkt, r = h.NextEx() {
-        if r == 0 {
-            // 超时, continue(100)
-            continue
-        }
-
-        if useCount {
-            lineCoint = lineCoint - 1
-            if lineCoint &lt; 0 {
-                h.Close()
-                os.Exit(1)
-            }
-        }
-
-        pkt.Decode()
-        fmt.Println(pkt)
-        if *hexdump {
-            Hexdump(pkt)
-        }
-
-    }
-    fmt.Fprintln(os.Stderr, &quot;tinydump:&quot;, h.Geterror())
-
-}
-
-func signalNotify(h *pcap.Pcap, dumper *pcap.PcapDumper) {
-    c := make(chan os.Signal, 1)
-    signal.Notify(c, os.Interrupt)
-    go func() {
-        for sig := range c {
-            fmt.Fprintln(os.Stderr, &quot;tinydump: received signal:&quot;, sig)
-            if os.Interrupt == sig {
-                //关闭退出
-                h.PcapDumpClose(dumper)
-                h.Close()
-                os.Exit(1)
-            }
-        }
-    }()
-}
-
-func min(a, b int) int {
-    if a &lt; b {
-        return a
-    }
-    return b
-}
-
-func Hexdump(pkt *pcap.Packet) {
-    for i := 0; i &lt; len(pkt.Data); i += 16 {
-        Dumpline(uint32(i), pkt.Data[i:min(i+16, len(pkt.Data))])
-    }
-}
-
-//行dump
-func Dumpline(addr uint32, line []byte) {
-    fmt.Printf(&quot;\t0x%04x: &quot;, int32(addr))
-    var i uint16
-    for i = 0; i &lt; 16 &amp;&amp; i &lt; uint16(len(line)); i++ {
-        if i%2 == 0 {
-            fmt.Print(&quot; &quot;)
-        }
-        fmt.Printf(&quot;%02x&quot;, line[i])
-    }
-    for j := i; j &lt;= 16; j++ {
-        if j%2 == 0 {
-            fmt.Print(&quot; &quot;)
-        }
-        fmt.Print(&quot;  &quot;)
-    }
-    fmt.Print(&quot;  &quot;)
-    for i = 0; i &lt; 16 &amp;&amp; i &lt; uint16(len(line)); i++ {
-        if line[i] &gt;= 32 &amp;&amp; line[i] &lt;= 126 {
-            fmt.Println(&quot;%c&quot;, line[i])
-        } else {
-            fmt.Print(&quot;.&quot;)
-        }
-    }
-    fmt.Println()
-}
-
-</code></pre>
-
-<h3 id="使用方法">使用方法：</h3>
-<pre><code>go build
-</code></pre>
-
-<p>生成 <code>tinydump</code> 执行文件</p>
-
-<h4 id="命令参数">命令参数</h4>
-<pre><code>sudo ./tinydump -h
-
- [ -i interface ]
- [ -t timeout ]
- [ -c count ]
- [ -s snaplen ]
- [ -X hexdump ]
- [ -d dump file ]
- [ -r read file ]
- [ -h show usage]
- [ expression ]
-</code></pre>
-
-<p>使用范例:</p>
-
-<p>1.直接使用</p>
-<pre><code>$ sudo ./tinydump 
-</code></pre>
-
-<p>2.host过滤</p>
-<pre><code>$ sudo ./tinydump 'src 192.168.1.101 or dst 192.168.1.101'
-</code></pre>
-
-<p>3.端口过滤</p>
-<pre><code>$ sudo ./tinydump 'port 8000'
-</code></pre>
-
-<p>4.超时捕获 (时间单位为秒)</p>
-<pre><code>$ sudo ./tinydump -t 60
-</code></pre>
-
-<p>5.生成快照文件</p>
-<pre><code>$ sudo ./tinydump -d /tmp/test.cap
-</code></pre>
-
-<p>6.读取快照文件</p>
-<pre><code>$ sudo ./tinydump -r /tmp/test.cap
-</code></pre>
-
-<p>7.捕获指定行数的包</p>
-<pre><code>$ sudo ./tinydump -c 10
-</code></pre>
-
-<h2 id="总结">总结</h2>
-
-<p>到这里为止，我们结合原理实现了一个Go的tcpdump工具。我们日常开发中，理解透原理也是我们做好工具的第一步。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/12/13/writing-tcpdump-like-tool-with-go-and-pcap.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>《程序员的自我修养》读书笔记：链接 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="an programmer prepares 1"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
+                            <span class="day">8</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/10/8/an-programmer-prepares-1.html">《程序员的自我修养》读书笔记：链接</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/c.html">c</a>
+                            <a class="tag label label-info" href="/tags/c&#43;&#43;.html">c&#43;&#43;</a>
+                            <a class="tag label label-info" href="/tags/linux.html">linux</a>
+                        </aside>
+                        <section class="brief"><p>本文是《程序员的自我修养》的读书笔记之一，主要把相关知识点进行了梳理。</p>
+
+<p>链接、装载等是操作系统中很基础也是很重要的一部分。我们需要掌握的东西很多，书中向我们灌输了理解linux里面的文件的ELF格式的重要性，我们从阅读《程序员的自我修养》前面的章节从学习ELF文件格式开始有助于更加了解日常编程看不到的东西：</p>
+
+<ul>
+<li>理解操作系统是如何让一段代码工作起来</li>
+<li>如何让不同的二进制模块协同工作</li>
+<li>理解整个系统的一个起点</li>
+</ul>
+
+<blockquote>
+<p>本书最好是配合 <a href="https://book.douban.com/subject/1436811/">《Linkers and Loaders》</a> 一起深入阅读。</p>
+</blockquote>
+
+<p>链接、装载、库是本书的三大核心点，本文先主要是<code>链接</code>的相关章节的阅读笔记。笔记整理如下：</p>
+
+<!--more-->
+
+<p>《程序员的自我修养》的作者在我们阅读前，提出了几个问题让我们带着思考的动机去看的，我觉得比较有意思，我在这里也把这几个问题也列出一下：</p>
+
+<p>我们先看一个简单的<code>hello world</code>程序</p>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+int main()
+{
+    printf(&quot;hello world\n&quot;);
+    return 0;
+}
+</code></pre>
+
+<p>越是简单的东西，其实背后往往隐藏了即为复杂的机制和步骤，所以作者继续卖关子，列举了一些值得我们思考的问题，以便他后面的知识点能更深刻地佐证，这些问题是：</p>
+
+<ul>
+<li><p>1、程序为什么要被编译器编译之后才能运行？</p></li>
+
+<li><p>2、最后编译器编译出来的可执行文件里面是什么？</p></li>
+
+<li><p>3、最后编译出来的可执行文件（ELF文件）里面是什么？除了机器代码还有什么？它们是怎么存放的？怎么组织的？目标文件是什么？链接又是什么？</p></li>
+
+<li><p>4、#include<stdio.h> 是什么意思？c语言库又是什么？它是怎么实现的？</p></li>
+
+<li><p>5、不同的编译器（Microsoft VC、GCC）和不同的硬件平台（x86、ARM）以及不同的操作系统（windows、linux、unix等）最终编译出来的结果是一样的吗？</p></li>
+
+<li><p>6、Hello world程序是这么运行起来的？操作系统是怎么装载它的？它从哪里开始执行到哪里结束？程序是从main开始执行的吗？main函数之前发生了什么？main函数后又发生了什么？</p></li>
+
+<li><p>7、如果没有操作系统， hello world程序可以运行吗？如果系统在一台没有操作系统的机器上运行helloworld需要什么？怎么实现？</p></li>
+
+<li><p>8、printf是怎么实现的？它问什么可以有不定数量的参数？为什么能够在终端上输出字符串？</p></li>
+
+<li><p>9、hello world程序运行时，它在内存中是怎么样子的？alloc分配的空间是连续的吗?</p></li>
+
+<li><p>10、为什么这段程序链接时报错？</p></li>
+
+<li><p>11、句柄到底是什么?</p></li>
+</ul>
+
+<p>围绕这些问题，我们脑袋基本能形成一本清晰且连连相扣的“通关”手册，而本书的知识点就是针对上述的不同“关卡”的详细攻略。</p>
+
+<h2 id="链接">链接</h2>
+
+<p>首先阅读这些章节，我们目的是获取以下的知识点：</p>
+
+<ul>
+<li><p>编译和链接（基本概念和步骤）</p></li>
+
+<li><p>目标文件里面有什么（源代码编译后如何在目标文件中存储）</p></li>
+
+<li><p>静态链接（基本概念和步骤）</p></li>
+</ul>
+
+<p>我们通常将编译和链接的过程称为“构建（build）”，举个例子：</p>
+<pre><code>$ gcc hello.c
+
+$ ./a.out
+</code></pre>
+
+<p>这个命令包含了非常复杂的过程，我们下面就说明下这些隐藏了的过程:</p>
+
+<h3 id="build过程">build过程</h3>
+
+<p>程序构建的步骤主要包含：</p>
+
+<ul>
+<li><p>预处理 （prepressing）</p></li>
+
+<li><p>编译 (compilation)</p></li>
+
+<li><p>汇编 (assembly)</p></li>
+
+<li><p>链接 (linking)</p></li>
+</ul>
+
+<h3 id="预处理">预处理</h3>
+
+<p>预处理主要是处理那些源码文件中以 <code>&quot;#&quot;</code> 开头的预编译指令（#include 和 #define）</p>
+
+<p>它的工作性质相当于命令：</p>
+<pre><code>gcc -E hello.c -o hello.i
+</code></pre>
+
+<blockquote>
+<p><code>.i</code> 文件不包含任何的宏定义，因为所有的宏定义已经被展开，并且包含文件也被插入进来</p>
+</blockquote>
+
+<p>预处理的过程主要是以下几个步骤：</p>
+
+<ul>
+<li><p>1、将所有的 <code>#define</code> 删除，并且展开所有的宏定义</p></li>
+
+<li><p>2、处理所有条件的预编译指令，例如 #if、#ifdef、#elif、#else、#endif等</p></li>
+
+<li><p>3、处理 <code>#include</code> 预编译指令 （递归进行）</p></li>
+
+<li><p>4、删除所有的 <code>//</code> 和 <code>/* */</code></p></li>
+
+<li><p>5、添加行号和文件标识，以便编译时编译器能产生调试的行号信息以及用于编译时产生编译错误或报告时也能显示行号</p></li>
+
+<li><p>6、保留所有的 <code>#pragma</code>编译指令</p></li>
+</ul>
+
+<h3 id="编译">编译</h3>
+
+<p>编译的主要步骤：</p>
+
+<ul>
+<li><p>词法分析</p></li>
+
+<li><p>语法分析</p></li>
+
+<li><p>语义分析</p></li>
+
+<li><p>中间代码生成</p></li>
+
+<li><p>目标代码生成</p></li>
+</ul>
+
+<p>编译是整个构建的核心，它的工作性质相当于执行命令：</p>
+<pre><code>gcc -S hello.i -o hello.s
+</code></pre>
+
+<p>或者</p>
+<pre><code>gcc -S hello.c -o hello.s
+</code></pre>
+
+<h3 id="汇编">汇编</h3>
+
+<p>汇编主要将代码变成机器可以执行的指令，每一个汇编语句几乎都对应一条机器指令</p>
+
+<p>它的工作性质相当于执行命令：</p>
+<pre><code>as hello.s -o hello.o 
+</code></pre>
+
+<p>或者</p>
+<pre><code>gcc -c hello.s -o hello.o
+</code></pre>
+
+<h3 id="链接-1">链接</h3>
+
+<blockquote>
+<p>这里我们主要介绍的是<code>静态链接</code></p>
+</blockquote>
+
+<p>链接是《程序员的自我修养》的重点概念，学习链接，主要有以下的好处：</p>
+
+<ul>
+<li><p>理解链接器将帮助我们构造大型程序</p></li>
+
+<li><p>能避免一些危险的编程错误</p></li>
+
+<li><p>帮助我们理解语言的作用域规则是如何实现的</p></li>
+
+<li><p>理解其它重要的系统概念</p></li>
+
+<li><p>能够利用好共享库</p></li>
+</ul>
+
+<p>背景：程序设计的模块化是人们一直追求的东西，比如我们程序main.c中使用了另外一个模块的func.c中的foo()函数，我们在main.c模块中每一处调用foo的时候都必须确切知道foo这个函数的地址，但是由于每个模块都是单独编译的，在编译器编译main.c的时候它并不知道foo函数的地址的，所以它暂时把这些调用foo的指令的目标地址搁置，等待最后链接的时候去将这些指令的目标地址修正，如果没有链接器，我们得手工把每个调用foo的指令进行修正，填入正确的函数地址。</p>
+
+<p>于是链接的目的其实就是：人们把每个源代码模块独立地进行编译，然后按照需要将它们“组织（正确地衔接）” 起来。</p>
+
+<p>静态链接的过程：</p>
+
+<ul>
+<li><p>地址和空间的分配</p></li>
+
+<li><p>符合解析（决议）</p></li>
+
+<li><p>重定位（在linking过程中，对其它定义在目标文件中的函数的指令重新调整）</p></li>
+</ul>
+
+<p>链接的手段基本是通过源代码文件（.c）和库（大多是运行时库）和目标文件（.o）一起绑定为可执行文件</p>
+
+<h2 id="目标文件">目标文件</h2>
+
+<p>针对目标文件，我们需要时刻记住几个<code>关注点</code>：</p>
+
+<ul>
+<li><p>1、目标文件格式（或可执行文件格式）</p></li>
+
+<li><p>2、目标文件是怎么样的</p></li>
+
+<li><p>3、ELF文件结构描述</p></li>
+
+<li><p>4、链接的接口（符号）</p></li>
+
+<li><p>5、调试信息</p></li>
+</ul>
+
+<h3 id="文件格式">文件格式</h3>
+
+<blockquote>
+<p>linux下，可以使用file命令查看相应的文件格式</p>
+</blockquote>
+
+<p>目标文件格式的主要分为：可重定位文件、可执行文件、共享目标文件、核心转储文件（codedump）</p>
+
+<h3 id="目标文件是怎么样的">目标文件是怎么样的</h3>
+
+<p>目标文件中的内容至少有编译后的机器指令代码、数据、符合表、调试信息、字符串等。目标文件将这些信息按不同的属性以<code>节（section）</code> 或 <code>段（segment）</code>的形式存储。</p>
+
+<p>程序代码编译后的机器指令经常放在代码段（.code或者.text）中，<code>初始化</code>后的全局变量或者局部变量放在数据段(.data)中。</p>
+
+<p>elf文件主要格式如下：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/elf.png" alt="elf" /></p>
+
+<p>header描述了整个ELF文件属性，包括文件是否可以执行，是否静态链接还是动态入口地址，目标硬件，操作系统等信息。</p>
+
+<p>header 还包含了一个<code>段表（section header table）</code>（用于描述文件中各个段（偏移位置和属性）的一个数组）</p>
+
+<p>.bss 段主要存储<code>未初始化</code>的全局变量和局部静态变量</p>
+
+<blockquote>
+<p>.bss段不占据空间</p>
+</blockquote>
+
+<h3 id="链接的接口-符号">链接的接口（符号）</h3>
+
+<p>在链接中，我们将函数和变量都统称为符号（symbol）。每一个目标文件都会有一个符号表记录相关的符号名和符号值（地址）</p>
+
+<h4 id="弱符号和强符号">弱符号和强符号</h4>
+
+<p>我们经常在编程中碰到一种情况叫符号重复定义。多个目标文件中包含相同名字的全局符号的定义，那么这些目标文件链接的时候将会出现符号重复定义的错误。</p>
+
+<p>编译器一般把初始化的全局变量归为强符号，把未初始化的全局变量归为弱符号。</p>
+
+<h4 id="弱引用和强引用">弱引用和强引用</h4>
+
+<p>目前我们所看到的对外部目标文件的符号引用在目标文件最终链接成可执行文件时，它们都需要被正确决议，如果没有找到该符号的定义，链接器就会报符号未定义的错误，这些情况，我们就说我们引用了强引用；与之不会报错的情况我们就说引用了弱引用。</p>
+
+<p>这种弱符号和弱引用对库来说十分有用，比如库中定义的弱符号可以被用户定义的强符号所覆盖，从而使得程序可以使用自定义版本的库函数；或者程序可以对某些扩展功能模块的应用定义为弱引用，当我们将扩展模块与程序链接在一起时，功能就可以正常使用；如果我们去掉了某些功能模块，那么程序也可以正常链接，只是缺少了相应的功能，这使得程序的功能更加容易裁剪和组合。</p>
+
+<blockquote>
+<p>linux中链接glibc的pthread就是一个典型的例子</p>
+</blockquote>
+
+<h3 id="静态的链接">静态的链接</h3>
+
+<p>静态链接，也叫 <code>两步链接（Two-Pass Linking）</code> 它的工作主要分两个步骤：</p>
+
+<ul>
+<li><p>空间与地址分配</p></li>
+
+<li><p>符号解析和重定位</p></li>
+</ul>
+
+<h4 id="空间与地址分配">空间与地址分配</h4>
+
+<p>这个步骤主要是扫描所有的输入文件，获得他们的各自的长度、属性和位置，并且将输入文件中的符号表所有的符号定义和符号引用收集起来！统一放到一个全局的符号表。这一步中通过<code>按序叠加</code>和<code>相似合并</code>，链接器将能够获得所有输入目标文件的长度，并且将它们合并，计算出输出文件的各个段合并后的长度和位置并建立映射关系。</p>
+
+<h4 id="符号解析和重定位">符号解析和重定位</h4>
+
+<p>使用上一步收集的所有信息，通过重定位表（ELF文件的一个段），读取输入文件中的数据、重定位信息并且讲符号进行解析与重定位吗，调整代码中的地址等。</p>
+
+<p>重定位是链接的核心步骤</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>

@@ -49,6 +49,53 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">9</span>
+                            <span class="day">11</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/9/11/distributed-cache.html">最近工作点滴</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>在目前这家电商公司刚好满两年，我觉得是时候简单总结一下最近的一些工作吧：</p>
+
+<p>最近公司内部人员调整算是比较大的, 按照leader的想法, 我这边下半年开始往基础架构的建设上下更大的功夫。 而且临近双十一，相关挑战也接踵而来：目前一个&rdquo;水深火热&rdquo;的问题是我们内部某个基础底层的服务需要增加更可靠的分布式缓存支持日益递增的业务请求压力；</p>
+
+<p>虽然说目前市面上的分布式缓存手段繁多,外面每个大厂分享的&rdquo;PPT&rdquo;描述得好像都很有道理，但能结合目前我们的问题的方案可就显得力不从心了，更何况当今的后端研发人员，一说到分布式缓存，不把memcache/redis挂在嘴上，都不好意思说自己懂后端开发了，但被问到如何解决实际的问题与策略，很多人就吞吞吐吐了。所以我们内部也开始研究乃至自己编写相关分布式缓存技术的组件, 希望能抗住目前项目所带来的巨大请求压力.</p>
+
+<p>典型的分布式缓存思路无非就是使用类似KV形式存储和访问数据，在内存中维护一张巨大的HashTable，然后根据相关的路由算法将key进行Hash，使得在读数据是首先读缓存(内存)。如果缓存中没有数据，那么再去读存储(磁盘)，并且把数据写入缓存。最终对数据查询的时间复杂度降低到O(1)，保证了对数据的高性能访问。</p>
+
+<p>这种手段放之四海而皆准。但往深入想一下，会发现这都是很表面的套路，一个健壮的分布式缓存应该需要同时解决以下的问题：</p>
+
+<ul>
+<li><p>扩容问题</p></li>
+
+<li><p>故障恢复</p></li>
+
+<li><p>存储一致性</p></li>
+
+<li><p>高效的读写</p></li>
+
+<li><p>过载保护</p></li>
+
+<li><p>预热功能</p></li>
+</ul>
+
+<p>上述的问题，我先抛出来，主要做一个记录，先不详细说明，这段时间我会结合不断的实践，到时如果有所收获的话，再提炼相关经验分享出来吧。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/9/11/distributed-cache.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">6</span>
                             <span class="day">29</span>
                         </span>
@@ -591,371 +638,6 @@ $ chmod +x /usr/bin/{cfssl,cfssljson}
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/3/29/etcd-https-setup.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">3</span>
-                            <span class="day">12</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/3/12/install-kubernetes-cluster--on-centos.html">深入学习Kubernetes(三):手工安装Kubernetes</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>由于Kubernetes还在不断的演进，不同版本的k8s，在某些命令会有出入，不过原理变化不大，本文安装的Kubernetes版本为 V1.3.0。</p>
-
-<p><a href="https://github.com/kubernetes/kubernetes/releases/download/v1.3.0/kubernetes.tar.gz">Kubernetes安装包下载地址</a></p>
-
-<p>解压后，我们需要使用到的服务程序文件位于：
-kubernetes/server/kubernetes/server/bin 下</p>
-
-<p>下面我们把安装步骤分为Master和Minion两部分，最后在统一进行验证。</p>
-
-<h2 id="环境准备">环境准备</h2>
-
-<p>为了达到简单的集群安装，我们先准备了两台服务器，如果要扩展minion，安装方式都是一样的，所以扩展比较方便。</p>
-
-<ul>
-<li><p>master server : 192.168.139.145</p></li>
-
-<li><p>minion server : 192.168.139.146</p></li>
-</ul>
-
-<p>我们的安装过程中，均使用centos的Systemd系统服务，进行Kubernetes服务的配置。</p>
-
-<p>Centos7 默认使用firewall为防火墙，我们先关闭防火墙的设定</p>
-<pre><code>$ systemctl disable firewalld.service
-
-$ systemctl stop firewalld.service
-</code></pre>
-
-<h2 id="master节点上安装">Master节点上安装</h2>
-
-<p>Master上需要具备的K8s程序组件是</p>
-
-<ul>
-<li>etcd</li>
-<li>kube-apiserver</li>
-<li>kube-controller-manager</li>
-<li>kube-scheduler</li>
-</ul>
-
-<h3 id="安装etcd">安装etcd</h3>
-
-<p>先下载最新的etcd并解压：</p>
-<pre><code>$ wget https://github.com/coreos/etcd/releases/download/v3.1.3/etcd-v3.1.3-darwin-amd64.zip
-</code></pre>
-
-<p>创建相关的工作目录：</p>
-<pre><code>$ mkdir /var/lib/etcd/
-
-$ mkdir /etc/etcd &amp;&amp; touch etcd.conf
-</code></pre>
-
-<p>创建etcd的服务文件：</p>
-<pre><code>$ vim /usr/lib/systemd/system/etcd.service
-</code></pre>
-
-<p>相关内容如下：</p>
-<pre><code>[Unit]
-Description=Etcd Server
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=/var/lib/etcd/
-EnvironmentFile=/etc/etcd/etcd.conf
-ExecStart=/usr/bin/etcd
-
-[Install]
-WantedBy=multi-user.target
-</code></pre>
-
-<p>其中 /etc/etcd/etcd.conf 为etcd的配置文件，内容可以为空，我们介绍默认的配置</p>
-
-<p>接下来，我们启动etcd的服务</p>
-<pre><code>$ systemctl daemon-reload
-
-$ systemctl enable etcd.service
-
-$ systemctl status etcd //检查etcd的运行状态
-
-</code></pre>
-
-<p>检查健康：</p>
-<pre><code>$ etcdctl cluster-health
-
-member 8e9e05c52164694d is healthy: got healthy result from http://localhost:2379
-cluster is healthy
-
-</code></pre>
-
-<h3 id="安装-kube-apiserver">安装 kube-apiserver</h3>
-
-<p>我们先创建服务的日志目录</p>
-<pre><code>$ mkdir -p /var/log/kubernetes
-</code></pre>
-
-<p>进入 kubernetes/server/kubernetes/server/bin，把相关程序文件复制到 /usr/bin下</p>
-<pre><code>$ cp kube-apiserver /usr/bin/
-</code></pre>
-
-<p>编辑systemd服务文件</p>
-<pre><code>$ vim /usr/lib/systemd/system/kube-apiserver.service
-</code></pre>
-
-<p>内容如下：</p>
-<pre><code>[Unit]
-Description=Kubernetes API Server
-After=etcd.service
-Wants=etcd.service
-
-[Service]
-EnvironmentFile=/etc/kubernetes/apiserver
-ExecStart=/usr/bin/kube-apiserver $KUBE_API_ARGS
-Restart=on-failure
-Type=notify
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-</code></pre>
-
-<p>创建 apiserver 配置文件</p>
-<pre><code>mkdir -p /etc/kubernetes &amp;&amp; touch /etc/kubernetes/apiserver
-</code></pre>
-
-<p>配置文件 /etc/kubernetes/apiserver 的内容包括了 kube-apiserver的全部启动参数，只有的配置参数在变量KUBE_API_ARGS中指定，相关内容如下：</p>
-<pre><code>$ vim /etc/kubernetes/apiserver
-
-KUBE_API_ARGS=&quot;--etcd_servers=http://127.0.0.1:2379
---insecure-bind-address=0.0.0.0 --insecure-port=8080
---service-cluster-ip-range=169.169.0.0/16 --service-node-port-range=1-65535
---admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
---logtostderr=false --log-dir=/var/log/kubernetes --v=2&quot;
-
-</code></pre>
-
-<blockquote>
-<p>相关的参数说明可以参考 <a href="https://kubernetes.io/docs/admin/kube-apiserver/">https://kubernetes.io/docs/admin/kube-apiserver/</a></p>
-</blockquote>
-
-<h3 id="安装-kube-controller-manager">安装 kube-controller-manager</h3>
-
-<p>kube-controller-manager 服务依赖于 kube-apiserver服务。</p>
-
-<p>跟apiserver一样，我们需要把程序文件复制到 /usr/bin/</p>
-<pre><code>cp kube-controller-manager /usr/bin/
-</code></pre>
-
-<p>编辑systemd的服务文件</p>
-<pre><code>$ vim /usr/lib/systemd/system/kube-controller-manager.service
-
-[Unit]
-Description=Kubernetes Controller Manager
-After=kube-apiserver.service
-Requires=kube-apiserver.service
-
-[Service]
-EnvironmentFile=/etc/kubernetes/controller-manager
-ExecStart=/usr/bin/kube-controller-manager $KUBE_CONTROLLER_MANAGER_ARGS
-Restart=on-failure
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-</code></pre>
-
-<p>创建并编辑配置文件</p>
-<pre><code>$ vim /etc/kubernetes/controller-manager
-
-KUBE_CONTROLLER_MANAGER_ARGS=&quot;--master=http://192.168.139.145:8080 --logtostderr=false --log-dir=/var/log/kubernetes --v=2&quot;
-</code></pre>
-
-<blockquote>
-<p>配置参数可以参考 <a href="https://kubernetes.io/docs/admin/kube-controller-manager/">https://kubernetes.io/docs/admin/kube-controller-manager/</a></p>
-</blockquote>
-
-<h3 id="安装-kube-scheduler">安装 kube-scheduler</h3>
-
-<p>跟apiserver一样，我们需要把程序文件复制到 /usr/bin/</p>
-<pre><code>cd kubernetes/server/kubernetes/server/bin
-
-cp kube-scheduler /usr/bin/
-</code></pre>
-
-<p>编辑systemd的服务文件</p>
-<pre><code>$ vim /usr/lib/systemd/system/kube-scheduler.service
-
-[Unit]
-Description=Kubernetes Scheduler
-After=kube-apiserver.service
-Requires=kube-apiserver.service
-
-[Service]
-EnvironmentFile=/etc/kubernetes/scheduler
-ExecStart=/usr/bin/kube-scheduler $KUBE_SCHEDULER_ARGS
-Restart=on-failure
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-</code></pre>
-
-<p>编辑配置文件，主要配置 <code>KUBE_SCHEDULER_ARGS</code> 环境变量</p>
-<pre><code>$ vim  /etc/kubernetes/scheduler
-
-KUBE_SCHEDULER_ARGS=&quot;--master=http://192.168.139.145:8080 --logtostderr=false --log-dir=/var/log/kubernetes --v=2&quot;
-</code></pre>
-
-<h3 id="小结">小结</h3>
-
-<p>完成上面的Master节点安装配置后，我们执行systemctl start 命令这3个服务。同时使用 systemctl enable 命令将服务加入开机启动列表中</p>
-<pre><code>$ systemctl daemon-reload
-
-$ systemctl enable kube-apiserver.service
-$ systemctl start kube-apiserver.service
-
-$ systemctl enable kube-controller-manager.service
-$ systemctl start kube-controller-manager.service
-
-$ systemctl enable kube-scheduler.service
-$ systemctl start kube-scheduler.service
-</code></pre>
-
-<p>通过 syetem status 命令来验证服务的启动状态，&rdquo;running&rdquo;表示启动成功。到此，Master上所需的服务就全部启动完成。</p>
-
-<h2 id="minion节点安装">Minion节点安装</h2>
-
-<p>Minion上需要具备的K8s程序组件是</p>
-
-<ul>
-<li>docker engine</li>
-<li>kubelet</li>
-<li>kube-proxy</li>
-</ul>
-
-<h3 id="关闭防火墙服务">关闭防火墙服务</h3>
-<pre><code>$ systemctl disable firewalld.service
-
-$ systemctl stop firewalld.service
-</code></pre>
-
-<h3 id="安装docker">安装Docker</h3>
-<pre><code>$ systemctl start docker
-</code></pre>
-
-<p>切换docker镜像源：</p>
-
-<p>可以参考 <a href="https://www.daocloud.io/mirror#accelerator-doc">https://www.daocloud.io/mirror#accelerator-doc</a></p>
-<pre><code>$ curl -sSL https://get.daocloud.io/daotools/set_mirror.sh | sh -s http://dbe35452.m.daocloud.io
-</code></pre>
-
-<p>重启docker后台服务</p>
-<pre><code>$ systemctl restart docker
-</code></pre>
-
-<h3 id="安装-kubectl">安装 kubectl</h3>
-
-<p>创建日志目录：</p>
-<pre><code>$ mkdir -p /var/log/kubernetes
-</code></pre>
-
-<p>复制程序文件</p>
-<pre><code>$ cp kubelet /usr/bin/
-</code></pre>
-
-<p>创建工作目录：</p>
-<pre><code>$ mkdir -p /var/lib/kubelet
-</code></pre>
-
-<p>kubectl服务依赖docker服务。</p>
-
-<p>编辑服务文件</p>
-<pre><code>$ vim /usr/lib/systemd/system/kubelet.service
-
-[Unit]
-Description=Kubernetes Kubelet Server
-After=docker.service
-Requires=docker.service
-
-[Service]
-WorkingDirectory=/var/lib/kubelet
-EnvironmentFile=/etc/kubernetes/kubelet
-ExecStart=/usr/bin/kubelet $KUBELET_ARGS
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-</code></pre>
-
-<p>接下来，我们依旧针对环境变量 KUBELET_ARGS，编辑配置文件</p>
-<pre><code>$ vim /etc/kubernetes/kubelet
-
-KUBELET_ARGS=&quot;--api-servers=http://192.168.139.145:8080 --hostname-override=192.168.139.146 --logtostderr=false --log-dir=/var/log/kubernetes --v=2&quot;
-
-</code></pre>
-
-<h3 id="安装-kube-proxy">安装 kube-proxy</h3>
-
-<p>复制程序文件</p>
-<pre><code>$ cp kube-proxy /usr/bin/
-</code></pre>
-
-<p>编辑服务文件</p>
-<pre><code>[Unit]
-Description=Kubernetes Kube Proxy Server
-After=network.target
-Requires=network.service
-
-[Service]
-EnvironmentFile=/etc/kubernetes/proxy
-ExecStart=/usr/bin/kube-proxy $KUBE_PROXY_ARGS
-Restart=on-failure
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-</code></pre>
-
-<p>针对 KUBE_PROXY_ARGS,编辑配置文件</p>
-<pre><code>$ vim /etc/kubernetes/proxy
-
-KUBE_PROXY_ARGS=&quot;--master=http://192.168.139.145:8080 --logtostderr=false --log-dir=/var/log/kubernetes --v=2&quot;
-</code></pre>
-
-<p>配置完成后，通过syetemctl 启动kubelet和kube-proxy服务</p>
-<pre><code>systemctl daemon-reload
-
-systemctl enable kubelet.service
-systemctl start kubelet.service
-
-systemctl enable kube-proxy.service
-systemctl start kube-proxy.service
-
-</code></pre>
-
-<h2 id="总结">总结</h2>
-
-<p>kubelet默认采用向Master自动注册本Node的机制，在Master上查看各Node的状态，状态为Ready表示Node已经成功注册并状态为可用</p>
-
-<p>我们在<code>Master</code>上，执行一下命令，查看它的工作节点：</p>
-<pre><code>$ kubectl get nodes
-
-NAME              STATUS    AGE
-192.168.139.146   Ready     4m
-</code></pre>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/3/12/install-kubernetes-cluster--on-centos.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
