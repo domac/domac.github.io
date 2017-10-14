@@ -382,6 +382,85 @@ $ ./a.out
 </ul>
 
 <p>对应相同的段，操作系统把它们合并到一起当做一个段进行映射</p>
+
+<h3 id="动态链接">动态链接</h3>
+
+<p>基本思路：把链接的过程推迟到了运行时再进行。</p>
+
+<p>动态链接涉及到运行时的链接以及多个文件的装载，必需要有操作系统的支持。因为动态链接的情况下，进程的<code>虚拟地址空间</code>的分布会比静态链接下更为复杂，还有一些存储管理、内存共享、进程线程等机制在动态链接下会有一些微妙的变化。</p>
+
+<p>下面是一个简单的动态链接例子：</p>
+
+<p>SimpleDynamicLinking</p>
+
+<p>我们分别需要几个源文件：“Program1.c”、 “Program2.c”、 “Lib.c”、 “Lib.h”</p>
+<pre><code class="language-c">/* Program1.c */
+#include &quot;Lib.h&quot;
+
+int main()
+{
+    foobar(1);
+    return 0;
+}
+</code></pre>
+<pre><code class="language-c">/* Program2.c */
+#include &quot;Lib.h&quot;
+
+int main()
+{
+    foobar(2);
+    return 0;
+}
+</code></pre>
+<pre><code class="language-c">/* Lib.c */
+#include &quot;&lt;stdio.h&gt;&quot;
+
+void foobar(int i)
+{
+    printf(&quot;Printing from Lib.so %d\n&quot;.i);
+}
+</code></pre>
+<pre><code class="language-c">/* Lib.h */
+#ifndef LIB_H
+#define LIB_H
+
+void foobar(int i);
+
+#endif
+</code></pre>
+
+<p>程序很简单，两个程序的主要模块 Program1.c 和 Program2.c 分别调用了Lib.c 里面的foobar()函数，传进去一个数字。</p>
+
+<p>然后我们使用GCC将Lib.c编译成一个共享对象文件</p>
+<pre><code>$ gcc -fPIC -shared -o Lib.so Lib.c
+</code></pre>
+
+<p>这样我们得到了一个Lib.so文件，然后我们就可以分别编译Program1.c 和 Program2.c ：</p>
+<pre><code>$ gcc -o Program1 Program1.c ./Lib.so
+$ gcc -o Program1 Program2.c ./Lib.so
+</code></pre>
+
+<h3 id="地址无关代码">地址无关代码</h3>
+
+<p>动态共享对象有个典型问题是：共享对象的地址冲突问题</p>
+
+<blockquote>
+<p>共享对象的地址大部分是绝对地址，而且动态链接的装载地址是从0x00000000开始的</p>
+</blockquote>
+
+<p>为了能够使对象在任意地址进行装载，一般想到的手段是装载时重定位：动态链接模块被装载映射到虚拟空间后，<code>指令</code>部分是在多个进程间共享的，由于装载时重定位需要修改<code>指令</code>，所以没有办法做到同一份指令被多个进程共享，因为<code>指令</code>重定位后对于每个进程来说是不同的。当然动态链接库中<code>数据可修改部分</code>对于不同的进程来说可有多个副本，所以它们可以采用装载时重定位的方式来解决。</p>
+
+<p>装载时重定位既然是为了解决指令部分无法在多个进程之间共享的问题，那边它的基本思想其实很简单：把指令中那些需要修改的部分分离出来，跟数据部分放在一起，这样指令部分就可以保持不变，而数据部分就可以在每个进程中用于一个副本。这就是“地址无关技术（PIC）”</p>
+
+<p>动态链接的步骤：</p>
+
+<ul>
+<li><p>动态链接器的自举</p></li>
+
+<li><p>装载共享对象</p></li>
+
+<li><p>重定位和初始化</p></li>
+</ul>
 </section>
                     </div>
                 </div>
