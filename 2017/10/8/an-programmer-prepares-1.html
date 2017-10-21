@@ -461,6 +461,54 @@ $ gcc -o Program1 Program2.c ./Lib.so
 
 <li><p>重定位和初始化</p></li>
 </ul>
+
+<h3 id="共享库系统路径">共享库系统路径</h3>
+
+<p>目前大多数包括Linux在内的开源操作系统都遵守一个叫做FHS（File Hierarchy Standary）的标准。FHS规定，一个系统主要有3个存放共享库的位置，它们分别是：</p>
+
+<ul>
+<li>/lib</li>
+<li>/usr/lib</li>
+<li>/usr/local/lib</li>
+</ul>
+
+<p>总体来看，/lib和/usr/lib是一些很常用的、成熟的，一般是系统本身所需要的库；而/usr/local/lib是非系统所需的第三方程序的共享库。</p>
+
+<p>linux的动态链接的模块所依赖的模块路径保存在<code>.dynamic</code>段里面，由DT_NEED类型的项表示。动态连接器对于模块的查找有一定的规则：如果DT_NEED里面保存的是绝对路径，那么动态连接器就按照这个路径去查找；如果DT_NEED里面保存的是相对路径，那么动态链接器会在/lib、/usr/lib和由/etc/ld.so.conf里面配置文件指定的目录中查找共享库。</p>
+
+<p>ld.so.conf 是一个文本配置文件，它可能包含其他的配置文件，这些配置文件中存放着目录信息。如果修改这个文件，都应该允许ldconfig这个程序，以便调整SO-NAME和/etc/ld.so.cache。</p>
+
+<p>环境变量</p>
+
+<ul>
+<li><p>LD_LIBRARY_PATH：使用这个变量可以临时改变某个应用程序的共享库查找路径，而不会影响系统中的其它应用程序</p></li>
+
+<li><p>LD_PRELOAD：可以指定预先装载的一些共享库甚至或是目标文件</p></li>
+
+<li><p>LD_DEBUG：这个变量可以打开动态链接器的调试功能</p></li>
+</ul>
+
+<h4 id="共享库的创建">共享库的创建</h4>
+
+<p>命令格式：</p>
+<pre><code>gcc -shared -wl,-soname,my_soname -o library_name source_files libary_files
+</code></pre>
+
+<p>参考例子：</p>
+<pre><code>gcc -shared -fPIC -wl,-soname,libfoo.so.1 -o lib.so.1.0.0 libfoo1.c libfoo2.c -lbar1 -lbar2
+</code></pre>
+
+<h4 id="共享库的安装">共享库的安装</h4>
+
+<p>创建共享库以后我们必须将它安装在系统中，以便于各种程序都可以共享它。最简单的办法就是将它共享复制到某个标准的共享目录如：/lib、/usr/lib等，然后运行ldconfig即可。</p>
+
+<p>不过上述的方法往往需要系统的root权限，如果没有无法运行ldconfig程序。，否则就要通过建立相应SO-NAME的软链接的方法，并告诉编译器和程序如何找到该共享库。</p>
+
+<p>建立SO-NAME的办法也是使用ldconfig，只不过需要制定共享库所在目录</p>
+<pre><code>$ ldconfig -n shared_library_directory
+</code></pre>
+
+<p>在编译程序时，也需要制定共享库的位置，GCC提供了两个参数 &ldquo;-L&rdquo; 和 &ldquo;-l&rdquo;，分别用于制定共享库搜索目录和共享库的路径。</p>
 </section>
                     </div>
                 </div>
