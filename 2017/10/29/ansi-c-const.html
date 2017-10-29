@@ -107,7 +107,7 @@ ccp = cp
 <pre><code>const float *类型并不是一个有限定符的类型，它的类型是“指向一个有const限定符的float类型的指针”。也就是说const限定符修饰指针所指向的类型，而不是指针本身
 </code></pre>
 
-<p>由于<code>char **</code>和<code>const char **</code> 都是没有限定符的指针类型，但它们所指向的类型不一样（前者指向的是char *，后者指向的是const char**），因此它们是不相容的。</p>
+<p>由于<code>char **</code>和<code>const char **</code> 都是没有限定符的指针类型，但它们所指向的类型不一样（前者指向的是char *，后者指向的是const char*），因此它们是不相容的。</p>
 
 <p>举例：</p>
 <pre><code>char *a = &quot;123&quot;;
