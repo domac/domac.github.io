@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>C语言的限定符修饰问题 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="ansi c const"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
+                            <span class="day">29</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/10/29/ansi-c-const.html">C语言的限定符修饰问题</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/c.html">c</a>
+                        </aside>
+                        <section class="brief"><p>最近阅读 《<a href="https://book.douban.com/subject/2377310/">Expert C Programming</a>》，有一个问题是这样的：</p>
+<pre><code>foo(const char **p) {}
+
+main(int argc, char **argv)
+{
+    foo(argv)
+}
+</code></pre>
+
+<p>如果编译这段代码，编译器会发出一条警告信息如下：</p>
+<pre><code>warning: argument is incompatible with prototype
+</code></pre>
+
+<p>一般情况很多人会认为实参<code>char *s</code> 与形参 <code>const char *p</code> 应该是相容的，标准库中所有的字符串处理函数都是这样的。那么为什么 实参<code>char **argv</code> 与形参 <code>const char **p</code> 实际上不相容呢？</p>
+
+<!--more-->
+
+<p>答案是肯定的，它们并不相容，在ANSI标准中有以下的概念：</p>
+<pre><code>每个实参都应该具有自己的类型，这样它的值就可以赋值给与它对应的形参类型的对象（该对象的类型不能含有`限定符`）
+</code></pre>
+
+<h4 id="这就是说参数的传递过程类似于赋值">这就是说参数的传递过程类似于赋值</h4>
+
+<p>所以，除非一个类型为<code>char **</code>的值可以赋值给一个 <code>const char **</code> 类型的对象，否则肯定会产生一条诊断信息。要想知道这个赋值是否合法，需要满足以下的约束条件其中一个：</p>
+<pre><code>1、两个操作数都是指向有限定符或无限定符的相容类型的指针
+2、左边指针指向的类型必须具有右边指针所指向类型的全部限定符
+</code></pre>
+
+<p>正是这个条件，使得函数中调用实参<code>char *</code>能够与<code>const char *</code>匹配。它之所以合法，是因为在下面的代码中：</p>
+<pre><code>char *cp;
+const char *cpp;
+ccp = cp
+</code></pre>
+
+<ul>
+<li>左操作数是一个指向有const限定符的char的指针</li>
+<li>右操作数是一个指向没有限定符的char的指针</li>
+<li>char类型与char类型是相容的，左边操作数所指向的类型具有右操作数所指向类型的限定符（无），再加上自身的限定符（const）。</li>
+</ul>
+
+<p>注意，反过来就不能够赋值，如下：</p>
+<pre><code>cp = cpp;
+</code></pre>
+
+<p>char **实参 与 const char **形参是相容的？ 没有！！！</p>
+
+<p>举个例子：</p>
+<pre><code>const float *类型并不是一个有限定符的类型，它的类型是“指向一个有const限定符的float类型的指针”。也就是说const限定符修饰指针所指向的类型，而不是指针本身
+</code></pre>
+
+<p>由于<code>char **</code>和<code>const char **</code> 都是没有限定符的指针类型，但它们所指向的类型不一样（前者指向的是char *，后者指向的是const char**），因此它们是不相容的。</p>
+
+<p>举例：</p>
+<pre><code>char *a = &quot;123&quot;;
+const char **b;
+const char *c;
+char **d;
+b = &amp;a;  //OK
+c = a;   //OK
+a = c;   //有警告
+b = d;   //有警告！
+d = b;   //有警告
+</code></pre>
+
+<p>const最有用的用法就是用它限定函数的形参，这样该函数将不会修改实参指针所指的数据，但其它函数却可能会修改它。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>

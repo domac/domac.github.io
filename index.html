@@ -50,6 +50,42 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">10</span>
+                            <span class="day">29</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/10/29/ansi-c-const.html">C语言的限定符修饰问题</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>最近阅读 《<a href="https://book.douban.com/subject/2377310/">Expert C Programming</a>》，有一个问题是这样的：</p>
+<pre><code>foo(const char **p) {}
+
+main(int argc, char **argv)
+{
+    foo(argv)
+}
+</code></pre>
+
+<p>如果编译这段代码，编译器会发出一条警告信息如下：</p>
+<pre><code>warning: argument is incompatible with prototype
+</code></pre>
+
+<p>一般情况很多人会认为实参<code>char *s</code> 与形参 <code>const char *p</code> 应该是相容的，标准库中所有的字符串处理函数都是这样的。那么为什么 实参<code>char **argv</code> 与形参 <code>const char **p</code> 实际上不相容呢？</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/10/29/ansi-c-const.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
                             <span class="day">8</span>
                         </span>
                             </div>
@@ -129,37 +165,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/9/27/string-tips-in-c.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">9</span>
-                            <span class="day">20</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/9/20/setup-squid.html">squid安装与部署</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>前阵子开始构思用go+leveldb实现一个分布式缓存方案，顺便调研了一下squid，下面是这阵子对squid的一些总结：</p>
-
-<p>代理缓存服务很多，squid是其中一个比较成熟的工具（类似的有：varnish、ATS、nginx-proxycache等）。Squid用途广泛的，可以作为缓存服务器，可以过滤流量帮助网络安全，也可以作为代理服务器链中的一环，向上级代理转发数据或直接连接互联网。</p>
-
-<p>squid cache的总体架构可以理解为下图的展示方式</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/sq1.jpg" alt="sq1" /></p>
-
-<p>我们主要针对squid的缓存功能，下面会详细介绍：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/9/20/setup-squid.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
