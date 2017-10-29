@@ -75,7 +75,9 @@ main(int argc, char **argv)
 <!--more-->
 
 <p>答案是肯定的，它们并不相容，在ANSI标准中有以下的概念：</p>
-<pre><code>每个实参都应该具有自己的类型，这样它的值就可以赋值给与它对应的形参类型的对象（该对象的类型不能含有`限定符`）
+<pre><code>Each argument shall have a type such that its value may be assigned to an object with the unqualified version of the type of its corresponding parameter.
+
+每个实参都应该具有自己的类型，这样它的值就可以赋值给与它对应的形参类型的对象（该对象的类型不能含有`限定符`）
 </code></pre>
 
 <h4 id="这就是说参数的传递过程类似于赋值">这就是说参数的传递过程类似于赋值</h4>
@@ -121,7 +123,7 @@ b = d;   //有警告！
 d = b;   //有警告
 </code></pre>
 
-<p>const最有用的用法就是用它限定函数的形参，这样该函数将不会修改实参指针所指的数据，但其它函数却可能会修改它。</p>
+<p>const最有用的用法就是用它限定函数的形参，这样该函数将不会修改实参指针所指的数据，但其它函数却可能会修改它。简单地讲，就是char **与 const char **类型并不兼容（imcompatble）。进一步说，就是如果C语言允许这样，就会产生与引人const这个关键字本意自相矛盾的结果，const就变得一点意义都没有了。</p>
 </section>
                     </div>
                 </div>
