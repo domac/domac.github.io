@@ -281,6 +281,10 @@ $ ./a.out
 
 <p>程序代码编译后的机器指令经常放在代码段（.code或者.text）中，<code>初始化</code>后的全局变量或者局部变量放在数据段(.data)中。</p>
 
+<blockquote>
+<p>段可以方便地映射到链接器在运行时可以直接载入的对象中！载入器只是提取文件中每个段的映像，并直接将它们放入内存中</p>
+</blockquote>
+
 <p>elf文件主要格式如下：</p>
 
 <p><img src="http://og0usnhfv.bkt.clouddn.com/elf.png" alt="elf" /></p>
@@ -494,6 +498,10 @@ $ gcc -o Program1 Program2.c ./Lib.so
 <pre><code>gcc -shared -wl,-soname,my_soname -o library_name source_files libary_files
 </code></pre>
 
+<p>可以通过给编译器驱动器一个特殊的-W选项（表示传递这个选项到哪个阶段）向各个阶段传递选项信息。“W”后面跟一个字符（提示到哪个阶段）一个逗号，然后就是具体的选项。所以如果要从编译器驱动器向链接器传递给连接器，而不是预处理或编译器或汇编程序或其它编译阶段，下面这条命令</p>
+<pre><code>cc -Wl,-m main.c &gt; main.linker.cpp
+</code></pre>
+
 <p>参考例子：</p>
 <pre><code>gcc -shared -fPIC -wl,-soname,libfoo.so.1 -o lib.so.1.0.0 libfoo1.c libfoo2.c -lbar1 -lbar2
 </code></pre>
@@ -509,6 +517,30 @@ $ gcc -o Program1 Program2.c ./Lib.so
 </code></pre>
 
 <p>在编译程序时，也需要制定共享库的位置，GCC提供了两个参数 &ldquo;-L&rdquo; 和 &ldquo;-l&rdquo;，分别用于制定共享库搜索目录和共享库的路径。</p>
+
+<p>动态链接是一种“JIT（just in time）”链接，这意味着程序在运行时必须能够找到它们所需要的函数库。连接器通过把文件名或路径名植入可执行文件中来做到这一点。这意味着，函数库的路径不能随意移动。如果把程序连接到/usr/lib/libthread.so库，那么就不能把改函数库移动到其它的目录，除非在连接器中进行特别的说明。否则，当程序调用该函数库的函数时，就会在运行时导致失败，给出这样一条错误消息：</p>
+<pre><code>ld.so.1: main: fatal: libthread.so: can’t open file: errno = 2
+</code></pre>
+
+<h2 id="附">附</h2>
+
+<p>有用的C语言工具：</p>
+
+<h3 id="用于检查源代码的工具">用于检查源代码的工具</h3>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-11-04%20%E4%B8%8B%E5%8D%884.16.12.png" alt="t1" /></p>
+
+<h3 id="用于检查可执行文件的工具">用于检查可执行文件的工具</h3>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-11-04%20%E4%B8%8B%E5%8D%884.18.36.png" alt="t2" /></p>
+
+<h3 id="帮助调试的工具">帮助调试的工具</h3>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-11-04%20%E4%B8%8B%E5%8D%884.19.42.png" alt="t3" /></p>
+
+<h3 id="性能优化辅助工具">性能优化辅助工具</h3>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/%E5%B1%8F%E5%B9%95%E5%BF%AB%E7%85%A7%202017-11-04%20%E4%B8%8B%E5%8D%884.21.15.png" alt="t4" /></p>
 </section>
                     </div>
                 </div>
