@@ -111,9 +111,9 @@
 </code></pre>
 
 <p>安装完成后，进行编译</p>
-<pre><code>$ cd /apps/svr/trafficserver-${VERSION}
+<pre><code>$ cd /apps/demo/trafficserver-${VERSION}
 
-$ ./configure --with-user=apps --with-group=apps --prefix=/apps/svr/trafficserver --sysconfdir=/apps/conf/trafficserver --localstatedir=/apps/dbdat/trafficserver --enable-debug --enable-example-plugins --enable-experimental-plugins --enable-hwloc
+$ ./configure --with-user=apps --with-group=apps --prefix=/apps/demo/trafficserver --sysconfdir=/apps/conf/trafficserver --localstatedir=/apps/dbdat/trafficserver --enable-debug --enable-example-plugins --enable-experimental-plugins --enable-hwloc
 
 $ make &amp;&amp; make install
 </code></pre>
@@ -138,7 +138,7 @@ CONFIG proxy.config.http.insert_response_via_str INT 2
 <p>2）如果是中心节点，修改  /apps/conf/trafficserver/remap.config 配置</p>
 
 <p>反向配置并增加balance负载策略 remap.config文件参考配置如下：(ip是ha的ip或源站ip，下面是随意写)</p>
-<pre><code>map http://a.appsimg.com/ http://a.appsimg.com/  @plugin=/apps/svr/trafficserver/libexec/trafficserver/balancer.so @pparam=--policy=hash,url @pparam=10.10.10.1 @pparam=10.10.10.2  @pparam=10.10.10.3
+<pre><code>map http://a.testpic.com/ http://a.testpic.com/  @plugin=/apps/demo/trafficserver/libexec/trafficserver/balancer.so @pparam=--policy=hash,url @pparam=10.10.10.1 @pparam=10.10.10.2  @pparam=10.10.10.3
 </code></pre>
 
 <p>并且修改  /apps/conf/trafficserver/records.config 配置</p>
@@ -149,20 +149,20 @@ CONFIG proxy.config.http.insert_response_via_str INT 2
 </code></pre>
 
 <p>3、关闭与启动</p>
-<pre><code>$ /apps/svr/trafficserver/bin/trafficserver stop
-$ /apps/svr/trafficserver/bin/trafficserver start
+<pre><code>$ /apps/demo/trafficserver/bin/trafficserver stop
+$ /apps/demo/trafficserver/bin/trafficserver start
 </code></pre>
 
 <p>4、日志查看</p>
-<pre><code>$ /apps/svr/trafficserver/bin/traffic_logcat -f 日志文件路径
+<pre><code>$ /apps/demo/trafficserver/bin/traffic_logcat -f 日志文件路径
 </code></pre>
 
 <p>5、配置更新</p>
-<pre><code>$ /apps/svr/trafficserver/bin/traffic_ctl config reload
+<pre><code>$ /apps/demo/trafficserver/bin/traffic_ctl config reload
 </code></pre>
 
 <p>6、数据清理</p>
-<pre><code>$ /apps/svr/trafficserver/bin/traffic_server -Cclear
+<pre><code>$ /apps/demo/trafficserver/bin/traffic_server -Cclear
 </code></pre>
 
 <p>7、状态监控</p>
