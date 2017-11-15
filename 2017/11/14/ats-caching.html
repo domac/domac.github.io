@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>ATS缓存使用总结 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="ats caching"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">14</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/11/14/ats-caching.html">ATS缓存使用总结</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/cache.html">cache</a>
+                            <a class="tag label label-info" href="/tags/%e5%88%86%e5%b8%83%e5%bc%8f.html">分布式</a>
+                        </aside>
+                        <section class="brief"><h2 id="一-简介">一、简介</h2>
+
+<p>Apache Traffic Server基本可以用一句话概括：它不仅是HTTP代理服务器, 还是HTTP缓存服务器，且可以缓存任何字节流数据。</p>
+
+<h2 id="二-使用情况">二、使用情况</h2>
+
+<p>由于是做电商，为了满足日常业务的发展，最初的nginx-proxycache的方式已经不能满足我们的大并发量而且大流量对象的缓存需要。这个时候我调研过squid、varnish等缓存代理，最后基于同行的使用报告和自己搭建使用一段时间后，最终我们就决定采用ATS作为缓存中心的核心层。具体的原因有以下几点：</p>
+
+<!--more-->
+
+<ul>
+<li><p>URL Rewrite 功能可以满足线上需求；</p></li>
+
+<li><p>支持https；</p></li>
+
+<li><p>ATS提供TS-Lua;</p></li>
+
+<li><p>支持日志自定义格式；</p></li>
+
+<li><p>支持后端检测；</p></li>
+
+<li><p>插件化支持</p></li>
+</ul>
+
+<h2 id="三-ats缓存服务架构">三、ATS缓存服务架构</h2>
+
+<h3 id="3-1-集群-结构">3.1、集群结构</h3>
+
+<p>先简单说明下我们采用的部署方案，如下图：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/ats.png" alt="ats" /></p>
+
+<p>我们采用两级缓存层作为服务提供方案：边缘节点+中心节点。边缘节点主要负责反向代理和一级缓存；中心节点负责二级缓存和负载到HA（回源入口）</p>
+
+<h3 id="3-2-内部cache架构">3.2、内部cache架构</h3>
+
+<p>缓存对象的概念</p>
+
+<p>一个字节流被缓存住时(还有相关的HTTP协议头)我们称之为缓存中的一个对象。每个对象可以通过全局唯一的缓存key的来定位，我们也称之为KV对象。</p>
+
+<p>详细参考： <a href="https://docs.trafficserver.apache.org/en/7.1.x/developer-guide/architecture/index.en.html">Cache Architecture</a></p>
+
+<h2 id="四-运维方案">四、运维方案</h2>
+
+<h4 id="常用命令">常用命令</h4>
+
+<p>1、安装</p>
+
+<p>前期需要安装相关依赖：</p>
+<pre><code>sudo yum install -y pkgconfig libtool gcc gcc-c++ make openssl openssl-devel tcl tcl-devel pcre libcap flex hwloc lua curses curl
+</code></pre>
+
+<p>安装完成后，进行编译</p>
+<pre><code>$ cd /apps/svr/trafficserver-${VERSION}
+
+$ ./configure --with-user=apps --with-group=apps --prefix=/apps/svr/trafficserver --sysconfdir=/apps/conf/trafficserver --localstatedir=/apps/dbdat/trafficserver --enable-debug --enable-example-plugins --enable-experimental-plugins --enable-hwloc
+
+$ make &amp;&amp; make install
+</code></pre>
+
+<p>2、配置集群</p>
+
+<blockquote>
+<p>访问边缘节点，资源请求不命中，会 remap 到 parent ats 节点去请求相关的资源。</p>
+</blockquote>
+
+<p>1）如果是边缘节点，修改 /apps/conf/trafficserver/parent.config，增加以下配置：(ip是中心节点的ip，下面是随意写)</p>
+<pre><code>dest_domain=. method=get  parent=&quot;10.11.10.1:80;10.11.10.2:80;10.11.10.3:80;10.11.10.4:80&quot;  round_robin=consistent_hash
+</code></pre>
+
+<p>并修改  /apps/conf/trafficserver/records.config 配置</p>
+<pre><code>CONFIG proxy.config.url_remap.pristine_host_hdr INT 1
+CONFIG proxy.config.http.parent_proxy_routing_enable INT 1
+CONFIG proxy.config.http.insert_request_via_str INT 1
+CONFIG proxy.config.http.insert_response_via_str INT 2
+</code></pre>
+
+<p>2）如果是中心节点，修改  /apps/conf/trafficserver/remap.config 配置</p>
+
+<p>反向配置并增加balance负载策略 remap.config文件参考配置如下：(ip是ha的ip或源站ip，下面是随意写)</p>
+<pre><code>map http://a.appsimg.com/ http://a.appsimg.com/  @plugin=/apps/svr/trafficserver/libexec/trafficserver/balancer.so @pparam=--policy=hash,url @pparam=10.10.10.1 @pparam=10.10.10.2  @pparam=10.10.10.3
+</code></pre>
+
+<p>并且修改  /apps/conf/trafficserver/records.config 配置</p>
+<pre><code>CONFIG proxy.config.url_remap.pristine_host_hdr INT 1
+CONFIG proxy.config.http.parent_proxy_routing_enable INT 0
+CONFIG proxy.config.http.insert_request_via_str INT 1
+CONFIG proxy.config.http.insert_response_via_str INT 2
+</code></pre>
+
+<p>3、关闭与启动</p>
+<pre><code>$ /apps/svr/trafficserver/bin/trafficserver stop
+$ /apps/svr/trafficserver/bin/trafficserver start
+</code></pre>
+
+<p>4、日志查看</p>
+<pre><code>$ /apps/svr/trafficserver/bin/traffic_logcat -f 日志文件路径
+</code></pre>
+
+<p>5、配置更新</p>
+<pre><code>$ /apps/svr/trafficserver/bin/traffic_ctl config reload
+</code></pre>
+
+<p>6、数据清理</p>
+<pre><code>$ /apps/svr/trafficserver/bin/traffic_server -Cclear
+</code></pre>
+
+<h4 id="关注点与调控">关注点与调控</h4>
+
+<p>cache是整个服务的核心，ats缓存架构核心理念是缓存布局的高效管理</p>
+
+<p>ats的缓存布局管理只有分为内存和磁盘读写控制，详细架构设计请参考官网的<a href="https://docs.trafficserver.apache.org/en/7.1.x/developer-guide/architecture/architecture.en.html#introduction">开发指南</a></p>
+
+<p>1、in-memory（RAM）</p>
+
+<p>配置入口：/apps/conf/trafficserver/records.config</p>
+
+<p>说明：设置主存大小</p>
+<pre><code>CONFIG proxy.config.cache.ram_cache.size INT 26843545600 # 移动图片缓存中心边缘节点设置RAM最大为25G
+CONFIG proxy.config.cache.ram_cache_cutoff INT 26843545600
+CONFIG proxy.config.cache.limits.http.max_alts INT 5
+CONFIG proxy.config.cache.max_doc_size INT 0 #不限制缓存object 大小
+CONFIG proxy.config.cache.min_average_object_size INT 8000
+</code></pre>
+
+<p>2、on-disk</p>
+
+<p>配置入口：/apps/conf/trafficserver/storage.config</p>
+
+<p>说明：设置磁盘存储缓存的最大空间，当存储上限达到此值时，存储空间不会再增长，ats开始根据clufs算法排走部分缓存数据</p>
+<pre><code>/apps/dbdat/trafficserver/trafficserver 400G
+</code></pre>
+
+<h4 id="集群检测方案">集群检测方案</h4>
+
+<p>任何分布式服务，CAP不能同时实现，特别目前以两级缓存模型实现的ATS结构更是如此。由于边缘节点依赖中心节点，ats边缘节点使用URL一致性哈希把请求打到中心节点的时候，如果中心节点挂掉，ats节点本身会做rehash,但rehash的次数是有限制的,极端情况下,当所有的中心节点不可用时，我们希望ats节点能直接回源操作，保障可用性.</p>
+
+<p>ats中心节点回源策略是透过URL哈希方式负载到haproxy上的，同理，如果ha节点挂掉，会直接影响缓存服务，请求无法穿透到源站。
+所以我们需要一个工具除了能监测依赖节点的健康情况外，还需要做容错和故障恢复等功能。</p>
+
+<p>有见及此，我开发了一个 <code>ats_check</code> (<a href="https://github.com/domac/ats_check">https://github.com/domac/ats_check</a>) 工具。</p>
+
+<p>服务场景如下：</p>
+
+<ul>
+<li><p>边缘节点依赖多个中心节点，当出现某中心节点服务不可用时，ats_check会自动发现并迅速调整 ATS 的parent.config的配置</p></li>
+
+<li><p>当边缘节点发现其所有中心节点都不可用时，ats_check 会进一步调整 records.config 关闭parent proxy功能，并自动调整 remap , 让请求能直接通过balance，回到源站</p></li>
+
+<li><p>中心节点本身发现负责回源的Haproxy节点不可用时，ats_check会修改 remap，确保回源有效，提高鲁棒性</p></li>
+</ul>
+
+<h2 id="五-调优与改进">五、调优与改进</h2>
+
+<ul>
+<li>定制化插件</li>
+</ul>
+
+<h2 id="参考">参考</h2>
+
+<p><a href="https://docs.trafficserver.apache.org/en/7.1.x/index.html">ATS官方文档</a></p>
+
+<p><a href="https://www.zhihu.com/question/20143441">varnish/squid/nginx cache有什么不同</a></p>
+
+<p><a href="http://blog.csdn.net/joeyon1985/article/details/46573281">nginx ats squid varnish使用场景对比介绍</a></p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2015 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+</html>

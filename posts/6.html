@@ -50,6 +50,131 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">11</span>
+                            <span class="day">29</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/11/29/base-128-varint.html">Base128变长编码</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>最近在使用google的protobuf的时候，有一个地方引起了我的好奇，下面是一段样例代码：</p>
+<pre><code class="language-go">type KeyValue struct {
+
+    Key []byte `protobuf:&quot;bytes,1,opt,name=key,proto3&quot; json:&quot;key,omitempty&quot;`
+
+    CreateRevision int64 `protobuf:&quot;varint,2,opt,name=create_revision,json=createRevision,proto3&quot; json:&quot;create_revision,omitempty&quot;`
+
+    ModRevision int64 `protobuf:&quot;varint,3,opt,name=mod_revision,json=modRevision,proto3&quot; json:&quot;mod_revision,omitempty&quot;`
+
+    Value []byte `protobuf:&quot;bytes,5,opt,name=value,proto3&quot; json:&quot;value,omitempty&quot;`
+
+    Lease int64 `protobuf:&quot;varint,6,opt,name=lease,proto3&quot; json:&quot;lease,omitempty&quot;`
+}
+</code></pre>
+
+<p>上面代码中，varint几乎都出现在每个字段属性的定义中，当时我在想，这个varint是用来做什么的呢？于是我查阅了Protocol Buffers的文档中对
+<a href="https://developers.google.com/protocol-buffers/docs/encoding">varints的说明</a>：</p>
+
+<blockquote>
+<p>varints是protobuf的序列化整型数据的一种编码方式，它的优点是整型数据的值越小，编码后所用的字节数越小</p>
+</blockquote>
+
+<p>在base128中，有效存储的只有7位，其中第8位是用于存储标志位：如果这一位是1，就表示这个字节后面还有其他字节，如果这个位是0的话，就表示这是最后一个字节了，这样一来，就可以准确的知道一个整数的结束位置。</p>
+
+<p>对于编码的步骤，可以看skoo的 <a href="http://skoo.me/algorithm/2013/09/30/base-128-varint">《Base 128 Varint, 一种处理整数的变长二进制编码算法》</a></p>
+
+<p>下面是一个go的实现例子，我们尝试把占用8字节的int64的整数，转换为更小&rdquo;长度&rdquo;的整数</p>
+<pre><code class="language-go">package main
+
+import (
+    &quot;bytes&quot;
+    &quot;fmt&quot;
+)
+
+func marshall128Int(out *bytes.Buffer, n int64) (err error) {
+    if n == 0 {
+        err = out.WriteByte(0)
+        return
+    }
+
+    l := 0
+    for i := n; i &gt; 0; i &gt;&gt;= 7 {
+        l++
+    }
+
+    for i := l - 1; i &gt;= 0; i-- {
+        o := byte(n &gt;&gt; uint(i*7))
+        o &amp;= 0x7f
+        if i != 0 {
+            o |= 0x80
+        }
+        err = out.WriteByte(o)
+        if err != nil {
+            return
+        }
+    }
+
+    return nil
+}
+
+func unmashallBase128Int(bytes []byte, initOffset int) (ret, offset int, err error) {
+    offset = initOffset
+    for shifted := 0; offset &lt; len(bytes); shifted++ {
+        if shifted &gt; 4 {
+            err = fmt.Errorf(&quot;Structural Error: base 128 integer too large&quot;)
+            return
+        }
+        ret &lt;&lt;= 7
+        b := bytes[offset]
+        ret |= int(b &amp; 0x7f)
+        offset++
+        if b&amp;0x80 == 0 {
+            return
+        }
+    }
+    err = fmt.Errorf(&quot;Syntax Error: truncated base 128 integer&quot;)
+    return
+}
+
+func main() {
+    num := int64(30)
+    b := bytes.Buffer{}
+    marshall128Int(&amp;b, num)
+    fmt.Printf(&quot;%v\n&quot;, b.Bytes())
+
+    num2 := int64(300)
+    b2 := bytes.Buffer{}
+    marshall128Int(&amp;b2, num2)
+    ret, offset, _ := unmashallBase128Int(b2.Bytes(), 0)
+    fmt.Printf(&quot;%v\n&quot;, b2.Bytes())
+    fmt.Printf(&quot;%d , size: %d \n&quot;, ret, offset)
+}
+
+
+</code></pre>
+
+<p>输出结果：</p>
+<pre><code>[30]
+[130 44]
+300 , size: 2
+</code></pre>
+
+<p>通过varint,我们可以用更小的内存存储我们的数据，而不是统一固定用4个字节或者8个字节。好处显然是非常明显的，特别是在二进制网络协议设计的时候，对整数进行变长编码很有必要。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/11/29/base-128-varint.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
                             <span class="day">19</span>
                         </span>
                             </div>
@@ -887,145 +1012,6 @@ PASS
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/11/6/google-snappy.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">5</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/11/5/golang-byteorder.html">go语言的字节序</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><blockquote>
-<p>最近在看nsq的源码时候，发现它处理message的时候，都会采用字节序进行数据包的处理，于是我觉得有必要深入了解下TCP协议中
-字节序的知识</p>
-</blockquote>
-
-<h2 id="字节序-byte-order">字节序（Byte Order）</h2>
-
-<p>我们一般把字节（byte）看作是数据的最小单位。当然，其实一个字节中还包含8个bit (bit = binary digit)。
-在一个32位的CPU中“字长”为32个bit，也就是4个byte。在这样的CPU中，总是以4字节对齐的方式来读取或写入内存，
-那么同样这4个字节的数据是以什么顺序保存在内存中的呢？我们下面详细探讨一下。</p>
-
-<p>字节序包括：大端序和小端序，为什么要这么麻烦还要分门别类呢？举个例子，255用二进制表达就是1111 1111，再加1就是1 0000 0000，多了一个1出来，显然我们需要再用额外的一个字节来存放这个1，但是这个1要存放在第一个字节还是第二个字节呢？这时候因为人们选择的不同，就出现了大端序和小端序的差异。</p>
-
-<p>而所谓大字节序（big endian），便是指其“最高有效位（most significant byte）”落在低地址上的存储方式。例如像地址a写入0x0A0B0C0D之后，在内存中的数据便是：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/Big-Endian.png" alt="big-end" /></p>
-
-<p>而对于小字节序（little endian）来说就正好相反了，它把“最低有效位（least significant byte）”放在低地址上。例如：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/Little-Endian.png" alt="little-end" /></p>
-
-<p>对于我们常用的CPU架构，如Intel，AMD的CPU使用的都是小字节序，而例如Mac OS以前所使用的Power PC使用的便是大字节序（不过现在Mac OS也使用Intel的CPU了）。</p>
-
-<h2 id="go-处理字节序">Go 处理字节序</h2>
-
-<p>Go中处理大小端序的代码位于 <code>encoding/binary</code> ,包中的全局变量BigEndian用于操作大端序数据，LittleEndian用于操作小端序数据，这两个变量所对应的数据类型都实行了ByteOrder接口：</p>
-<pre><code>type ByteOrder interface {
-    Uint16([]byte) uint16
-    Uint32([]byte) uint32
-    Uint64([]byte) uint64
-    PutUint16([]byte, uint16)
-    PutUint32([]byte, uint32)
-    PutUint64([]byte, uint64)
-    String() string
-}
-</code></pre>
-
-<p>其中，前三个方法用于读取数据，后三个方法用于写入数据。</p>
-
-<p>大家可能会注意到，上面的方法操作的都是无符号整型，如果我们要操作有符号整型的时候怎么办呢？很简单，强制转换就可以了，比如这样：</p>
-<pre><code>func PutInt32(b []byte, v int32) {
-        binary.BigEndian.PutUint32(b, uint32(v))
-}
-</code></pre>
-
-<p>为了深入了解它们，我们先写一个程序观察下go处理大端序和小端序的方式：</p>
-<pre><code>package main
-
-import (
-    &quot;encoding/binary&quot;
-    &quot;fmt&quot;
-    &quot;unsafe&quot;
-)
-
-const INT_SIZE int = int(unsafe.Sizeof(0))
-
-//判断我们系统中的字节序类型
-func systemEdian() {
-    var i int = 0x1
-    bs := (*[INT_SIZE]byte)(unsafe.Pointer(&amp;i))
-    if bs[0] == 0 {
-        fmt.Println(&quot;system edian is little endian&quot;)
-    } else {
-        fmt.Println(&quot;system edian is big endian&quot;)
-    }
-}
-
-func testBigEndian() {
-
-    // 0000 0000 0000 0000   0000 0001 1111 1111
-    var testInt int32 = 256
-    fmt.Printf(&quot;%d use big endian: \n&quot;, testInt)
-    var testBytes []byte = make([]byte, 4)
-    binary.BigEndian.PutUint32(testBytes, uint32(testInt))
-    fmt.Println(&quot;int32 to bytes:&quot;, testBytes)
-
-    convInt := binary.BigEndian.Uint32(testBytes)
-    fmt.Printf(&quot;bytes to int32: %d\n\n&quot;, convInt)
-}
-
-func testLittleEndian() {
-
-    // 0000 0000 0000 0000   0000 0001 1111 1111
-    var testInt int32 = 256
-    fmt.Printf(&quot;%d use little endian: \n&quot;, testInt)
-    var testBytes []byte = make([]byte, 4)
-    binary.LittleEndian.PutUint32(testBytes, uint32(testInt))
-    fmt.Println(&quot;int32 to bytes:&quot;, testBytes)
-
-    convInt := binary.LittleEndian.Uint32(testBytes)
-    fmt.Printf(&quot;bytes to int32: %d\n\n&quot;, convInt)
-}
-
-func main() {
-    systemEdian()
-    fmt.Println(&quot;&quot;)
-    testBigEndian()
-    testLittleEndian()
-}
-
-</code></pre>
-
-<p>执行的结果：</p>
-<pre><code>system edian is big endian
-
-256 use big endian:
-int32 to bytes: [0 0 1 0]
-bytes to int32: 256
-
-256 use little endian:
-int32 to bytes: [0 1 0 0]
-bytes to int32: 256
-</code></pre>
-
-<h2 id="总结">总结</h2>
-
-<p>为了程序的兼容，我们在开发跨服务器的TCP服务时，每次发送和接受数据都要进行转换，这样做的目的是保证代码在任何计算机上执行时都能达到预期的效果。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/11/5/golang-byteorder.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
