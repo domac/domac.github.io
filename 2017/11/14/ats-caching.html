@@ -165,6 +165,16 @@ $ /apps/svr/trafficserver/bin/trafficserver start
 <pre><code>$ /apps/svr/trafficserver/bin/traffic_server -Cclear
 </code></pre>
 
+<p>7、状态监控</p>
+
+<p>修改 plugins.config，增加以下配置：</p>
+<pre><code>stats_over_http.so --integer-counters --wrap-counters
+</code></pre>
+
+<p>通过下面命令进行获取</p>
+<pre><code>curl http://ip:port/_stats
+</code></pre>
+
 <h4 id="关注点与调控">关注点与调控</h4>
 
 <p>cache是整个服务的核心，ats缓存架构核心理念是缓存布局的高效管理</p>
