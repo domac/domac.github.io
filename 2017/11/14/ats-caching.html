@@ -3,7 +3,7 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>ATS缓存使用总结 - domac博客</title>
+    <title>ATS缓存组件使用总结 - domac博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
     <meta name="description" content="ats caching"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
@@ -51,7 +51,7 @@
                         </span>
                             </div>
                             <h5 class="title">
-                                <a href="/2017/11/14/ats-caching.html">ATS缓存使用总结</a>
+                                <a href="/2017/11/14/ats-caching.html">ATS缓存组件使用总结</a>
                             </h5>
                         </header>
                         <aside class="aside clearfix">
@@ -200,6 +200,32 @@ CONFIG proxy.config.cache.min_average_object_size INT 8000
 <p>说明：设置磁盘存储缓存的最大空间，当存储上限达到此值时，存储空间不会再增长，ats开始根据clufs算法排走部分缓存数据</p>
 <pre><code>/apps/dbdat/trafficserver/trafficserver 400G
 </code></pre>
+
+<p>3、开启UI</p>
+
+<p>配置入口：/apps/conf/trafficserver/records.config</p>
+<pre><code>CONFIG proxy.config.http_ui_enabled INT 3
+</code></pre>
+<pre><code>说明：
+0 - 禁止所以内部UI访问
+1 - 只允许cache相关的UI访问
+2 - 只运行状态stats相关的UI访问
+3 - 开发所有功能UI的访问 
+</code></pre>
+
+<p>remap.config设置反向代理规则</p>
+
+<p>配置入口：/apps/conf/trafficserver/remap.config</p>
+<pre><code>map http://ats-ui.vip.vip.com/cache     http://{cache} 
+map http://ats-ui.vip.vip.com/cache-internal     http://{cache-internal} 
+map http://ats-ui.vip.vip.com/stat     http://{stat}
+map http://ats-ui.vip.vip.com/test     http://{test} 
+map http://ats-ui.vip.vip.com/hostdb     http://{hostdb} 
+map http://ats-ui.vip.vip.com/net     http://{net} 
+map http://ats-ui.vip.vip.com/http     http://{http}
+</code></pre>
+
+<p>通过浏览器访问 <a href="http://ats-ui.vip.vip.com/cache/">http://ats-ui.vip.vip.com/cache/</a> 即可</p>
 
 <h4 id="集群检测方案">集群检测方案</h4>
 
