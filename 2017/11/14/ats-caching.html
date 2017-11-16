@@ -216,16 +216,16 @@ CONFIG proxy.config.cache.min_average_object_size INT 8000
 <p>remap.config设置反向代理规则</p>
 
 <p>配置入口：/apps/conf/trafficserver/remap.config</p>
-<pre><code>map http://ats-ui.vip.vip.com/cache     http://{cache} 
-map http://ats-ui.vip.vip.com/cache-internal     http://{cache-internal} 
-map http://ats-ui.vip.vip.com/stat     http://{stat}
-map http://ats-ui.vip.vip.com/test     http://{test} 
-map http://ats-ui.vip.vip.com/hostdb     http://{hostdb} 
-map http://ats-ui.vip.vip.com/net     http://{net} 
-map http://ats-ui.vip.vip.com/http     http://{http}
+<pre><code>map http://ats-node.com/cache     http://{cache} 
+map http://ats-node.com/cache-internal     http://{cache-internal} 
+map http://ats-node.com/stat     http://{stat}
+map http://ats-node.com/test     http://{test} 
+map http://ats-node.com/hostdb     http://{hostdb} 
+map http://ats-node.com/net     http://{net} 
+map http://ats-node.com/http     http://{http}
 </code></pre>
 
-<p>通过浏览器访问 <a href="http://ats-ui.vip.vip.com/cache/">http://ats-ui.vip.vip.com/cache/</a> 即可</p>
+<p>通过浏览器访问 <a href="http://ats-node.com/cache/">http://ats-node.com/cache/</a> 即可</p>
 
 <h4 id="集群检测方案">集群检测方案</h4>
 
