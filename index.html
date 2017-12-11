@@ -49,6 +49,39 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">12</span>
+                            <span class="day">11</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/12/11/read-big-file-in-go.html">用Go统计大文件小点滴</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>今天，团队里面的小伙伴说手头上有一些几个G以上的文件，需要统计文件里面的数据（文件里面的数据很简单都是Key:Value这样的组织形式）。然后咱俩随便抽了一个5G多的文件，用很普通的方式写了几行代码，流程是 <code>读文件--&gt;扫文件--&gt;识别KV--&gt;统计</code>。</p>
+
+<p>然后程序跑了一趟，发现竟然要5分多钟。十分惊讶下，我想，明明很简单的逻辑的代码为什么要跑这么慢。然后我看了一下初版的代码，发现引起性能问题的几个点，分别是：</p>
+
+<ul>
+<li>strconv的频繁使用</li>
+<li>map[string]uint64形式的对象频繁调用</li>
+<li>为了识别KV，遍历文件时使用了 split 函数</li>
+</ul>
+
+<p>下面是最开始的代码：</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/12/11/read-big-file-in-go.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">11</span>
                             <span class="day">14</span>
                         </span>
@@ -140,29 +173,6 @@ main(int argc, char **argv)
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/10/8/an-programmer-prepares-1.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
-                            <span class="day">2</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/10/2/beginning-lua.html">Lua入门学习</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>了解到<code>Lua</code>(一种轻量级、可嵌入式的脚本语言)，其实是很早之前和一些做游戏的朋友聊天的时候知道的，他们在项目中广泛地使用到这个语言。于是自己上网也看了一些lua开发中的一些特定发现，Lua 被运用的领域远不止游戏。特别最近很火的Redis和<code>OpenResty</code>(一个基于Nginx 与Lua 的高性能Web 平台）其内部集成了大量精良的Lua 库、第三方模块以及大多数的依赖项，开发人员使用Lua编写脚本就能非常轻松开发出高性能的服务了。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/10/2/beginning-lua.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
