@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Go的Bit操作 - domac博客</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="bit operator"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac博客 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">12</span>
+                            <span class="day">30</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/12/30/bit-operator.html">Go的Bit操作</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                        </aside>
+                        <section class="brief"><p>原文地址：<a href="https://medium.com/learning-the-go-programming-language/bit-hacking-with-go-e0acee258827">https://medium.com/learning-the-go-programming-language/bit-hacking-with-go-e0acee258827</a></p>
+
+<blockquote>
+<p>本文是对原文的个人翻译，翻译不是很完善，能理解其中的思想即可。导出本文的原因是之前参加公司的算法比赛，我们在自身的程序做了较多的位运算操作，觉得比较有意思，于是根据原文翻译出下文内容 ：）</p>
+</blockquote>
+
+<p>在计算机正处于发展初期的阶段，内存和处理能力相对有限，于是为了避免这些昂贵的开销，人们一般都首选直接进行位操作的方式获取数据。直至今天，虽然计算机硬件飞速发展，内存和CPU的处理能力已经不是什么问题了，但位操作依然在一些情况（例如：底层系统编程、图像处理、密码加密解密等）中扮演重要的角色。</p>
+
+<p>Go这门编程语言为我们提供了一些位运算符操作，如下：</p>
+
+<!--more-->
+<pre><code> &amp;   bitwise AND
+ |   bitwise OR
+ ^   bitwise XOR （异或）
+&amp;^   AND NOT
+&lt;&lt;   左移
+&gt;&gt;   右移
+</code></pre>
+
+<p>下文我们会根据上面的位运算符来详细地进行说明与举例说明用法</p>
+
+<h2 id="一-操作符">一、 &amp; 操作符</h2>
+
+<p>在Go里面，&amp;操作符用于在两个整数值之间执行<code>AND</code>运算操作。我们先回顾下AND操作的一些属性：</p>
+<pre><code>假设给定数值 a，b
+
+只有满足 a = b = 1 的情况下下
+AND(a,b) = 1，否则为 0
+</code></pre>
+
+<p>所以AND的另外一个很好的效果是可以用于把一个整数进行清零。举个例子，我们可以使用 &amp; 操作符把至少具有4个LSB清零:</p>
+
+<blockquote>
+<p>LSB或lsb可以指： Linux标准规范（Linux Standard Base）。 最低有效位（英语：Least Significant Bit，lsb），一个二进制数字中的第0位（即最低位）；若LSB为全大写，则指的是多字节序列中最小权重的字节（Least Significant Byte）</p>
+</blockquote>
+<pre><code class="language-go">func main() {
+    var x uint8 = 0xAC    // x = 10101100
+    x = x &amp; 0xF0          // x = 10100000
+}
+</code></pre>
+
+<p>所有的二元操作支持缩写的方式，所以上面的例子，可以用以下简写的方式达到同样效果：</p>
+<pre><code class="language-go">func main() {
+    var x uint8 = 0xAC    // x = 10101100
+    x &amp;= 0xF0             // x = 10100000
+}
+</code></pre>
+
+<p>这里说下另外一个使用 &amp; 的技巧：我们可以使用他它来检验我们整数的奇偶性。当一个整数的LSB等于1,我们可以认为他是奇数，换句话说，非1的就被认为是偶数：</p>
+<pre><code class="language-go">import (
+    “fmt”
+    “math/rand”
+)
+func main() {
+    for x := 0; x &lt; 100; x++ {
+        num := rand.Int()
+        if num&amp;1 == 1 {
+            fmt.Printf(“%d is odd\n”, num)
+        } else {
+            fmt.Printf(“%d is even\n”, num)
+        }
+    }
+}
+</code></pre>
+
+<h2 id="二-操作符">二、 | 操作符</h2>
+
+<p><code>|</code> 操作符对整数部分执行OR操作。回顾一下OR操作符的属性：</p>
+<pre><code>给定数值 a, b 
+
+当 a = 1 或者 b = 1
+OR(a,b) = 1
+否则为 0
+</code></pre>
+
+<p>我们可以对一个给定的整数选择性地使用OR操作符设置各个位的值。例如，在下面的例子中，我们使用OR运算符（从最低位到最高位（MSB））将第3位，第7位和第8位设置为1。</p>
+<pre><code class="language-go">func main() {
+    var a uint8 = 0
+    a |= 196
+    fmt.Printf(“%b”, a)
+}
+// prints 11000100
+</code></pre>
+
+<p>当我们使用位掩码的手段为给定的整数值设置任意位时，使用OR是非常有用的，例如：</p>
+<pre><code class="language-go">func main() {
+    var a uint8 = 0
+    a |= 196
+    a |= 3
+    fmt.Printf(“%b”, a)
+}
+// prints 11000111
+</code></pre>
+
+<p>前面的程序中，不仅具有十进制196的位，还具有十进制值3的最后两个最低有效位。我们可以继续用同样的方式进行OR操作更多的位字段进行掩码设置。</p>
+
+<h4 id="使用位进行配置">使用位进行配置</h4>
+
+<p>现在，我们通过 <code>AND(a, 1) = a if and only if a = 1</code>。我们可以使用这个定理去对一系列的位值进行查询。举个例子，上面的例子中，a &amp; 196 会返回 196 因为a本身已经包含196。所以我们可以结合使用AND、OR 操作符来实现具体的配置操作，下来通过代码来举例：</p>
+<pre><code class="language-go">const (
+    UPPER  = 1 // upper case
+    LOWER  = 2 // lower case
+    CAP    = 4 // capitalizes
+    REV    = 8 // reverses
+)
+func main() {
+    fmt.Println(procstr(“HELLO PEOPLE!”, LOWER|REV|CAP))
+}
+func procstr(str string, conf byte) string {
+    // reverse string
+    rev := func(s string) string {
+        runes := []rune(s)
+        n := len(runes)
+        for i := 0; i &lt; n/2; i++ {
+            runes[i], runes[n-1-i] = runes[n-1-i], runes[i]
+        }
+        return string(runes)
+    }
+ 
+    // query config bits
+    if (conf &amp; UPPER) != 0 {
+        str = strings.ToUpper(str)
+    }
+    if (conf &amp; LOWER) != 0 {
+        str = strings.ToLower(str)
+    }
+    if (conf &amp; CAP) != 0 {
+        str = strings.Title(str)
+    }
+    if (conf &amp; REV) != 0 {
+        str = rev(str)
+    }
+    return str
+}
+</code></pre>
+
+<p>上面函数调用 <code>procstr(“HELLO PEOPLE!”, LOWER|REV|CAP)</code> 会对字符串先进行小写处理，然后进程反转处理，最后再进行首字母大写处理。</p>
+
+<h2 id="三-操作符">三、 ^ 操作符</h2>
+
+<p>^ 操作符主要用于XOR 异或运算，它具有以下的属性：</p>
+<pre><code>假设给定 a, b 
+当且只有 a!=b 时
+XOR(a,b) = 1
+否则等于 0
+</code></pre>
+
+<p>根据XOR的定义，它的实现主要用于把一个值切换到另外一个值。例如,给定一个16位的值，我们可以对它的高八位进行值切换：</p>
+<pre><code>func main() {
+    var a uint16 = 0xCEFF
+    a ^= 0xFF00 // same a = a ^ 0xFF00
+}
+// a = 0xCEFF   (11001110 11111111)
+// a ^=0xFF00   (00110001 11111111)
+</code></pre>
+
+<p>上面的代码中，每一位根据与1进行XOR的位被翻转（从0到1或从1到0）,从而比较符号的大小。当（a ^ b）≥0（或（a ^ b）&lt;0为相反符号）时，两个整数a，b具有相同的符号</p>
+<pre><code class="language-go">func main() {
+    a, b := -12, 25
+    fmt.Println(“a and b have same sign?“, (a ^ b) &gt;= 0)
+}
+</code></pre>
+
+<h3 id="补充">^补充：</h3>
+
+<p>与其他语言（c / c ++，Java，Python，Javascript等）不同，Go没有专门的一元位运算符。相反，异或运算符^也可以用作一元运算符来对数值进行补码。</p>
+
+<p>如，给定 x，在Go中： ^ x = 1 ^ x中反转位。</p>
+
+<p>我们可以在下面的代码片段中看到这一点，它使用^ a来取代变量a的补码。</p>
+<pre><code class="language-go">func main() {
+    var a byte = 0x0F
+    fmt.Printf(“%08b\n”, a)
+    fmt.Printf(“%08b\n”, ^a)
+}
+
+// prints
+00001111     // var a
+11110000     // ^a
+</code></pre>
+
+<h2 id="四-操作符">四、 &amp;^ 操作符</h2>
+
+<p>&amp;^ 可以读作 AND NOT，它具有以下的属性：</p>
+<pre><code>假设给定 a, b 
+AND_NOT(a,b) = AND(a,NOT(b))
+</code></pre>
+
+<p>有意思的是，我们可以根据第二个参数出现的1对第一个参数的对应位进行清零操作</p>
+<pre><code class="language-go">AND_NOT(a, 1) = 0; clears a
+AND_NOT(a, 0) = a; 
+</code></pre>
+
+<p>下面我们通过 AND NOT 来对变量a清理其最后4个LSB（从1010 1011 变为 1010 0000）</p>
+<pre><code class="language-go">func main() {
+    var a byte = 0xAB
+     fmt.Printf(&quot;%08b\n&quot;, a)
+     a &amp;^= 0x0F
+     fmt.Printf(&quot;%08b\n&quot;, a)
+}
+// prints:
+10101011
+10100000
+</code></pre>
+
+<h2 id="五-和-操作符">五、 &gt;&gt; 和 &lt;&lt; 操作符</h2>
+
+<p>跟大部分基于C语言一样，Go使用 &gt;&gt; 和 &lt;&lt; 来分别表示左移和右移运算符,如下所示：</p>
+<pre><code>给定 a 和 n,
+a &lt;&lt; n; 对a的所有位向左移n次
+a &gt;&gt; n; 对a的所有位向右移n次
+</code></pre>
+
+<p>例如，下面的代码：</p>
+<pre><code class="language-go">func main() {
+    var a int8 = 3
+    fmt.Printf(“%08b\n”, a)
+    fmt.Printf(“%08b\n”, a&lt;&lt;1)
+    fmt.Printf(“%08b\n”, a&lt;&lt;2)
+    fmt.Printf(“%08b\n”, a&lt;&lt;3)
+}
+// prints:
+00000011
+00000110
+00001100
+00011000
+</code></pre>
+
+<p>请注意，每次移位时，右侧的LSB都是零填充的。反之，使用右移位运算符，每个位的值可以向右移位，MSB在左侧填零，如以下示例所示:</p>
+<pre><code class="language-go">func main() {
+ var a uint8 = 120
+ fmt.Printf(“%08b\n”, a)
+ fmt.Printf(“%08b\n”, a&gt;&gt;1)
+ fmt.Printf(“%08b\n”, a&gt;&gt;2)
+}
+// prints:
+01111000
+00111100
+00011110
+</code></pre>
+
+<p>左移或右移位算子可以完成的一些最简单的技巧是乘法和除法，其中每个移位位置代表2的幂。例如，以下将200（以a存储）除以2。</p>
+<pre><code class="language-go">func main() {
+    a := 200
+    fmt.Printf(“%d\n”, a&gt;&gt;1)
+}
+// prints:
+100
+</code></pre>
+
+<p>或者通过移位实现乘以4的效果：</p>
+<pre><code class="language-go">func main() {
+    a := 12
+    fmt.Printf(“%d\n”, a&lt;&lt;2)
+}
+// prints:
+48
+</code></pre>
+
+<p>移位运算符提供了一些有趣的方法来处理二进制值中指定位置的位。例如，在以下代码片段中，| 和 &lt;&lt; 组合使用可以对变量a的第三位bit进行设置</p>
+<pre><code class="language-go">func main() {
+    var a int8 = 8
+    fmt.Printf(“%08b\n”, a)
+    a = a | (1&lt;&lt;2)
+    fmt.Printf(“%08b\n”, a)
+}
+// prints:
+00001000
+00001100
+</code></pre>
+
+<p>或者，你可以结合shift和＆运算符来测试是否将第n位设置为一个值，如以下代码片段所示:</p>
+<pre><code class="language-go">func main() {
+    var a int8 = 12
+    if a&amp;(1&lt;&lt;2) != 0 {
+        fmt.Println(“take action”)
+    }
+}
+// prints:
+take action
+</code></pre>
+
+<p>通过使用 &amp;^ 和 移位操作，我们可以取消设置值的第n位：</p>
+<pre><code class="language-go">func main() {
+    var a int8 = 13 
+    fmt.Printf(“%04b\n”, a)
+    a = a &amp;^ (1 &lt;&lt; 2)
+    fmt.Printf(“%04b\n”, a)
+}
+// prints:
+1101
+1001
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<p>与其他现代语言一样，Go支持所有按位运算符。这篇文章只提供了一些可以用这些操作符完成的各种各样的技巧性操作。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2017 domac博客.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by
+            <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+
+</html>
