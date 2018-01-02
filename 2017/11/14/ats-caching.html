@@ -157,6 +157,10 @@ $ /apps/demo/trafficserver/bin/trafficserver start
 <pre><code>$ /apps/demo/trafficserver/bin/traffic_logcat -f 日志文件路径
 </code></pre>
 
+<p>其它：历史文件备份命令</p>
+<pre><code>rm -rf /apps/logs/trafficserver/stdout.log &amp;&amp; touch /apps/logs/trafficserver/stdout.log &amp;&amp; ls /apps/logs/trafficserver/ | grep access.log_$HOSTNAME.$(date -d last-day +%Y%m%d).*.old  | sed &quot;s:^:/apps/logs/trafficserver/:&quot; | xargs /apps/svr/trafficserver/bin/traffic_logcat -C &gt; /apps/logs/trafficserver/stdout.log
+</code></pre>
+
 <p>5、配置更新</p>
 <pre><code>$ /apps/demo/trafficserver/bin/traffic_ctl config reload
 </code></pre>
