@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>Page 1 - domac博客</title>
+    <title>关于网络的混杂模式 - domac博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.me is my blog"/>
+    <meta name="description" content="network promisc mode"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,11 +39,8 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
-            
-            
-            
-            <article class="article" style="margin-bottom: 4em;">
+        <div id="article-single">
+            <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -57,6 +54,9 @@
                                 <a href="/2018/3/11/network-promisc-mode.html">关于网络的混杂模式</a>
                             </h5>
                         </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                        </aside>
                         <section class="brief"><h2 id="什么是网络的混杂模式">什么是网络的混杂模式</h2>
 
 <p>混杂模式（promiscuous mode）是指一台机器的网卡能够接收所有经过它的数据流，而不论其目的地址是否是它。</p>
@@ -149,112 +149,16 @@ func OpenLive(device string, snaplen int32, promisc bool, timeout time.Duration)
 
 <p>坑啊，之前没有仔细测试，直接赋值了一个true, 也就是说这个服务强制了使用了混杂模式对网卡进行监听，在流量高峰的时候，很容易导致某些网络服务timeout的现象。 啊~，心中万马奔腾，原来是自己的大意疏忽！！要引以为戒。</p>
 </section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/3/11/network-promisc-mode.html">继续阅读</a>
-                        </aside>
                     </div>
                 </div>
             </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">1</span>
-                            <span class="day">1</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/1/1/bit-operator.html">Go的Bit操作</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>原文地址：<a href="https://medium.com/learning-the-go-programming-language/bit-hacking-with-go-e0acee258827">https://medium.com/learning-the-go-programming-language/bit-hacking-with-go-e0acee258827</a></p>
-
-<blockquote>
-<p>本文是对原文的个人翻译，翻译不是很完善，能理解其中的思想即可。翻译原文的原因是之前参加公司的算法比赛，做题过程中我们在自身的程序做了较多的位运算操作，觉得比较有意思，于是根据原文翻译出下文内容 ：）</p>
-</blockquote>
-
-<p>在计算机正处于发展初期的阶段，内存和处理能力相对有限，于是为了避免这些昂贵的开销，人们一般都首选直接进行位操作的方式获取数据。直至今天，虽然计算机硬件飞速发展，内存和CPU的处理能力已经不是什么问题了，但位操作依然在一些情况（例如：底层系统编程、图像处理、密码加密解密等）中扮演重要的角色。</p>
-
-<p>Go这门编程语言为我们提供了一些位运算符操作，如下：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/1/1/bit-operator.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">12</span>
-                            <span class="day">11</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/12/11/read-big-file-in-go.html">用Go统计大文件小点滴</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>今天，团队里面的小伙伴说手头上有一些几个G以上的文件，需要统计文件里面的数据（文件里面的数据很简单都是Key:Value这样的组织形式）。然后咱俩随便抽了一个5G多的文件，用很普通的方式写了几行代码，流程是 <code>读文件--&gt;扫文件--&gt;识别KV--&gt;统计</code>。</p>
-
-<p>然后程序跑了一趟，发现竟然要5分多钟。十分惊讶下，我想，明明很简单的逻辑的代码为什么要跑这么慢。然后我看了一下初版的代码，发现引起性能问题的几个点，分别是：</p>
-
-<ul>
-<li>strconv的频繁使用</li>
-<li>map[string]uint64形式的对象频繁调用</li>
-<li>为了识别KV，遍历文件时使用了 split 函数</li>
-</ul>
-
-<p>下面是最开始的代码：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/12/11/read-big-file-in-go.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">14</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/11/14/ats-caching.html">ATS缓存组件使用总结</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="一-简介">一、简介</h2>
-
-<p>Apache Traffic Server基本可以用一句话概括：它不仅是HTTP代理服务器, 还是HTTP缓存服务器，且可以缓存任何字节流数据。</p>
-
-<h2 id="二-使用情况">二、使用情况</h2>
-
-<p>由于是做电商，为了满足日常业务的发展，最初的nginx-proxycache的方式已经不能满足我们的大并发量而且大流量对象的缓存需要。这个时候我调研过squid、varnish等缓存代理，最后基于同行的使用报告和自己搭建使用一段时间后，最终我们就决定采用ATS作为缓存中心的核心层。具体的原因有以下几点：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/11/14/ats-caching.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            
-            <div class="article-pager text-center">
-                
-                <a class="btn btn-lg btn-info" href="/posts/2.html">后一页</a>
-            </div>
         </div>
+        
+<section id="comment">
+    
+    
+</section>
+
     </div>
 </section>
 <footer id="footer">
