@@ -49,6 +49,35 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">14</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/11/14/ats-caching.html">ATS缓存组件使用总结</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="一-简介">一、简介</h2>
+
+<p>Apache Traffic Server基本可以用一句话概括：它不仅是HTTP代理服务器, 还是HTTP缓存服务器，且可以缓存任何字节流数据。</p>
+
+<h2 id="二-使用情况">二、使用情况</h2>
+
+<p>由于是做电商，为了满足日常业务的发展，最初的nginx-proxycache的方式已经不能满足我们的大并发量而且大流量对象的缓存需要。这个时候我调研过squid、varnish等缓存代理，最后基于同行的使用报告和自己搭建使用一段时间后，最终我们就决定采用ATS作为缓存中心的核心层。具体的原因有以下几点：</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/11/14/ats-caching.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">10</span>
                             <span class="day">29</span>
                         </span>
@@ -134,37 +163,6 @@ main(int argc, char **argv)
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/10/2/beginning-lua.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">9</span>
-                            <span class="day">27</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/9/27/string-tips-in-c.html">C语言字符指针与数组</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="基本概念">基本概念</h2>
-
-<p>字符串是C语言中最有用、最重要的数据类型之一，在C语言里面，字符串常量是一个字符数组，例如：</p>
-<pre><code>&quot;I am a string&quot;
-</code></pre>
-
-<p>在字符串的内部表示中，字符数组以空字符 <code>'\0'</code> 结尾的char类型数组，所以程序可以通过检查空字符找到字符数组的结尾。字符串常量占据的存储单元数也因此比双引号内的字符数大<code>1</code>。</p>
-
-<p>字符串常量最常见的用法也许是作为函数参数，例如：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/9/27/string-tips-in-c.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

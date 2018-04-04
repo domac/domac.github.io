@@ -43,6 +43,86 @@
             
             
             
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">26</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2014/11/26/mongodb-inner-doc.html">MongoDB 查询内嵌文档</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>今晚看了一些MongoDB的内嵌文档的文章, 总结了下在我们日常开发中有两种方法可以查询内嵌文档 : <code>查询整个文档</code>, 或者只针对<code>键/值对进行查询</code> .</p>
+
+<p>查询这个内嵌文档与普通查询完全相同, 例如, 有如下的文档 :</p>
+<pre><code class="language-javascript">{
+    &quot;name&quot; :  {
+       &quot;first&quot; : &quot;joe&quot;
+       &quot;last&quot; : &quot;schemoe&quot;
+    },
+    &quot;age&quot; : 45
+}
+</code></pre>
+
+<p>要查询姓名为Joe schemoe的人可以这样 :</p>
+<pre><code class="language-bash">   &gt; db.people.find({&quot;name&quot;:&quot;joe&quot; , &quot;last&quot;:&quot;schmoe&quot;})
+</code></pre>
+
+<p>但是, 如果要查询一个完整的子文档, 那么子文档必须精确匹配 . 如果Joe决定添加一个代表中间名的键, 那么整个查询不再可行了, 因为查询条件不再与整个内嵌文档匹配. 而且这种查询还是与顺序有关的. <code>{&quot;last&quot;:&quot;schmoe&quot;,&quot;fist&quot;:&quot;joe&quot;}</code> 什么都匹配不到.</p>
+
+<p>如果允许的话, 通常只针对<code>内嵌文档</code>的特定键值进行查询, 这是比较好的做法. 这样, 即使是数据模式改变了, 也不会导致所有查询因为要精确匹配而一下子都挂掉. 我们可以使用点表示法查询内嵌文档的键 :</p>
+<pre><code class="language-bash">   &gt; db.people.find({&quot;name.first&quot;:&quot;joe&quot;, &quot;name.last&quot;:&quot;schmoe&quot;)
+</code></pre>
+
+<p>现在, 如果Joe增加了更多的键, 这个查询依然会匹配他的姓和名 .</p>
+
+<hr />
+
+<p>这种点表示法是查询文档区别其他文档的主要特点. 查询文档可以包含点来表达 <code>&quot;进入内嵌文档内部&quot;</code> 的意思 . 点表示法也是插入的文档不能包含 <code>&quot;.&quot;</code> 的原因 . 将URL作为键保存时经常会遇到此类问题. 一种解决方法就是插入前或者提取后执行一个全局替换, 将 <code>&quot;.&quot;</code> 替换成一个URL中的非法字符 .</p>
+
+<hr />
+
+<p>当文档结构变得更加复杂后, 内嵌文档的匹配需要些技巧了. 假如, 有博客文章若干, 要找出由 Joe 发表的 5 分以上的评论. 博客文章的结构如下所示 :</p>
+<pre><code class="language-bash">    &gt; db.blog.find()
+     {
+       &quot;content&quot; : &quot; ... 略&quot;
+       &quot;comments&quot; : [
+          {
+            &quot;author&quot; : &quot;Joe&quot;,
+            &quot;score&quot; : 3,
+            &quot;comment&quot; : &quot;nice post&quot;
+          },
+          {
+            &quot;author&quot; : &quot;Mary&quot;,
+            &quot;score&quot; : 6,
+            &quot;comment&quot; : &quot;good post&quot;
+          }
+       ]
+     }
+</code></pre>
+
+<p>不能直接用<code>db.blog.find({&quot;comments&quot; :  {&quot;author&quot;: &quot;Joe&quot; , &quot;score&quot; : {$gte : 5} }})</code>来查询. 内嵌文档的匹配, 必须要整个文档完全匹配, 而这个查询不会匹配不会匹配 &ldquo;comment&rdquo; 键 .</p>
+
+<p>那么使用<code>db.blog.find({&quot;comments.author&quot; : &quot;joe&quot; , &quot;comments.score&quot; : &quot;{ &quot;$gte&quot; : 5 }&quot; })</code>可以吗 ? 也不行!!!因为符合author条件的评论和符合score条件的评论可能不是同一个评论, 也就是说 , 会返回刚才显示的那个评论 . 因为 &ldquo;author&rdquo; : &ldquo;joe&rdquo; 在第一个评论中匹配了, &ldquo;score&rdquo;:6 在第二条评论中匹配了.</p>
+
+<p>要正确地指定一组条件, 而不必指定每个键, 就需要使用 &ldquo;$elemMatch&rdquo;. 这种模糊的命名条件句能用在查询条件中部分指定匹配数组的单个内嵌文档, 所以正确的写法应该是下面这样的 :</p>
+<pre><code class="language-bash">   &gt; db.blog.find({&quot;comments&quot; : {&quot;$elemMatch&quot; : { &quot;author&quot; : &quot;Joe&quot;, &quot;score&quot;: {&quot;$gte&quot;:5} }}})
+</code></pre>
+
+<p>$elemMatch将限定条件进行分组, 仅当需要对一个内嵌文档的多个键操作时才会用到.</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2014/11/26/mongodb-inner-doc.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
             
             <div class="article-pager text-center">
                 <a class="btn btn-lg btn-info" href="/posts/15.html">前一页</a>
