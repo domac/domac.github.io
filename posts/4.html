@@ -49,6 +49,152 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">6</span>
+                            <span class="day">29</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/6/29/how-to-use-protobuf.html">Golang版protobuf的安装与使用</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="protobuf-介绍">Protobuf 介绍</h2>
+
+<p>序列化库在网络传输，RPC，数据库访问等环境中经常用到，它的性能的好坏直接影响着整个产品的性能, 所以我们有必要对一些优秀的序列化库进一步的学习与掌握.</p>
+
+<p><code>protobuf</code>是Google开发的一种数据描述语言语言，能够将结构化的数据序列化，可用于数据存储，通信协议等方面,官方版本支持 Go,  C++, Java, Python，社区版本支持更多语言.</p>
+
+<p>相对于JSON和XML具有以下优点：</p>
+
+<ul>
+<li><p>简洁</p></li>
+
+<li><p>体积小:消息大小只需要XML的1/10 ~ <sup>1</sup>&frasl;<sub>3</sub></p></li>
+
+<li><p>速度快:解析速度比XML快20 ~ 100倍</p></li>
+
+<li><p>使用Protobuf的编译器,可以生成更容易在编程中使用的数据访问代码</p></li>
+
+<li><p>更好的兼容性,Protobuf设计的一个原则就是要能够很好的支持向下或向上兼容</p></li>
+</ul>
+
+<p>本文主要以Go语言的方式来具体讲述如何使用Pb进行数据的定义与传输</p>
+
+<h2 id="protobuf-使用">Protobuf 使用</h2>
+
+<h3 id="安装">安装</h3>
+
+<p>1.从 <a href="https://github.com/google/protobuf/releases">https://github.com/google/protobuf/releases</a> 获取 Protobuf 编译器 protoc</p>
+<pre><code class="language-bash">wget https://github.com/google/protobuf/releases/download/v2.6.1/protobuf-2.6.1.tar.gztar zxvf protobuf-2.6.1.tar.gz
+cd protobuf-2.6.1./configure
+make
+make install
+protoc   -h
+</code></pre>
+
+<p>2.获取 goprotobuf 提供的 Protobuf 插件 protoc-gen-go（被放置于 $GOPATH/bin 下，$GOPATH/bin 应该被加入 PATH 环境变量，以便 protoc 能够找到 protoc-gen-go）</p>
+
+<p>此插件被 protoc 使用，用于编译 .proto 文件为 Golang 源文件，通过此源文件可以使用定义在 .proto 文件中的消息。</p>
+<pre><code class="language-bash">go get github.com/golang/protobuf/protoc-gen-go
+ 
+cd github.com/golang/protobuf/protoc-gen-go
+ 
+go build
+ 
+go install
+ 
+vi /etc/profile 将$GOPATH/bin 加入环境变量
+ 
+source profile
+</code></pre>
+
+<p>3.获取 goprotobuf 提供的支持库，包含诸如编码（marshaling）、解码（unmarshaling）等功能</p>
+<pre><code class="language-bash">go get github.com/golang/protobuf/proto
+cd github.com/golang/protobuf/proto
+go build
+go install
+</code></pre>
+
+<h2 id="使用-go-protobuf">使用 go protobuf</h2>
+
+<p>接着, 我们进行数据格式的定义, 写一个简单的例子:
+我们在 $GOPATH下新建一个测试项目 pblearn/packet
+在 $GOPATH/pblearn/packet 下, 创建一个名为 packet.proto 的文件, 然后编写如下的内容</p>
+<pre><code class="language-proto">package packet;
+message Header{
+    required string messageId = 1;
+    required string topic = 2; //topic类型
+}
+//byte类消息
+message BytesMessage{
+    required Header  header= 1;
+    required  bytes body = 2;    
+}
+//string类型的message
+message StringMessage{
+    required Header header = 1;
+    required string body = 2;
+}
+</code></pre>
+
+<p>然后通过 –go_out 来使用 goprotobuf 提供的 Protobuf 插件 protoc-gen-go。这时候我们会生成一个名为 test.pb.go 的源文件, 参考如下</p>
+<pre><code class="language-bash">protoc --go_out=. *.proto
+</code></pre>
+
+<p>命令执行后, pblearn/packet 下会生成一个go的文件 packet.pb.go, 这个就是我们消息操作对象</p>
+
+<p>最后,我们可以编写测试例子, 在 在 $GOPATH/pblearn/ 下,我们编写 main.go</p>
+<pre><code class="language-go">package main
+ 
+import (
+    // 辅助库
+    &quot;github.com/golang/protobuf/proto&quot;
+    // test.pb.go 的路径
+    &quot;pblearn/packet&quot;
+)
+ 
+func main() {
+ 
+    bodyData := &quot;guangzhou/fangcun/vip/company&quot;
+ 
+    p := &amp;packet.StringMessage{
+        Body: proto.String(bodyData),
+        Header: &amp;packet.Header{
+            MessageId: proto.String(&quot;20-05&quot;),
+            Topic:     proto.String(&quot;golang&quot;),
+        },
+    }
+ 
+    pData, err := proto.Marshal(p)
+ 
+    if err != nil {
+        println(err.Error())
+    }
+    println(string(pData))
+ 
+    p2 := &amp;packet.StringMessage{}
+    proto.Unmarshal(pData, p2)
+ 
+    println(p2.GetHeader().GetTopic())
+}
+</code></pre>
+
+<p>通过运行例子 go run main.go  可以发现, 我们的数据格式可以正常的序列化和反序列化了.</p>
+
+<p>这样,我们日后可以根据自己的业务需要, 进行高效的数据传输</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/6/29/how-to-use-protobuf.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">4</span>
                             <span class="day">21</span>
                         </span>
@@ -810,181 +956,6 @@ NAME              STATUS    AGE
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/3/12/install-kubernetes-cluster--on-centos.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">3</span>
-                            <span class="day">8</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/3/8/get-concepts-in-kubernetes.html">深入学习Kubernetes(二):基础组件与概念</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p><strong><em>Kubernetes</em></strong> 是Google开源的一种基于容器的开源服务编排解决方案（orchestration system）,它提供的是一种比Fleet更加高度抽象的调度和管理模式，对使用者屏蔽服务部署底层的细节信息，但它的目标不仅仅是一个编排系统，而是提供一个规范，可以让你来描述集群的架构，定义服务的最终状态，它来帮助你的系统达到和维持在这个状态。从这个角度上说，可以将Kubernetes看作是一个平台既服务（Platform as a Service,PaaS）工具。Kubernetes构建于容器之上，使用Go语言开发，为应用提供资源调度、部署运行、服务发现、扩容缩容等一套功能。</p>
-
-<p>官网介绍：<a href="https://kubernetes.io/docs/whatisk8s/">《What is Kubernetes》</a></p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/docker_k8s.png" alt="dk" /></p>
-
-<h2 id="kubernetes为我们解决哪方面问题">Kubernetes为我们解决哪方面问题</h2>
-
-<p>根本上说，Kubernetes能让处于物理机或虚拟机上的应用容器提供调度与运行管理。对于运行在生产上的应用，它主要带来如下好处：</p>
-
-<p>使用Kubernetes就是在全面拥抱微服务架构。微服务架构的核心是将一个巨大的单体应用分解为很多小的互相连接的微服务，一个微服务背后可能有多个实例副本在支撑，副本的数量可能会随着系统的负荷变化而进行调整，内嵌的负载均衡器在这里发挥了重要作用。微服务架构使得每个服务都可以由专门的开发团队来开发，开发者可以自由选择开发技术，这对于大规模团队来说很有价值，另外每个微服务独立开发、升级、扩展，因此系统具备很高的稳定性和快速迭代进化能力。</p>
-
-<p>然后，我们的系统可以随时随地整体“搬迁”到公有云上。Kubernetes初的目标就是运行在谷歌自家的公有云GCE中，未来会支持更多的公有云及基于OpenStack的私有云。同时，在Kubernetes的架构方案中，底层网络的细节完全被屏蔽，基于服务的ClusterIP甚至都无须我们改变运行期的配置文件，就能将系统从物理机环境中无缝迁移到公有云中，或者在服务高峰期将部分服务对应的Pod副本放入公有云中以提升系统的吞吐量，不仅节省了公司的硬件投入，还大大改善了客户体验。</p>
-
-<p>最后，Kubernetes系统架构具备了超强的横向扩容能力。一个Kubernetes集群即可从只包含几个Node的小集群平滑扩展到拥有上百个Node的大规模集群，我们利用Kubernetes提供的工具，甚至可以在线完成集群扩容。只要我们的微服务设计得好，结合硬件或者公有云资源的线性增加，系统就能够承受大量用户并发访问所带来的巨大压力。</p>
-
-<h2 id="集群架构">集群架构</h2>
-
-<p>关于Kubernetes集群，官方是这样宣传的：</p>
-
-<blockquote>
-<p>“Kubernetes coordinates a highly available cluster of computers that are connected to work as a single unit. ”</p>
-</blockquote>
-
-<p>Kubernetes由两种节点组成：Master节点和Minion节点，前者是集群的管理节点，后者是容器运行的工作节点。</p>
-
-<p>我们若有计划想去了解Kubernetes集群的工作流程，先要熟悉它的组织架构，下面是官方的架构图：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/aWg6wGz.png" alt="ka" /></p>
-
-<ul>
-<li><p>APIServer：其中Master节点有一个重要的组件叫APIServer,负责响应用户的管理请求，进行指挥调度工作，任何对资源进行增删改查的操作都会交给APIServer处理后才提交给Etcd。</p></li>
-
-<li><p>Scheduler：作用是根据特定的调度算法(round robin)将Pod(后文会介绍)调度到指定的Minion上。这一过程在项目文档里也叫绑定。</p></li>
-
-<li><p>Controller Manager：运行在集群的Master节点上，是基于pod API上的一个独立服务，它重点实现了service Endpoint(服务端点)的动态更新，管理着Kubernetes集群中的各种控制器，包括下文会提到的replication controller和Node Controller。相比之下，APIServer负责接受用户的请求并创建出对应的资源，而Controller Manager则在系统中扮演的角色是在一旁默默地管控这些<code>资源</code>，确保它们永远保持在预期的状态。</p></li>
-
-<li><p>Kubelet：也是运行在Kubernetes集群的工作节点的重要组件，负责管理和维护在这台机上<code>运行着</code>的所有容器，说白了就是一个针对运行容器的Agent。</p></li>
-
-<li><p>Kube-proxy：即支持Http，也支持TCP和UDP连接，默认情况下提供Round Robin算法将客户端流量负载到Service对应的一组后端Pod的组件。在服务发现上，Kube-proxy使用etcd的watch机制监控集群Service和Endpoint对象的数据动态变化，并且维护一个从Service到Endpoint的映射关系，从而保证了后端pod的IP变化不会对访问者造成影响。</p></li>
-</ul>
-
-<h2 id="抽象概念">抽象概念</h2>
-
-<h3 id="master">Master</h3>
-
-<p>Kubernetes里的Master指的是集群控制节点，每个Kubernetes集群里需要有一个Master节点来负责整个集群的管理和控制，基本上Kubernetes所有的控制命令都是发给它，它来负责具体的执行过程，我们后面所有的执行命令基本都是在Master上运行的，它就是整个集群的“首脑”。</p>
-
-<p>Master节点上运行着以下的一组进程</p>
-
-<ul>
-<li><p>Kubernetes API Server，提供了HTTP Rest接口的关键服务进程，是Kubernetes里所有资源的增删改查等操作的唯一入口，也是集群控制的入口进行。</p></li>
-
-<li><p>Kubernetes Controller Manager，Kubernetes里所有资源对象的自动化控制中心，也可以理解为资源对象的“大总管”。</p></li>
-
-<li><p>Kubernetes Scheduler，负责资源调度（Pod调度）的进程。</p></li>
-</ul>
-
-<p>其实Master节点上还启动了一个Etcd Server进程，因为Kubernetes里的所有资源对象全部是保存在etcd中的。</p>
-
-<h3 id="node">Node</h3>
-
-<p>除了Master，Kubernetes集群中的其它机器被称为Node节点，是Kubernetes集群中的工作负载节点，每个Node都会被Master分配一些工作负载（Docker容器），当某个Node宕机时，其上的工作负载会被Master自动转移到其它节点上。</p>
-
-<p>每个Node节点上都运行着以下的一组关键进程：</p>
-
-<ul>
-<li><p>Kubelet：负责Pod对应的容器的创建，启动等任务，同时与Master节点密切协作。</p></li>
-
-<li><p>Kube-peoxy：实现Kubernetes Service的通信与负载均衡机制的重要组件。</p></li>
-
-<li><p>Docker Engine：负责本机的容器创建和管理工作。</p></li>
-</ul>
-
-<h3 id="pod">Pod</h3>
-
-<p>在Kubernetes中，能够被创建、调度和管理的最小部署单元是Pod，而非单个容器。</p>
-
-<p>Pod里的容器是共享网络和存储的。</p>
-
-<p>Pod是为了解决“如何合理使用容器支撑企业级复杂应用”这个问题而诞生的。一旦某个pod被分配到指定的工作节点上，那么这个pod就会在这个工作节点上一直运行到生命周期结束，中途不会被调度到其他节点上再次运行。</p>
-
-<p>Pod与其他组件关系示意图如下：</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/kpod.png" alt="kp" /></p>
-
-<h3 id="label">Label</h3>
-
-<p>Label是Kubernetes系统中的另外一个核心概念，一个Label是一个key=label的键值对，其中key与value由用户指定。Label可以附加到各种资源对象上，例如Node、Pod、Service、RC等，一个资源对象可以定义任意数量的Label，同一个Label也可以被添加到任意数量的资源对象上。</p>
-
-<p>Label通常在资源定义时确定，也可以在对象创建后动态添加或者删除。</p>
-
-<p>K8s使用Label的目的是：面向用户，使之成为用户级别的Kubernetes对象标识属性，因为label应该要包含对象的功能性和特战描述的特性。这样比UUID更加用户友好和更有意义。</p>
-
-<p>label selector是Kubernetes的核心的分组机制</p>
-
-<p>目前，Kubernetes支持两类资源使用label selector来监控和管理它们的pod资源 --- services和replication controller (RC)</p>
-
-<h3 id="replication-controller">Replication Controller</h3>
-
-<p>Replication Controller（简称 RC）是Kubernetes系统中的核心概念之一，决定了一个pod有多少个同时运行的副本。简单来说，它其实是定义了一个期望的场景，即声明某种Pod的副本数量在任意时刻都符合某个期望值，所以RC的定义包括如下的几个部分。</p>
-<pre><code>所以，只要创建了一个pod，一般都推荐同时给pod创建一个replacation controller，让这个rc一直守护pod，直到pod删除
-</code></pre>
-
-<ul>
-<li><p>Pod期待的副本数（replicas）</p></li>
-
-<li><p>用于筛选目标Podde Label Selector。</p></li>
-
-<li><p>当Pod的副本数量小于预期数量的时候，用于创建新的Pod模板</p></li>
-</ul>
-
-<p>要注意的是，删除RC并不会影响通过该RC已经创建好的Pod。为了删除所有的Pod，可以设置replicas的值为0，然后更新该RC。另外，kubectl提供了stop和delete命令来一次性删除RC和RC控制的全部Pod。</p>
-
-<p>RC 对pod数量和监控情况的控制是通过replica selector， label selector 的一种来实现的。</p>
-
-<p>replica selector定义了RC和它所控制的pod之间的一种松耦合关系。这种松耦合关系可以通过修改pod的label将一个pod从replication controller的控制集中移除。比如可以把出现故障的pod从工作集群中移除，然后对pod进行debug。</p>
-
-<h3 id="deployment">Deployment</h3>
-
-<p>Deployment是Kubernetes1.2引入的新概念，引入的目的是为了更好解决Pod的编排问题。</p>
-
-<p>Deployment相对于RC的一个最大升级是我们可以随时知道当前Pod“部署”的进度。</p>
-
-<p>Deployment的典型使用场景有以下几个：</p>
-
-<ul>
-<li><p>创建一个Deployment对象生成对应的Replica Set并完成Pod副本的创建过程</p></li>
-
-<li><p>检查Deployment的状态来看部署动作是否完成（Pod副本的数量是否达到预期的值）</p></li>
-
-<li><p>更新Deployment以创建新的Pod（比如镜像升级）</p></li>
-
-<li><p>如果当前Deployment不稳定，则回滚到一个早先的Deployment版本</p></li>
-
-<li><p>挂起或者恢复一个Deployment</p></li>
-</ul>
-
-<h3 id="service">Service</h3>
-
-<p>Service相当于我们微服务架构中的一个“微服务”。</p>
-
-<p>Service这个概念存在的意义在于pod在Kubernetes中的IP地址不是固定的，因此需要一个代理来确保需要使用pod的应用不需要知晓pod的真实IP地址。另外一个原因是当使用rc创建了多个pod副本时，需要一个代理为这些pod做负载均衡。</p>
-
-<p>设计原则：任何一个kube-proxy都能将流量正确导向任何一个被代理的pod，而这个kube-proxy不需要和被代理的pod在同一个宿主机上。</p>
-
-<p>目前，kubernetes主要支持两种service的发现机制：环境变量和DNS。</p>
-
-<h2 id="总结">总结</h2>
-
-<p>上述这些组件是Kubernetes系统的核心组件，它们共同构成了Kubernetes系统的框架和计算模型，通过对它们进行灵活组合，用户就可以快速、方便地对容器集群进行配置、创建和管理。</p>
-
-<p>如果不特别指明Namespace, 用户创建的pod、rc、service都讲被系统创建到这个默认的名为<code>default</code>的Namespace中。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/3/8/get-concepts-in-kubernetes.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

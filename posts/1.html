@@ -50,6 +50,332 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">4</span>
+                            <span class="day">24</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/4/24/go-reverse-proxy.html">使用Go开发一个简单反向代理服务</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>最近，团队的小伙伴反映，我们这边一个短连接服务在一台普通的服务器上吞吐量受到限制，所以把服务迁移到高性能机器上，虽然硬件是数倍的提升但压测发现吞吐量并没有预期的效果。</p>
+
+<p>结合后台服务本身的特点初步原因分析：</p>
+
+<ul>
+<li><p>1、从下往上看：服务属于计算IO密集型，性能瓶颈多在于计算请求，但高配机压测过程中，受到单实例模块之间通讯采用串行调用的特点，虽然单点请求计算性能有很大提速，但总体并行上不去，CPU利用率低</p></li>
+
+<li><p>2、从上往下看： 吞吐量受服务器的接受能力影响很大，由于短连接接入层目前只有一个实例，无论部署在中配或是高配，除非是多实例模式或者类似nginx这种多worker工作模型，一般情况下，单实例accept的效果有限，高并发时容易成为瓶颈</p></li>
+
+<li><p>3、从服务进程的角度看，单个web api的请求accept队列（backlog）是有限制的，如果多实例部署也许能补短。</p></li>
+</ul>
+
+<p>分析到这里，很多人都想到可以通过扩容+分布式通讯的方式来弥补短板。是的，方法是摆在面前，但是你想到一个方法不难，难的是你要如何去验证你的想法。毕竟对于一个成熟的产品技术框架，不是随便都能的，一定要数据说话。</p>
+
+<p>不过如何调优不是本文的目的，本文的目的是如何使用Go来快速实现一个反向代理服务来验证前面的背景想法。</p>
+
+<h2 id="设计">设计</h2>
+
+<p>一个反向代理层，无论是四层还是七层，我觉得实现上主要需要具备以下工作：</p>
+
+<ul>
+<li>负载均衡算法</li>
+<li>请求可传递</li>
+<li>endpoints可权重配置</li>
+<li>endpoints故障处理</li>
+</ul>
+
+<p>关于使用Go写负载均衡算法，之前在 《<a href="http://lihaoquan.me/2016/12/19/about-round-robin.html">关于Round-Robin</a>》这文章提及过，这里不延伸。</p>
+
+<p>以http为例，go如何快速实现反向代理?</p>
+
+<p>查看go的文档，发现源码net/http/httputil提供了一个叫 ReverseProxy：<a href="https://godoc.org/net/http/httputil#ReverseProxy">https://godoc.org/net/http/httputil#ReverseProxy</a> 的玩意，这个就是golang自带反向代理功能，而且使用很简单</p>
+
+<p>ReverseProxy提供了ServerHTTP方法，这意味着我们可以跟普通http handler一样简单地使用它来处理请求</p>
+
+<p>ReverseProxy 暴露了NewSingleHostReverseProxy的方法</p>
+<pre><code>// NewSingleHostReverseProxy returns a new ReverseProxy that rewrites
+// URLs to the scheme, host, and base path provided in target. If the
+// target's path is &quot;/base&quot; and the incoming request was for &quot;/dir&quot;,
+// the target request will be for /base/dir.
+func NewSingleHostReverseProxy(target *url.URL) *ReverseProxy {
+        targetQuery := target.RawQuery
+        director := func(req *http.Request) {
+                req.URL.Scheme = target.Scheme
+                req.URL.Host = target.Host
+                req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
+                if targetQuery == &quot;&quot; || req.URL.RawQuery == &quot;&quot; {
+                        req.URL.RawQuery = targetQuery + req.URL.RawQuery
+                } else {
+                        req.URL.RawQuery = targetQuery + &quot;&amp;&quot; + req.URL.RawQuery
+                }
+        }
+        return &amp;ReverseProxy{Director: director}
+}
+</code></pre>
+
+<p>这样，我们可以通过一行代码就基本上实现了主体的反向代理功能了，如下：</p>
+<pre><code>httputil.NewSingleHostReverseProxy(address)
+</code></pre>
+
+<h2 id="实现">实现</h2>
+
+<p>结合Round-Robin，我们尝试实现我们的反向代理层</p>
+
+<h3 id="带权重的负载均衡实现-round-robin-go">带权重的负载均衡实现 round-robin.go</h3>
+<pre><code class="language-go">package roundrobin
+
+// RR: 基于 权重round robin算法的接口
+type RR interface {
+    Next() interface{}
+    Add(node interface{}, weight int)
+    RemoveAll()
+    Reset()
+}
+
+const (
+    RR_NGINX = 0 //Nginx算法
+    RR_LVS   = 1 //LVS算法
+)
+
+//算法实现工厂类
+func NewWeightedRR(rtype int) RR {
+    if rtype == RR_NGINX {
+        return &amp;WNGINX{}
+    } else if rtype == RR_LVS {
+        return &amp;WLVS{}
+    }
+    return nil
+}
+
+//节点结构
+type WeightNginx struct {
+    Node            interface{}
+    Weight          int
+    CurrentWeight   int
+    EffectiveWeight int
+}
+
+func (ww *WeightNginx) fail() {
+    ww.EffectiveWeight -= ww.Weight
+    if ww.EffectiveWeight &lt; 0 {
+        ww.EffectiveWeight = 0
+    }
+}
+
+//nginx算法实现类
+type WNGINX struct {
+    nodes []*WeightNginx
+    n     int
+}
+
+//增加权重节点
+func (w *WNGINX) Add(node interface{}, weight int) {
+    weighted := &amp;WeightNginx{
+        Node:            node,
+        Weight:          weight,
+        EffectiveWeight: weight}
+    w.nodes = append(w.nodes, weighted)
+    w.n++
+}
+
+func (w *WNGINX) RemoveAll() {
+    w.nodes = w.nodes[:0]
+    w.n = 0
+}
+
+//下次轮询事件
+func (w *WNGINX) Next() interface{} {
+    if w.n == 0 {
+        return nil
+    }
+    if w.n == 1 {
+        return w.nodes[0].Node
+    }
+
+    return nextWeightedNode(w.nodes).Node
+}
+
+func nextWeightedNode(nodes []*WeightNginx) (best *WeightNginx) {
+    total := 0
+
+    for i := 0; i &lt; len(nodes); i++ {
+        w := nodes[i]
+
+        if w == nil {
+            continue
+        }
+
+        w.CurrentWeight += w.EffectiveWeight
+        total += w.EffectiveWeight
+        if w.EffectiveWeight &lt; w.Weight {
+            w.EffectiveWeight++
+        }
+
+        if best == nil || w.CurrentWeight &gt; best.CurrentWeight {
+            best = w
+        }
+    }
+
+    if best == nil {
+        return nil
+    }
+    best.CurrentWeight -= total
+    return best
+}
+
+func (w *WNGINX) Reset() {
+    for _, s := range w.nodes {
+        s.EffectiveWeight = s.Weight
+        s.CurrentWeight = 0
+    }
+}
+
+//节点结构
+type WeightLvs struct {
+    Node   interface{}
+    Weight int
+}
+
+//lvs算法实现类
+type WLVS struct {
+    nodes []*WeightLvs
+    n     int
+    gcd   int //通用的权重因子
+    maxW  int //最大权重
+    i     int //被选择的次数
+    cw    int //当前的权重值
+}
+
+//下次轮询事件
+func (w *WLVS) Next() interface{} {
+    if w.n == 0 {
+        return nil
+    }
+
+    if w.n == 1 {
+        return w.nodes[0].Node
+    }
+
+    for {
+        w.i = (w.i + 1) % w.n
+        if w.i == 0 {
+            w.cw = w.cw - w.gcd
+            if w.cw &lt;= 0 {
+                w.cw = w.maxW
+                if w.cw == 0 {
+                    return nil
+                }
+            }
+        }
+        if w.nodes[w.i].Weight &gt;= w.cw {
+            return w.nodes[w.i].Node
+        }
+    }
+}
+
+//增加权重节点
+func (w *WLVS) Add(node interface{}, weight int) {
+    weighted := &amp;WeightLvs{Node: node, Weight: weight}
+    if weight &gt; 0 {
+        if w.gcd == 0 {
+            w.gcd = weight
+            w.maxW = weight
+            w.i = -1
+            w.cw = 0
+        } else {
+            w.gcd = gcd(w.gcd, weight)
+            if w.maxW &lt; weight {
+                w.maxW = weight
+            }
+        }
+    }
+    w.nodes = append(w.nodes, weighted)
+    w.n++
+}
+
+func gcd(x, y int) int {
+    var t int
+    for {
+        t = (x % y)
+        if t &gt; 0 {
+            x = y
+            y = t
+        } else {
+            return y
+        }
+    }
+}
+func (w *WLVS) RemoveAll() {
+    w.nodes = w.nodes[:0]
+    w.n = 0
+    w.gcd = 0
+    w.maxW = 0
+    w.i = -1
+    w.cw = 0
+}
+func (w *WLVS) Reset() {
+    w.i = -1
+    w.cw = 0
+}
+
+</code></pre>
+
+<h3 id="主体部分-main-go">主体部分 main.go</h3>
+<pre><code class="language-go">var RR = rr.NewWeightedRR(rr.RR_NGINX)
+
+type handle struct {
+    addrs []string
+}
+
+func (this *handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    addr := RR.Next().(string)
+    remote, err := url.Parse(&quot;http://&quot; + addr)
+    if err != nil {
+        panic(err)
+    }
+    proxy := httputil.NewSingleHostReverseProxy(remote)
+    proxy.ServeHTTP(w, r)
+}
+
+func startServer() {
+    //被代理的服务器host和port
+    h := &amp;handle{}
+    h.addrs = []string{&quot;172.17.0.2:28080&quot;, &quot;172.17.0.3:28080&quot;}
+
+    w := 1
+    for _, e := range h.addrs {
+        RR.Add(e, w)
+        w++
+    }
+    err := http.ListenAndServe(&quot;:28080&quot;, h)
+    if err != nil {
+        log.Fatalln(&quot;ListenAndServe: &quot;, err)
+    }
+}
+
+func main() {
+    startServer()
+}
+</code></pre>
+
+<p>在ReverseProxy中的ServeHTTP方法实现了这个具体的过程，主要是对源http包头进行重新封装，而后发送到后端服务器。</p>
+
+<p>这样，我们一个简单快速的反向代理层就实现了，日常可以基于它自定义负载我们的服务。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/4/24/go-reverse-proxy.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">4</span>
                             <span class="day">4</span>
                         </span>
                             </div>
@@ -396,39 +722,6 @@ func OpenLive(device string, snaplen int32, promisc bool, timeout time.Duration)
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/1/1/bit-operator.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">12</span>
-                            <span class="day">11</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/12/11/read-big-file-in-go.html">用Go统计大文件小点滴</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>今天，团队里面的小伙伴说手头上有一些几个G以上的文件，需要统计文件里面的数据（文件里面的数据很简单都是Key:Value这样的组织形式）。然后咱俩随便抽了一个5G多的文件，用很普通的方式写了几行代码，流程是 <code>读文件--&gt;扫文件--&gt;识别KV--&gt;统计</code>。</p>
-
-<p>然后程序跑了一趟，发现竟然要5分多钟。十分惊讶下，我想，明明很简单的逻辑的代码为什么要跑这么慢。然后我看了一下初版的代码，发现引起性能问题的几个点，分别是：</p>
-
-<ul>
-<li>strconv的频繁使用</li>
-<li>map[string]uint64形式的对象频繁调用</li>
-<li>为了识别KV，遍历文件时使用了 split 函数</li>
-</ul>
-
-<p>下面是最开始的代码：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/12/11/read-big-file-in-go.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
