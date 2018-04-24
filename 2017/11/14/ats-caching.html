@@ -62,7 +62,7 @@
 
 <p>Apache Traffic Server基本可以用一句话概括：它不仅是HTTP代理服务器, 还是HTTP缓存服务器，且可以缓存任何字节流数据。</p>
 
-<h2 id="二-使用情况">二、使用情况</h2>
+<h2 id="二-使用情况">二、使用情况</h2>
 
 <p>由于是做电商，为了满足日常业务的发展，最初的nginx-proxycache的方式已经不能满足我们的大并发量而且大流量对象的缓存需要。这个时候我调研过squid、varnish等缓存代理，最后基于同行的使用报告和自己搭建使用一段时间后，最终我们就决定采用ATS作为缓存中心的核心层。具体的原因有以下几点：</p>
 
@@ -84,13 +84,13 @@
 
 <h2 id="三-ats缓存服务架构">三、ATS缓存服务架构</h2>
 
-<h3 id="3-1-集群-结构">3.1、集群结构</h3>
+<h3 id="3-1-集群结构">3.1、集群结构</h3>
 
 <p>先简单说明下我们采用的部署方案，如下图：</p>
 
 <p><img src="http://og0usnhfv.bkt.clouddn.com/ats.png" alt="ats" /></p>
 
-<p>我们采用两级缓存层作为服务提供方案：边缘节点+中心节点。边缘节点主要负责反向代理和一级缓存；中心节点负责二级缓存和负载到HA（回源入口）</p>
+<p>我们采用两级缓存层作为服务提供方案：边缘节点+中心节点。边缘节点主要负责反向代理和一级缓存；中心节点负责二级缓存和负载到HA（回源入口）</p>
 
 <h3 id="3-2-内部cache架构">3.2、内部cache架构</h3>
 
@@ -102,11 +102,11 @@
 
 <h2 id="四-运维方案">四、运维方案</h2>
 
-<h4 id="常用命令">常用命令</h4>
+<h4 id="常用命令">常用命令</h4>
 
 <p>1、安装</p>
 
-<p>前期需要安装相关依赖：</p>
+<p>前期需要安装相关依赖：</p>
 <pre><code>sudo yum install -y pkgconfig libtool gcc gcc-c++ make openssl openssl-devel tcl tcl-devel pcre libcap flex hwloc lua curses curl
 </code></pre>
 
@@ -137,7 +137,7 @@ CONFIG proxy.config.http.insert_response_via_str INT 2
 
 <p>2）如果是中心节点，修改  /apps/conf/trafficserver/remap.config 配置</p>
 
-<p>反向配置并增加balance负载策略 remap.config文件参考配置如下：(ip是ha的ip或源站ip，下面是随意写)</p>
+<p>反向配置并增加balance负载策略 remap.config文件参考配置如下：(ip是ha的ip或源站ip，下面是随意写)</p>
 <pre><code>map http://a.testpic.com/ http://a.testpic.com/  @plugin=/apps/demo/trafficserver/libexec/trafficserver/balancer.so @pparam=--policy=hash,url @pparam=10.10.10.1 @pparam=10.10.10.2  @pparam=10.10.10.3
 </code></pre>
 
@@ -148,7 +148,7 @@ CONFIG proxy.config.http.insert_request_via_str INT 1
 CONFIG proxy.config.http.insert_response_via_str INT 2
 </code></pre>
 
-<p>3、关闭与启动</p>
+<p>3、关闭与启动</p>
 <pre><code>$ /apps/demo/trafficserver/bin/trafficserver stop
 $ /apps/demo/trafficserver/bin/trafficserver start
 </code></pre>
@@ -233,7 +233,7 @@ map http://ats-node.com/http     http://{http}
 
 <h4 id="集群检测方案">集群检测方案</h4>
 
-<p>任何分布式服务，CAP不能同时实现，特别目前以两级缓存模型实现的ATS结构更是如此。由于边缘节点依赖中心节点，ats边缘节点使用URL一致性哈希把请求打到中心节点的时候，如果中心节点挂掉，ats节点本身会做rehash,但rehash的次数是有限制的,极端情况下,当所有的中心节点不可用时，我们希望ats节点能直接回源操作，保障可用性.</p>
+<p>任何分布式服务，CAP不能同时实现，特别目前以两级缓存模型实现的ATS结构更是如此。由于边缘节点依赖中心节点，ats边缘节点使用URL一致性哈希把请求打到中心节点的时候，如果中心节点挂掉，ats节点本身会做rehash,但rehash的次数是有限制的,极端情况下,当所有的中心节点不可用时，我们希望ats节点能直接回源操作，保障可用性.</p>
 
 <p>ats中心节点回源策略是透过URL哈希方式负载到haproxy上的，同理，如果ha节点挂掉，会直接影响缓存服务，请求无法穿透到源站。
 所以我们需要一个工具除了能监测依赖节点的健康情况外，还需要做容错和故障恢复等功能。</p>
@@ -253,7 +253,7 @@ map http://ats-node.com/http     http://{http}
 <h2 id="五-调优与改进">五、调优与改进</h2>
 
 <ul>
-<li>定制化插件</li>
+<li>定制化插件</li>
 </ul>
 
 <h2 id="参考">参考</h2>

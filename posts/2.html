@@ -61,7 +61,7 @@
 
 <p>Apache Traffic Server基本可以用一句话概括：它不仅是HTTP代理服务器, 还是HTTP缓存服务器，且可以缓存任何字节流数据。</p>
 
-<h2 id="二-使用情况">二、使用情况</h2>
+<h2 id="二-使用情况">二、使用情况</h2>
 
 <p>由于是做电商，为了满足日常业务的发展，最初的nginx-proxycache的方式已经不能满足我们的大并发量而且大流量对象的缓存需要。这个时候我调研过squid、varnish等缓存代理，最后基于同行的使用报告和自己搭建使用一段时间后，最终我们就决定采用ATS作为缓存中心的核心层。具体的原因有以下几点：</p>
 </section>
@@ -99,7 +99,7 @@ main(int argc, char **argv)
 <pre><code>warning: argument is incompatible with prototype
 </code></pre>
 
-<p>一般情况很多人会认为实参<code>char *s</code> 与形参 <code>const char *p</code> 应该是相容的，标准库中所有的字符串处理函数都是这样的。那么为什么 实参<code>char **argv</code> 与形参 <code>const char **p</code> 实际上不相容呢？</p>
+<p>一般情况很多人会认为实参<code>char *s</code> 与形参 <code>const char *p</code> 应该是相容的，标准库中所有的字符串处理函数都是这样的。那么为什么 实参<code>char **argv</code> 与形参 <code>const char **p</code> 实际上不相容呢？</p>
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/10/29/ansi-c-const.html">继续阅读</a>
@@ -122,7 +122,7 @@ main(int argc, char **argv)
                                 <a href="/2017/10/8/an-programmer-prepares-1.html">《程序员的自我修养》读书笔记</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>本文是《程序员的自我修养》的读书笔记之一，主要把相关知识点进行了梳理。</p>
+                        <section class="brief"><p>本文是《程序员的自我修养》的读书笔记之一，主要把相关知识点进行了梳理。</p>
 
 <p>链接、装载等是操作系统中很基础也是很重要的一部分。我们需要掌握的东西很多，书中向我们灌输了理解linux里面的文件的ELF格式的重要性，我们从阅读《程序员的自我修养》前面的章节从学习ELF文件格式开始有助于更加了解日常编程看不到的东西：</p>
 

@@ -3,7 +3,7 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>用Go统计大文件小点滴 - domac博客</title>
+    <title>用Go统计大文件小点滴 - domac博客</title>
     <meta name="keywords" content="go,golang,go语言"/>
     <meta name="description" content="read big file in go"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
@@ -51,23 +51,23 @@
                         </span>
                             </div>
                             <h5 class="title">
-                                <a href="/2017/12/11/read-big-file-in-go.html">用Go统计大文件小点滴</a>
+                                <a href="/2017/12/11/read-big-file-in-go.html">用Go统计大文件小点滴</a>
                             </h5>
                         </header>
                         <aside class="aside clearfix">
                             <a class="tag label label-info" href="/tags/go.html">go</a>
                         </aside>
-                        <section class="brief"><p>今天，团队里面的小伙伴说手头上有一些几个G以上的文件，需要统计文件里面的数据（文件里面的数据很简单都是Key:Value这样的组织形式）。然后咱俩随便抽了一个5G多的文件，用很普通的方式写了几行代码，流程是 <code>读文件--&gt;扫文件--&gt;识别KV--&gt;统计</code>。</p>
+                        <section class="brief"><p>今天，团队里面的小伙伴说手头上有一些几个G以上的文件，需要统计文件里面的数据（文件里面的数据很简单都是Key:Value这样的组织形式）。然后咱俩随便抽了一个5G多的文件，用很普通的方式写了几行代码，流程是 <code>读文件--&gt;扫文件--&gt;识别KV--&gt;统计</code>。</p>
 
-<p>然后程序跑了一趟，发现竟然要5分多钟。十分惊讶下，我想，明明很简单的逻辑的代码为什么要跑这么慢。然后我看了一下初版的代码，发现引起性能问题的几个点，分别是：</p>
+<p>然后程序跑了一趟，发现竟然要5分多钟。十分惊讶下，我想，明明很简单的逻辑的代码为什么要跑这么慢。然后我看了一下初版的代码，发现引起性能问题的几个点，分别是：</p>
 
 <ul>
 <li>strconv的频繁使用</li>
 <li>map[string]uint64形式的对象频繁调用</li>
-<li>为了识别KV，遍历文件时使用了 split 函数</li>
+<li>为了识别KV，遍历文件时使用了 split 函数</li>
 </ul>
 
-<p>下面是最开始的代码：</p>
+<p>下面是最开始的代码：</p>
 
 <!--more-->
 <pre><code class="language-go">
@@ -129,11 +129,11 @@ func main() {
 
 <p>为什么使用strconv的原因很简单，我们代码中需要把字符串转化为数值进行统计，于是直接使用了strconv.atoi的方法。</p>
 
-<p>map[string]uint64 这样的结构主要是作为本地的统计信息集合，用于每次分析KV的时候对数值重新设置。</p>
+<p>map[string]uint64 这样的结构主要是作为本地的统计信息集合，用于每次分析KV的时候对数值重新设置。</p>
 
 <p>split 函数的目的更明确了，因为需要拿到Key和Value，当时脑袋第一反应就是使用了strings.split函数了</p>
 
-<p>以上这三个点其实就是引起大文件耗时超过5分钟的直接原因了。</p>
+<p>以上这三个点其实就是引起大文件耗时超过5分钟的直接原因了。</p>
 
 <p>于是我对代码进行了小小的改造，如下：</p>
 <pre><code class="language-go">
@@ -222,9 +222,9 @@ func main() {
 <p>最后的总结：</p>
 
 <ul>
-<li>对性能敏感的部分，尽量使用[]byte而不是直接操作字符串</li>
+<li>对性能敏感的部分，尽量使用[]byte而不是直接操作字符串</li>
 <li>频繁操作map的时候，可以事先对key进行自定义快速的hash，而不直接使用string作为key（当然要考虑具体场景）</li>
-<li>类型转换在密集型场景下是代价很大的</li>
+<li>类型转换在密集型场景下是代价很大的</li>
 </ul>
 </section>
                     </div>

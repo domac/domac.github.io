@@ -70,7 +70,7 @@ main(int argc, char **argv)
 <pre><code>warning: argument is incompatible with prototype
 </code></pre>
 
-<p>一般情况很多人会认为实参<code>char *s</code> 与形参 <code>const char *p</code> 应该是相容的，标准库中所有的字符串处理函数都是这样的。那么为什么 实参<code>char **argv</code> 与形参 <code>const char **p</code> 实际上不相容呢？</p>
+<p>一般情况很多人会认为实参<code>char *s</code> 与形参 <code>const char *p</code> 应该是相容的，标准库中所有的字符串处理函数都是这样的。那么为什么 实参<code>char **argv</code> 与形参 <code>const char **p</code> 实际上不相容呢？</p>
 
 <!--more-->
 
@@ -95,8 +95,8 @@ ccp = cp
 
 <ul>
 <li>左操作数是一个指向有const限定符的char的指针</li>
-<li>右操作数是一个指向没有限定符的char的指针</li>
-<li>char类型与char类型是相容的，左边操作数所指向的类型具有右操作数所指向类型的限定符（无），再加上自身的限定符（const）。</li>
+<li>右操作数是一个指向没有限定符的char的指针</li>
+<li>char类型与char类型是相容的，左边操作数所指向的类型具有右操作数所指向类型的限定符（无），再加上自身的限定符（const）。</li>
 </ul>
 
 <p>注意，反过来就不能够赋值，如下：</p>

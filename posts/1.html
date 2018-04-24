@@ -297,9 +297,9 @@ func main() {
 
 <h2 id="线上的一次真实案例">线上的一次真实案例</h2>
 
-<p>几个月前负责帮公司内部数据监控团队写了一个应用流量采集的底层进程模块，该模块基于Go使用的是libpcap库对网络设备的流量进行捕获并根据我们自身的业务进行封装整理。这个后台进程运行了几个月了，一直相当“安分”，没有引起告警或者占用过多资源等现场。不过&rdquo;不幸&rdquo;的事终于还是发生了。下面我还原一下事情的经过：</p>
+<p>几个月前负责帮公司内部数据监控团队写了一个应用流量采集的底层进程模块，该模块基于Go使用的是libpcap库对网络设备的流量进行捕获并根据我们自身的业务进行封装整理。这个后台进程运行了几个月了，一直相当“安分”，没有引起告警或者占用过多资源等现场。不过&rdquo;不幸&rdquo;的事终于还是发生了。下面我还原一下事情的经过：</p>
 
-<p>某天，收到运维的同学反馈某些机器上的组件如redis、mc有超时，运维的同事协助观察发现，组件的GC正常、网络层面无丢包、mc无异常，真正对比了Haproxy的配置均无变更。但涉及的影响面20w请求就有1000~2000次的timeout现象。</p>
+<p>某天，收到运维的同学反馈某些机器上的组件如redis、mc有超时，运维的同事协助观察发现，组件的GC正常、网络层面无丢包、mc无异常，真正对比了Haproxy的配置均无变更。但涉及的影响面20w请求就有1000~2000次的timeout现象。</p>
 
 <p>到后来，我们排查系统日志发现有蓝牙设备初始化的记录，时间点比较符合，网卡不断地在混杂模式中来回切换，可能与此相关:</p>
 
@@ -311,7 +311,7 @@ func main() {
 
 <h2 id="修补方案">修补方案</h2>
 
-<p>既然问题得到定位，就要思考问什么，和如何修复了。应用流量监控模块，我这边是直接采用了 <code>github.com/google/gopacket/pcap</code> 这个库。</p>
+<p>既然问题得到定位，就要思考问什么，和如何修复了。应用流量监控模块，我这边是直接采用了 <code>github.com/google/gopacket/pcap</code> 这个库。</p>
 
 <p>后来发现问题所在了，我其中的handler调用的函数定义：</p>
 <pre><code class="language-go">
@@ -361,7 +361,7 @@ func OpenLive(device string, snaplen int32, promisc bool, timeout time.Duration)
 <pre><code>handle, err := pcap.OpenLive(faceName, int32(*snaplen), true, 500)
 </code></pre>
 
-<p>坑啊，之前没有仔细测试，直接赋值了一个true, 也就是说这个服务强制了使用了混杂模式对网卡进行监听，在流量高峰的时候，很容易导致某些网络服务timeout的现象。 啊~，心中万马奔腾，原来是自己的大意疏忽！！要引以为戒。</p>
+<p>坑啊，之前没有仔细测试，直接赋值了一个true, 也就是说这个服务强制了使用了混杂模式对网卡进行监听，在流量高峰的时候，很容易导致某些网络服务timeout的现象。 啊~，心中万马奔腾，原来是自己的大意疏忽！！要引以为戒。</p>
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/3/11/network-promisc-mode.html">继续阅读</a>
@@ -412,20 +412,20 @@ func OpenLive(device string, snaplen int32, promisc bool, timeout time.Duration)
                         </span>
                             </div>
                             <h5 class="title">
-                                <a href="/2017/12/11/read-big-file-in-go.html">用Go统计大文件小点滴</a>
+                                <a href="/2017/12/11/read-big-file-in-go.html">用Go统计大文件小点滴</a>
                             </h5>
                         </header>
-                        <section class="brief"><p>今天，团队里面的小伙伴说手头上有一些几个G以上的文件，需要统计文件里面的数据（文件里面的数据很简单都是Key:Value这样的组织形式）。然后咱俩随便抽了一个5G多的文件，用很普通的方式写了几行代码，流程是 <code>读文件--&gt;扫文件--&gt;识别KV--&gt;统计</code>。</p>
+                        <section class="brief"><p>今天，团队里面的小伙伴说手头上有一些几个G以上的文件，需要统计文件里面的数据（文件里面的数据很简单都是Key:Value这样的组织形式）。然后咱俩随便抽了一个5G多的文件，用很普通的方式写了几行代码，流程是 <code>读文件--&gt;扫文件--&gt;识别KV--&gt;统计</code>。</p>
 
-<p>然后程序跑了一趟，发现竟然要5分多钟。十分惊讶下，我想，明明很简单的逻辑的代码为什么要跑这么慢。然后我看了一下初版的代码，发现引起性能问题的几个点，分别是：</p>
+<p>然后程序跑了一趟，发现竟然要5分多钟。十分惊讶下，我想，明明很简单的逻辑的代码为什么要跑这么慢。然后我看了一下初版的代码，发现引起性能问题的几个点，分别是：</p>
 
 <ul>
 <li>strconv的频繁使用</li>
 <li>map[string]uint64形式的对象频繁调用</li>
-<li>为了识别KV，遍历文件时使用了 split 函数</li>
+<li>为了识别KV，遍历文件时使用了 split 函数</li>
 </ul>
 
-<p>下面是最开始的代码：</p>
+<p>下面是最开始的代码：</p>
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/12/11/read-big-file-in-go.html">继续阅读</a>
