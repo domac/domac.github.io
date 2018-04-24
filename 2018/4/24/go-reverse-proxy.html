@@ -121,7 +121,7 @@ func NewSingleHostReverseProxy(target *url.URL) *ReverseProxy {
 
 <p>结合Round-Robin，我们尝试实现我们的反向代理层</p>
 
-<h3 id="带权重的负载均衡实现-round-robin-go">带权重的负载均衡实现 round-robin.go</h3>
+<h4 id="带权重的负载均衡实现-round-robin-go">带权重的负载均衡实现 round-robin.go</h4>
 <pre><code class="language-go">package roundrobin
 
 // RR: 基于 权重round robin算法的接口
@@ -320,7 +320,7 @@ func (w *WLVS) Reset() {
 
 </code></pre>
 
-<h3 id="主体部分-main-go">主体部分 main.go</h3>
+<h4 id="主体部分-main-go">主体部分 main.go</h4>
 <pre><code class="language-go">var RR = rr.NewWeightedRR(rr.RR_NGINX)
 
 type handle struct {
