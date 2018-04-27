@@ -50,6 +50,198 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">4</span>
+                            <span class="day">27</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/4/27/panic-output.html">panic output</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>根据“墨菲定律”，我们编写的后台的服务都有出现crash的可能，一种情况是Go的后台服务我们经常也会遇到panic的情况。出问题不可怕，我们需要分析并解决问题，不过panic处理的信息，默认是直接标准输出的，我们希望能捕获它指向我们特定的文件以便能做后续问题的跟踪排查，而不是一次性输出难以跟踪。</p>
+
+<p>我们一个通用的方法是</p>
+<pre><code>err := execFunc()
+if err != nil {
+    outputToFile(err)
+}
+</code></pre>
+
+<p>但有一些第三方库会使用<code>panic/recover</code>机制作为其内部的异常控制方式，这样我们在外面是难以察觉的，异常信息可能就直接打到我们的标准输出那里了，除非你在执行程序之前，使用类似linux的 <code>./test &gt;&gt; panic.log</code> ,否则我们会很大机会与重要的跟踪信息擦肩而过。（跨平台到windows可能不适用）</p>
+
+<p>所以，如何把panic的信息灵活地“重定向”呢？</p>
+
+<p>实现思路一般是：</p>
+
+<p>1、既然panic使用的的是标准输出，我们可以使用自定义的文件file引用取代go里头的os.Stdout 和 os.Stderr</p>
+
+<p>2、引起panic并测试重定向的正确性</p>
+
+<p>3、windows里面没有stdout和stderr的输出方式，也没办法像unix那样使用“&gt;&gt;”进行标准输出的重新向，这个如何破？</p>
+
+<p>我们先试试一个简单的例子：</p>
+<pre><code>package main
+
+import (
+    &quot;fmt&quot;;
+    &quot;os&quot;;
+)
+
+const panicFile = &quot;/tmp/panic.log&quot;
+
+func InitPanicFile() error {
+    log.Println(&quot;init panic file in unix mode&quot;)
+    file, err := os.OpenFile(panicFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+    if err != nil {
+        return err
+    }
+
+    os.Stdout = file
+    os.Stderr = file
+    return nil
+}
+
+func init() {
+    err := pc.InitPanicFile()
+    if err != nil {
+        println(err)
+    }
+}
+
+func testPanic() {
+    panic(&quot;test panic&quot;)
+}
+
+func main() {
+    testPanic()
+}
+</code></pre>
+
+<p>这个例子，我们尝试使用 <code>os.Stdout = file</code> 和 <code>os.Stderr = file</code> 来“强制”转换，但我们运行程序后，发现不起作用， /tmp/panic.log 没有任何信息流入，panic信息照样输出到标准输出那里。</p>
+
+<p>关于原因，Rob是这样说的：</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/rob.png" alt="rob say" /></p>
+
+<p>看来是把变量直接赋值到底层是不行的，图上所说，推荐使用syscall.Dup的方式。我们再改写下 <code>InitPanicFile()</code> 函数：</p>
+<pre><code>func InitPanicFile() error {
+    log.Println(&quot;init panic file in unix mode&quot;)
+    file, err := os.OpenFile(panicFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+    if err != nil {
+        println(err)
+        return err
+    }
+    if err = syscall.Dup2(int(file.Fd()), int(os.Stderr.Fd())); err != nil {
+        return err
+    }
+    return nil
+}
+</code></pre>
+
+<p>我们运行程序，发现panic正常定向到我们的文件里面去了：</p>
+<pre><code>$ tail -f /tmp/panic.log
+
+panic: test panic
+
+goroutine 1 [running]:
+
+... ...
+... ...
+</code></pre>
+
+<p>不过经过实践，上面的代码是有些bug的，原因是我们上面的file是一个局部变量，放系统发生gc的时候，会触发file里面的 <code>runtime.SetFinalizer(f.file, (*file).close)</code>, 会引起句柄会被回收， 如果我们代码是长期运行在后台的话，建议代码调整如下的形式：</p>
+<pre><code>var globalFile *os.File
+
+func InitPanicFile() error {
+    log.Println(&quot;init panic file in unix mode&quot;)
+    file, err := os.OpenFile(panicFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+    globalFile = file
+    if err != nil {
+        println(err)
+        return err
+    }
+    if err = syscall.Dup2(int(file.Fd()), int(os.Stderr.Fd())); err != nil {
+        return err
+    }
+    return nil
+}
+</code></pre>
+
+<p>接下来，我们要延伸思考下，如果服务是运行在windows上面该如何破？</p>
+
+<p>使用<code>syscall.Dup2</code>的例子windows下会编译直接报错:</p>
+<pre><code>undefined: syscall.Dup2
+
+... ...
+
+syscall.Dup2 is a linux/OSX only thing. there's no windows equivalent。
+</code></pre>
+
+<p>记得我前面的文件，介绍过go调用DLL的方法 <a href="http://lihaoquan.me/2018/4/4/go-windows-dll.html">《使用Go结合windows dll开发程序》</a> ，其实我们也可以想到，可以直接使用DLL的调用达到功能效果：</p>
+
+<p>代码如下：</p>
+<pre><code>package main
+
+import (
+    &quot;log&quot;
+    &quot;os&quot;
+    &quot;syscall&quot;
+)
+
+const (
+    kernel32dll = &quot;kernel32.dll&quot;
+)
+
+const panicFile = &quot;C:/panic.log&quot;
+
+func InitPanicFile() error {
+    log.Println(&quot;init panic file in windows mode&quot;)
+    file, err := os.OpenFile(panicFile, os.O_CREATE|os.O_APPEND, 0666)
+    if err != nil {
+        return err
+    }
+    kernel32 := syscall.NewLazyDLL(kernel32dll)
+    setStdHandle := kernel32.NewProc(&quot;SetStdHandle&quot;)
+    sh := syscall.STD_ERROR_HANDLE
+    v, _, err := setStdHandle.Call(uintptr(sh), uintptr(file.Fd()))
+    if v == 0 {
+        return err
+    }
+    return nil
+}
+
+func init() {
+    err := pc.InitPanicFile()
+    if err != nil {
+        println(err)
+    }
+}
+
+func testPanic() {
+    panic(&quot;test panic&quot;)
+}
+
+func main() {
+    testPanic()
+}
+
+</code></pre>
+
+<p>然后我们把编译后的代码在windows下运行，panic信息也能正常重定向到指定文件上了。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/4/27/panic-output.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">4</span>
                             <span class="day">24</span>
                         </span>
                             </div>
@@ -691,37 +883,6 @@ func OpenLive(device string, snaplen int32, promisc bool, timeout time.Duration)
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/3/11/network-promisc-mode.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">1</span>
-                            <span class="day">1</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/1/1/bit-operator.html">Go的Bit操作</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>原文地址：<a href="https://medium.com/learning-the-go-programming-language/bit-hacking-with-go-e0acee258827">https://medium.com/learning-the-go-programming-language/bit-hacking-with-go-e0acee258827</a></p>
-
-<blockquote>
-<p>本文是对原文的个人翻译，翻译不是很完善，能理解其中的思想即可。翻译原文的原因是之前参加公司的算法比赛，做题过程中我们在自身的程序做了较多的位运算操作，觉得比较有意思，于是根据原文翻译出下文内容 ：）</p>
-</blockquote>
-
-<p>在计算机正处于发展初期的阶段，内存和处理能力相对有限，于是为了避免这些昂贵的开销，人们一般都首选直接进行位操作的方式获取数据。直至今天，虽然计算机硬件飞速发展，内存和CPU的处理能力已经不是什么问题了，但位操作依然在一些情况（例如：底层系统编程、图像处理、密码加密解密等）中扮演重要的角色。</p>
-
-<p>Go这门编程语言为我们提供了一些位运算符操作，如下：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/1/1/bit-operator.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
