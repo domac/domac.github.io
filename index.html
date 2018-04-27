@@ -193,9 +193,12 @@ const (
 
 const panicFile = &quot;C:/panic.log&quot;
 
+var globalFile *os.File
+
 func InitPanicFile() error {
     log.Println(&quot;init panic file in windows mode&quot;)
     file, err := os.OpenFile(panicFile, os.O_CREATE|os.O_APPEND, 0666)
+    globalFile = file
     if err != nil {
         return err
     }
