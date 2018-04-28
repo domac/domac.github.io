@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?><rss version="2.0">
   <channel>
-    <title>domac博客</title>
+    <title>domac的菜园子</title>
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Fri, 27 Apr 2018 17:33:39 +0800</pubDate>
+    <pubDate>Sat, 28 Apr 2018 22:50:19 +0800</pubDate>
     <item>
       <title>如何把panic信息重定向</title>
       <link>http://lihaoquan.me/2018/4/27/panic-output.html</link>
