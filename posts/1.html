@@ -49,6 +49,420 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">5</span>
+                            <span class="day">4</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/5/4/reflect-action.html">golang reflect实践</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>之前看过很多Go技术的文章和一些技术群里面的交流，主流意见都是认为反射（reflect）是导致性能的主要元凶，叫开发者少用为妙；主要是他们使用反射的业务场景离不开下面的情况：</p>
+
+<ul>
+<li><p>reflect涉及到内存分配以及后续的GC</p></li>
+
+<li><p>reflect实现里面有大量的枚举，也就是for循环，比如类型之类的</p></li>
+</ul>
+
+<p>一开始我也“遵循”的，直到最近项目需要，越来越多的场景需要用到反射机制才能灵活应对，毕竟某些情况某些情景下性能不是特别高的要求，模块的灵活性扩展性（够有能力处理各种输入类型，而这些类型可能无法共享同一个接口，也可能布局未知）才是占据重要的位置。反射不但指计算机程序在运行时（Run time）可以访问、检测和修改它本身状态或行为的一种能力，也是元编程的一种形式，我们常见的RPC库或者一些ORM框架基本都是使用反射来实现核心的功能，所以本文主要是最近使用反射的一些总结</p>
+
+<h2 id="go的类型系统">Go的类型系统</h2>
+
+<p>Go不是面向对象的语言，所以它的类型系统特点是没有泛型、没有继承的，所有的类型都是一个interface。</p>
+
+<p>我觉得Go的类型主要是分两种的：</p>
+
+<p>一种是指定类型的变量类型（例如 int、string、float32等），在创建变量的时候已经确定具体类型</p>
+
+<p>一种是concrete类型，主要面向interface相关的类型，interface类型的变量总是具有相同的静态类型，即使在运行时在接口变量中的值可能改变，但该值始终满足接口</p>
+
+<p>Go语言中反射的操作主要定义在标准库reflect中，在标准库中定义了两种类型来表现运行时的对象信息，分别是：reflect.Value（反射对象的类型）和 reflect.Type（反射对象的值），所有反射操作都是基于这两个类型进行的。</p>
+
+<p>为了说明reflect处理类型的相关知识，我们先看一个例子：</p>
+<pre><code>file, err := os.Open(&quot;/tmp/test.log&quot;)
+if err != nil {
+    panic(err)
+}
+defer file.Close()
+
+var r io.Reader
+r = file
+fmt.Printf(&quot;%v\n&quot;, reflect.TypeOf(r))
+
+var w io.Writer
+w = r.(io.Writer)
+fmt.Printf(&quot;%v\n&quot;, reflect.TypeOf(w))
+</code></pre>
+
+<p>程序输出</p>
+<pre><code>*os.File
+*os.File
+</code></pre>
+
+<p>reflect.TypeOf 函数接受任何的interface{}参数，并且把接口中的动态类型以reflect.Type的形式返回；把一个具体指赋值给一个接口类型的时候会发生一个隐式类型的转换，转换会生成一个包含两部分内容的接口值：</p>
+
+<p>因为reflect.TypeOf返回一个接口值对应的动态类型，所以它返回的总是具体类型(而不是接口类型)。比如上面例子执行输出的是*.os.File，而不是
+io.Writer，这点很重要！</p>
+
+<p>reflect另外一个重要操作是valueOf, 它是用来获取参数接口值得数据的动态值，当执行reflect.valueOf后，可以通过它本身的Interface()方法来获取接口的真实内容，再通过类型判断，就可以获取真实内容的值了。</p>
+
+<h2 id="go反射的基本操作">Go反射的基本操作</h2>
+
+<p>说到Go的反射操作，先说两点：</p>
+
+<ul>
+<li><p>反射必须结合interface才行</p></li>
+
+<li><p>变量的type必须是concrete才行</p></li>
+</ul>
+
+<p>interface底层有两部分：type 和 value，我们统称为pair。type是interface变量的一个指针指向的值的类型信息。value是interface变量的另外一个指针指向的实际的值</p>
+
+<p>interface及其（type,value）的存在是Go反射的前提，也就是说Go的反射终归是用来检测存储在interface内部（type,value）的机制。</p>
+
+<h4 id="那么如何通过使用reflect-value来设置值">那么如何通过使用reflect.Value来设置值?</h4>
+
+<p>我们使用反射除了运行时判断真实类型，无非也是想在运行时更新变量的值</p>
+
+<p>再看一个例子：</p>
+<pre><code>a := 12
+b := reflect.ValueOf(&amp;a)
+b.Set(reflect.ValueOf(int64(48)))
+fmt.Println(a)
+</code></pre>
+
+<p>上面的代码，我们目的是在运行时把变量a的值从12修改为48，但单当我们运行代码的时候，会抛出异常</p>
+<pre><code>panic: reflect: reflect.Value.Set using unaddressable value
+</code></pre>
+
+<p>unaddressable ? 也就是上面我们的变量b其实是unaddressable的，哪怕b有一个指针指向变量a，但无法这样的方式来更新变量a的值。</p>
+
+<p>那么如何让b变为addressable呢？ 再来看下面的示范：</p>
+<pre><code>x := 12
+a := reflect.ValueOf(2)
+println(a.CanAddr()) //false
+
+b := reflect.ValueOf(x)
+println(b.CanAddr()) //false
+
+c := reflect.ValueOf(&amp;x)
+println(c.CanAddr()) //false
+
+d := reflect.ValueOf(&amp;x).Elem()
+println(d.CanAddr()) //true
+</code></pre>
+
+<p>a不可取址，因为a中的值仅仅是12的拷贝的副本</p>
+
+<p>b不可取址，因为b中的值是a的拷贝的副本</p>
+
+<p>c不可取址，因为c中的值只是一个指针&amp;x的拷贝</p>
+
+<p>d可取址，因为Elem()方法，可以获取变量对应的可取址地址的value</p>
+
+<p>官方对Elem()的解释是：</p>
+<pre><code>Elem returns the value that the interface v contains
+</code></pre>
+
+<p>所以，上面由于只有d可取值，也就是只有可寻址的reflect.Value直接调用reflect.Value.Set来更新值,否则会抛出以下的异常：</p>
+<pre><code>panic: reflect: reflect.Value.SetInt using unaddressable value
+</code></pre>
+
+<p>ok，也就是说我们可以通过Elem()来让我们某些不可取址的value变为addressable，那么我再重写一下上面的代码：</p>
+<pre><code>a := 12
+b := reflect.ValueOf(&amp;a).Elem()
+b.Set(reflect.ValueOf(int64(48)))
+fmt.Println(a)
+</code></pre>
+
+<p>当我们以为一切正常的时候，这个时候，我们又得到一个异常信息：</p>
+<pre><code>panic: reflect.Set: value of type int64 is not assignable to type int
+</code></pre>
+
+<p>从这个异常看出b现在是addressable了，但却变成了unassignable了！为什么呢？</p>
+
+<p>我们回顾下，interface类型的变量总是具有相同的静态类型，也就是说我们通过反射来对interface进行设值，这个值的静态类型必须是相同的，否则会分配不成功，我们再更改下例子的代码：</p>
+<pre><code>a := 12
+b := reflect.ValueOf(&amp;a).Elem()
+b.Set(reflect.ValueOf(48))
+fmt.Println(a)
+</code></pre>
+
+<p>这个时候，变量a重要成功被更新了，所以可以总结go反射操作变量需要满足几个条件：</p>
+<pre><code>1、反射可以将“接口类型变量”转换为“反射类型对象”
+
+2、反射可以将“反射类型对象”转换为“接口类型变量”
+
+3、如果要修改“反射类型对象”，其值必须是“可写的”、“可址的”
+</code></pre>
+
+<blockquote>
+<p>若对go reflect 赋值操作感兴趣的，可以阅读文章<a href="https://medium.com/capital-one-developers/learning-to-use-go-reflection-822a0aed74b7">《learning to use go reflection》</a><br />
+若要更深入了解Go语言的reflect，可以阅读官方的<a href="https://blog.golang.org/laws-of-reflection">《laws of reflection》</a></p>
+</blockquote>
+
+<h2 id="反射实践">反射实践</h2>
+
+<h4 id="一-slice类型处理">一、slice类型处理</h4>
+
+<p>我们尝试思考下如何可以接收任意类型slices,并统一返回[]interface{}?</p>
+
+<p>也许你可能会说：“这不是很容易吗？直接处理就行了”，于是你可能会这样处理：</p>
+<pre><code>func handleSlice(in []interface{}) (out []interface{}) {
+    out = make([]interface{}, len(in))
+    for i, v := range in {
+        out[i] = v
+    }
+    return
+}
+</code></pre>
+
+<p>于是我们尝试把一个[]int的slice作为入参的时候，还没到运行时，我们已经收到报错信息：</p>
+<pre><code>cannot use slice (type []int) as type []interface {} in argument to handleSlice4
+</code></pre>
+
+<p>原因很简单，我们的入参类型是[]int，它只能作为一个interface的隐藏类型，但不能作为[]interface的隐藏类型，所以上面的处理方法是不恰当的，我们应该这样写：</p>
+<pre><code>func handleSlice(arg interface{}) (out []interface{}, ok bool) {
+    argValue := reflect.ValueOf(arg)
+    if argValue.Type().Kind() == reflect.Slice {
+        length := argValue.Len()
+        if length == 0 {
+            return
+        }
+        ok = true
+        out = make([]interface{}, length)
+        for i := 0; i &lt; length; i++ {
+            out[i] = argValue.Index(i).Interface()
+        }
+    }
+    return
+}
+</code></pre>
+
+<h4 id="二-类型转换">二、类型转换</h4>
+
+<p>我们使用反射的一个比较常见的功能是用于类型的转换，如下面的代码片段，我们目的是要把一个未知类型的值转化为字符串并返回</p>
+
+<p><a href="https://github.com/domac/mafio/blob/master/util/stringutil.go">stringutil.go</a></p>
+<pre><code>... ...
+
+func ToStr(value interface{}, args ...int) (s string) {
+    switch v := value.(type) {
+    case bool:
+        s = strconv.FormatBool(v)
+    case float32:
+        s = strconv.FormatFloat(float64(v), 'f', argInt(args).Get(0, -1), argInt(args).Get(1, 32))
+    case float64:
+        s = strconv.FormatFloat(v, 'f', argInt(args).Get(0, -1), argInt(args).Get(1, 64))
+    case int:
+        s = strconv.FormatInt(int64(v), argInt(args).Get(0, 10))
+    case int8:
+        s = strconv.FormatInt(int64(v), argInt(args).Get(0, 10))
+    case int16:
+        s = strconv.FormatInt(int64(v), argInt(args).Get(0, 10))
+    case int32:
+        s = strconv.FormatInt(int64(v), argInt(args).Get(0, 10))
+    case int64:
+        s = strconv.FormatInt(v, argInt(args).Get(0, 10))
+    case uint:
+        s = strconv.FormatUint(uint64(v), argInt(args).Get(0, 10))
+    case uint8:
+        s = strconv.FormatUint(uint64(v), argInt(args).Get(0, 10))
+    case uint16:
+        s = strconv.FormatUint(uint64(v), argInt(args).Get(0, 10))
+    case uint32:
+        s = strconv.FormatUint(uint64(v), argInt(args).Get(0, 10))
+    case uint64:
+        s = strconv.FormatUint(v, argInt(args).Get(0, 10))
+    case string:
+        s = v
+    case []byte:
+        s = string(v)
+    default:
+        s = fmt.Sprintf(&quot;%v&quot;, v)
+    }
+    return s
+}
+
+... ...
+
+</code></pre>
+
+<p>再比方说我们日常最常用的“技巧” --- 字符串与byte数组互相转换</p>
+<pre><code>func BytesToString(b []byte) string {
+    bh := (*reflect.SliceHeader)(unsafe.Pointer(&amp;b))
+    sh := reflect.StringHeader{bh.Data, bh.Len}
+    return *(*string)(unsafe.Pointer(&amp;sh))
+}
+
+func StringToBytes(s string) []byte {
+    sh := (*reflect.StringHeader)(unsafe.Pointer(&amp;s))
+    bh := reflect.SliceHeader{sh.Data, sh.Len, 0}
+    return *(*[]byte)(unsafe.Pointer(&amp;bh))
+}
+</code></pre>
+
+<p>上面例子两个 reflect 例子, 我们以 BytesToString为测试对象，看下一些基准测试：</p>
+<pre><code>func BenchmarkDirectConvert(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        b := []byte(&quot;I am gopher&quot;)
+        _ = string(b)
+    }
+}
+
+func BenchmarkReflectConvert(b *testing.B) {
+    for i := 0; i &lt; b.N; i++ {
+        b := []byte(&quot;I am gopher&quot;)
+        _ = BytesToString(b)
+    }
+}
+
+//运行结果：
+
+$ go test -v -bench=. -benchmem
+
+BenchmarkDirectConvert-4        100000000            10.8 ns/op           0 B/op           0 allocs/op
+BenchmarkReflectConvert-4       200000000             6.78 ns/op           0 B/op           0 allocs/op
+</code></pre>
+
+<p>可以看到reflect的使用在某些情况下，非但没有引起性能问题，侧面还提升了呢，所以避开场景让reflect背上性能的锅都是不客观的。</p>
+
+<h4 id="三-单机版的mapreduce">三、单机版的MapReduce</h4>
+
+<p>下面是通过反射实现一个简单的单机版简单的类MR演示</p>
+<pre><code>package main
+
+import (
+    &quot;fmt&quot;
+    &quot;reflect&quot;
+)
+
+func Map(slice interface{}, fn func(a interface{}) interface{}) interface{} {
+    val := reflect.ValueOf(slice)
+    out := reflect.MakeSlice(reflect.TypeOf(slice), val.Len(), val.Cap())
+    for i := 0; i &lt; val.Len(); i++ {
+        ret := fn(val.Index(i).Interface())
+        out.Index(i).Set(reflect.ValueOf(ret))
+    }
+    return out.Interface()
+}
+
+func main() {
+    a := []int{1, 2, 3}
+    fn := func(a interface{}) interface{} {
+        return a.(int) * 2
+    }
+    b := Map(a, fn)
+    fmt.Printf(&quot;%v\n&quot;, b)
+}
+
+</code></pre>
+
+<h4 id="四-reflect-缓存">四、reflect 缓存</h4>
+
+<p>实现reflect.Type池主要的为了某程度提升reflect的性能，避免重复操作耗时</p>
+
+<p>下面是一个屏蔽用户名字展示的测试例子：</p>
+<pre><code>type User struct {
+    Name string
+    Age  int
+}
+
+var handler = func(u *User, message string) {
+    fmt.Printf(&quot;Hello, My name is %s, I am %d years old ! so, %s\n&quot;, u.Name, u.Age, message)
+}
+
+//使用普通反射的方式处理名字屏蔽
+func filtName(u *User, message string) {
+    fn := reflect.ValueOf(handler)
+    uv := reflect.ValueOf(u)
+    name := uv.Elem().FieldByName(&quot;Name&quot;)
+    name.SetString(&quot;XXX&quot;)
+    fn.Call([]reflect.Value{uv, reflect.ValueOf(message)})
+}
+
+
+//重用部分数据减少重复创建的反射方式处理名字屏蔽
+var offset uintptr = 0xFFFF
+func filtNameWithReuseOffset(u *User, message string) {
+    if offset == 0xFFFF {
+        t := reflect.TypeOf(u).Elem()
+        name, _ := t.FieldByName(&quot;Name&quot;)
+        offset = name.Offset
+
+    }
+    up := (*[2]uintptr)(unsafe.Pointer(&amp;u))
+    upnamePtr := (*string)(unsafe.Pointer(up[0] + offset))
+    *upnamePtr = &quot;YYY&quot;
+    fn := reflect.ValueOf(handler)
+    uv := reflect.ValueOf(u)
+    fn.Call([]reflect.Value{uv, reflect.ValueOf(message)})
+}
+
+//压测数据：
+
+BenchmarkFiltName-4              5000000               376 ns/op              56 B/op          3 allocs/op
+BenchmarkFiltNameWithCache-4     5000000               268 ns/op              48 B/op          2 allocs/op
+
+</code></pre>
+
+<p>虽然不明显，但通过对部分数据的重用可以起到优化反射的作用,优化效果还是要看具体的业务实现常见， 当然如果可以把上面的缓存方法设计得更通用些，可以这样：</p>
+<pre><code>var cache = map[*uintptr]map[string]uintptr{}
+
+func filtNameWithCache(u *User, message string) {
+    itab := *(**uintptr)(unsafe.Pointer(&amp;u))
+
+    m, ok := cache[itab]
+    if !ok {
+        m = make(map[string]uintptr)
+        cache[itab] = m
+    }
+
+    offset, ok := m[&quot;Name&quot;]
+    if !ok {
+        t := reflect.TypeOf(u).Elem()
+        name, _ := t.FieldByName(&quot;Name&quot;)
+        offset = name.Offset
+        m[&quot;Name&quot;] = offset
+    }
+    up := (*[2]uintptr)(unsafe.Pointer(&amp;u))
+    upnamePtr := (*string)(unsafe.Pointer(up[0] + offset))
+    *upnamePtr = &quot;ZZZ&quot;
+    fn := reflect.ValueOf(handler)
+    uv := reflect.ValueOf(u)
+    fn.Call([]reflect.Value{uv, reflect.ValueOf(message)})
+
+}
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<p>Go的反射（reflect）是一个强大并富有表达力的工具，一般情况下它应该被小心地使用，原因有几点：</p>
+
+<ul>
+<li><p>如果通过反射实现的功能，则是在真正运行到的时候才会抛出panic异常</p></li>
+
+<li><p>反射的操作不能做静态类型检查，而且大量反射的代码可读性较差。</p></li>
+
+<li><p>一般场景基于反射的代码通常比正常的代码运行速度要慢</p></li>
+</ul>
+
+<p>不过，关于上面第三点，尽管反射存在性能问题，但依然被频繁使用，以弥补静态语言在动态行为上的不足。某些时候，我们可以配合一些手段，以提升性能</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/5/4/reflect-action.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">4</span>
                             <span class="day">27</span>
                         </span>
@@ -592,7 +1006,7 @@ func main() {
 
 <p>要想了解Go的DLL编程,可以先阅读golang官方的相关资料 : <a href="https://github.com/golang/go/wiki/WindowsDLLs">WindowsDLLs</a></p>
 
-<p>若要深入学习动态链接的相关背景和步骤，可以阅读《[程序员的自我修养]()》</p>
+<p>若要深入学习动态链接的相关背景和步骤，可以阅读《[程序员的自我修养]》</p>
 
 <h2 id="什么是syscall">什么是syscall</h2>
 
@@ -777,119 +1191,6 @@ func main() {
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/4/4/go-windows-dll.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">3</span>
-                            <span class="day">11</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/3/11/network-promisc-mode.html">关于网络的混杂模式</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="什么是网络的混杂模式">什么是网络的混杂模式</h2>
-
-<p>混杂模式（promiscuous mode）是指一台机器的网卡能够接收所有经过它的数据流，而不论其目的地址是否是它。</p>
-
-<p><a href="https://zh.wikipedia.org/wiki/%E6%B7%B7%E6%9D%82%E6%A8%A1%E5%BC%8F">维基百科</a>：一般计算机网卡都工作在非混杂模式下，此时网卡只接受来自网络端口的目的地址指向自己的数据。当网卡工作在混杂模式下时，网卡将来自接口的所有数据都捕获并交给相应的驱动程序（即不验证MAC地址）。网卡的混杂模式一般在网络管理员分析网络数据作为网络故障诊断手段时用到，同时这个模式也被网络黑客利用来作为网络数据窃听的入口。</p>
-
-<p>网卡具有如下的几种工作模式：</p>
-
-<ul>
-<li><p>广播模式（Broad Cast Model）:它的物理地址（MAC）地址是 0Xffffff 的帧为广播帧，工作在广播模式的网卡接收广播帧。</p></li>
-
-<li><p>多播传送（MultiCast Model）：多播传送地址作为目的物理地址的帧可以被组内的其它主机同时接收，而组外主机却接收不到。但是，如果将网卡设置为多播传送模式，它可以接收所有的多播传送帧，而不论它是不是组内成员。</p></li>
-
-<li><p>直接模式（Direct Model）:工作在直接模式下的网卡只接收目地址是自己 Mac地址的帧。</p></li>
-
-<li><p>混杂模式（Promiscuous Model）:工作在混杂模式下的网卡接收所有的流过网卡的帧，信包捕获程序就是在这种模式下运行的。</p></li>
-</ul>
-
-<p>网卡的缺省工作模式包含广播模式和直接模式，即它只接收广播帧和发给自己的帧。如果采用混杂模式，一个站点的网卡将接受同一网络内所有站点所发送的数据包这样就可以到达对于网络信息监视捕获的目的。</p>
-
-<blockquote>
-<p>linux 下通过命令ifconfig基本能查询当前网卡是使用哪种的工作模式</p>
-</blockquote>
-
-<h2 id="线上的一次真实案例">线上的一次真实案例</h2>
-
-<p>几个月前负责帮公司内部数据监控团队写了一个应用流量采集的底层进程模块，该模块基于Go使用的是libpcap库对网络设备的流量进行捕获并根据我们自身的业务进行封装整理。这个后台进程运行了几个月了，一直相当“安分”，没有引起告警或者占用过多资源等现场。不过&rdquo;不幸&rdquo;的事终于还是发生了。下面我还原一下事情的经过：</p>
-
-<p>某天，收到运维的同学反馈某些机器上的组件如redis、mc有超时，运维的同事协助观察发现，组件的GC正常、网络层面无丢包、mc无异常，真正对比了Haproxy的配置均无变更。但涉及的影响面20w请求就有1000~2000次的timeout现象。</p>
-
-<p>到后来，我们排查系统日志发现有蓝牙设备初始化的记录，时间点比较符合，网卡不断地在混杂模式中来回切换，可能与此相关:</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/pro.png" alt="pro" /></p>
-
-<p>经过IDC的同事排查，机房并没有外接到蓝牙设备，系统本身也没有；后来我们在一些机器上移走蓝牙模块，单担心混杂模式来回切换的现象还是会出现。</p>
-
-<p>后来我们了解到如果使用tcpdump的时候，会启用网卡的混杂模式，但服务器正常时间段内，并没有运维人员去使用tcpdump去进行操作。于是我们就把问题定位在可能是有一些后台应用定时地调用一些网卡采集的功能，于是我们通过日志分析，定位在之前的应用流量采集的后台工具中，于是我们针对有问题的机器，停止了该服务，观察了一段时间，结果问题得到解决，混杂模式没有再来回切换的情况，超时现象没有再发生。</p>
-
-<h2 id="修补方案">修补方案</h2>
-
-<p>既然问题得到定位，就要思考问什么，和如何修复了。应用流量监控模块，我这边是直接采用了 <code>github.com/google/gopacket/pcap</code> 这个库。</p>
-
-<p>后来发现问题所在了，我其中的handler调用的函数定义：</p>
-<pre><code class="language-go">
-// OpenLive opens a device and returns a *Handle.
-// It takes as arguments the name of the device (&quot;eth0&quot;), the maximum size to
-// read for each packet (snaplen), whether to put the interface in promiscuous
-// mode, and a timeout.
-//
-// See the package documentation for important details regarding 'timeout'.
-func OpenLive(device string, snaplen int32, promisc bool, timeout time.Duration) (handle *Handle, _ error) {
-    buf := (*C.char)(C.calloc(errorBufferSize, 1))
-    defer C.free(unsafe.Pointer(buf))
-
-    var pro C.int
-    if promisc {
-        pro = 1
-    }
-    p := &amp;Handle{timeout: timeout, device: device}
-
-    ifc, err := net.InterfaceByName(device)
-    if err != nil {
-        // The device wasn't found in the OS, but could be &quot;any&quot;
-        // Set index to 0
-        p.deviceIndex = 0
-    } else {
-        p.deviceIndex = ifc.Index
-    }
-
-    dev := C.CString(device)
-    defer C.free(unsafe.Pointer(dev))
-
-    p.cptr = C.pcap_open_live(dev, C.int(snaplen), pro, timeoutMillis(timeout), buf)
-    if p.cptr == nil {
-        return nil, errors.New(C.GoString(buf))
-    }
-
-    if err := p.openLive(); err != nil {
-        C.pcap_close(p.cptr)
-        return nil, err
-    }
-
-    return p, nil
-}
-</code></pre>
-
-<p>其中第三个参数是指是否开启混杂模式，我之前调用的代码是这样的：</p>
-<pre><code>handle, err := pcap.OpenLive(faceName, int32(*snaplen), true, 500)
-</code></pre>
-
-<p>坑啊，之前没有仔细测试，直接赋值了一个true, 也就是说这个服务强制了使用了混杂模式对网卡进行监听，在流量高峰的时候，很容易导致某些网络服务timeout的现象。 啊~，心中万马奔腾，原来是自己的大意疏忽！！要引以为戒。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/3/11/network-promisc-mode.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

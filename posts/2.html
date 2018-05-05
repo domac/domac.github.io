@@ -49,6 +49,119 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">3</span>
+                            <span class="day">11</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/3/11/network-promisc-mode.html">关于网络的混杂模式</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="什么是网络的混杂模式">什么是网络的混杂模式</h2>
+
+<p>混杂模式（promiscuous mode）是指一台机器的网卡能够接收所有经过它的数据流，而不论其目的地址是否是它。</p>
+
+<p><a href="https://zh.wikipedia.org/wiki/%E6%B7%B7%E6%9D%82%E6%A8%A1%E5%BC%8F">维基百科</a>：一般计算机网卡都工作在非混杂模式下，此时网卡只接受来自网络端口的目的地址指向自己的数据。当网卡工作在混杂模式下时，网卡将来自接口的所有数据都捕获并交给相应的驱动程序（即不验证MAC地址）。网卡的混杂模式一般在网络管理员分析网络数据作为网络故障诊断手段时用到，同时这个模式也被网络黑客利用来作为网络数据窃听的入口。</p>
+
+<p>网卡具有如下的几种工作模式：</p>
+
+<ul>
+<li><p>广播模式（Broad Cast Model）:它的物理地址（MAC）地址是 0Xffffff 的帧为广播帧，工作在广播模式的网卡接收广播帧。</p></li>
+
+<li><p>多播传送（MultiCast Model）：多播传送地址作为目的物理地址的帧可以被组内的其它主机同时接收，而组外主机却接收不到。但是，如果将网卡设置为多播传送模式，它可以接收所有的多播传送帧，而不论它是不是组内成员。</p></li>
+
+<li><p>直接模式（Direct Model）:工作在直接模式下的网卡只接收目地址是自己 Mac地址的帧。</p></li>
+
+<li><p>混杂模式（Promiscuous Model）:工作在混杂模式下的网卡接收所有的流过网卡的帧，信包捕获程序就是在这种模式下运行的。</p></li>
+</ul>
+
+<p>网卡的缺省工作模式包含广播模式和直接模式，即它只接收广播帧和发给自己的帧。如果采用混杂模式，一个站点的网卡将接受同一网络内所有站点所发送的数据包这样就可以到达对于网络信息监视捕获的目的。</p>
+
+<blockquote>
+<p>linux 下通过命令ifconfig基本能查询当前网卡是使用哪种的工作模式</p>
+</blockquote>
+
+<h2 id="线上的一次真实案例">线上的一次真实案例</h2>
+
+<p>几个月前负责帮公司内部数据监控团队写了一个应用流量采集的底层进程模块，该模块基于Go使用的是libpcap库对网络设备的流量进行捕获并根据我们自身的业务进行封装整理。这个后台进程运行了几个月了，一直相当“安分”，没有引起告警或者占用过多资源等现场。不过&rdquo;不幸&rdquo;的事终于还是发生了。下面我还原一下事情的经过：</p>
+
+<p>某天，收到运维的同学反馈某些机器上的组件如redis、mc有超时，运维的同事协助观察发现，组件的GC正常、网络层面无丢包、mc无异常，真正对比了Haproxy的配置均无变更。但涉及的影响面20w请求就有1000~2000次的timeout现象。</p>
+
+<p>到后来，我们排查系统日志发现有蓝牙设备初始化的记录，时间点比较符合，网卡不断地在混杂模式中来回切换，可能与此相关:</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/pro.png" alt="pro" /></p>
+
+<p>经过IDC的同事排查，机房并没有外接到蓝牙设备，系统本身也没有；后来我们在一些机器上移走蓝牙模块，单担心混杂模式来回切换的现象还是会出现。</p>
+
+<p>后来我们了解到如果使用tcpdump的时候，会启用网卡的混杂模式，但服务器正常时间段内，并没有运维人员去使用tcpdump去进行操作。于是我们就把问题定位在可能是有一些后台应用定时地调用一些网卡采集的功能，于是我们通过日志分析，定位在之前的应用流量采集的后台工具中，于是我们针对有问题的机器，停止了该服务，观察了一段时间，结果问题得到解决，混杂模式没有再来回切换的情况，超时现象没有再发生。</p>
+
+<h2 id="修补方案">修补方案</h2>
+
+<p>既然问题得到定位，就要思考问什么，和如何修复了。应用流量监控模块，我这边是直接采用了 <code>github.com/google/gopacket/pcap</code> 这个库。</p>
+
+<p>后来发现问题所在了，我其中的handler调用的函数定义：</p>
+<pre><code class="language-go">
+// OpenLive opens a device and returns a *Handle.
+// It takes as arguments the name of the device (&quot;eth0&quot;), the maximum size to
+// read for each packet (snaplen), whether to put the interface in promiscuous
+// mode, and a timeout.
+//
+// See the package documentation for important details regarding 'timeout'.
+func OpenLive(device string, snaplen int32, promisc bool, timeout time.Duration) (handle *Handle, _ error) {
+    buf := (*C.char)(C.calloc(errorBufferSize, 1))
+    defer C.free(unsafe.Pointer(buf))
+
+    var pro C.int
+    if promisc {
+        pro = 1
+    }
+    p := &amp;Handle{timeout: timeout, device: device}
+
+    ifc, err := net.InterfaceByName(device)
+    if err != nil {
+        // The device wasn't found in the OS, but could be &quot;any&quot;
+        // Set index to 0
+        p.deviceIndex = 0
+    } else {
+        p.deviceIndex = ifc.Index
+    }
+
+    dev := C.CString(device)
+    defer C.free(unsafe.Pointer(dev))
+
+    p.cptr = C.pcap_open_live(dev, C.int(snaplen), pro, timeoutMillis(timeout), buf)
+    if p.cptr == nil {
+        return nil, errors.New(C.GoString(buf))
+    }
+
+    if err := p.openLive(); err != nil {
+        C.pcap_close(p.cptr)
+        return nil, err
+    }
+
+    return p, nil
+}
+</code></pre>
+
+<p>其中第三个参数是指是否开启混杂模式，我之前调用的代码是这样的：</p>
+<pre><code>handle, err := pcap.OpenLive(faceName, int32(*snaplen), true, 500)
+</code></pre>
+
+<p>坑啊，之前没有仔细测试，直接赋值了一个true, 也就是说这个服务强制了使用了混杂模式对网卡进行监听，在流量高峰的时候，很容易导致某些网络服务timeout的现象。 啊~，心中万马奔腾，原来是自己的大意疏忽！！要引以为戒。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/3/11/network-promisc-mode.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">1</span>
                             <span class="day">1</span>
                         </span>
@@ -131,42 +244,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/11/14/ats-caching.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
-                            <span class="day">29</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/10/29/ansi-c-const.html">C语言的限定符修饰问题</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>最近阅读 《<a href="https://book.douban.com/subject/2377310/">Expert C Programming</a>》，有一个问题是这样的：</p>
-<pre><code>foo(const char **p) {}
-
-main(int argc, char **argv)
-{
-    foo(argv)
-}
-</code></pre>
-
-<p>如果编译这段代码，编译器会发出一条警告信息如下：</p>
-<pre><code>warning: argument is incompatible with prototype
-</code></pre>
-
-<p>一般情况很多人会认为实参<code>char *s</code> 与形参 <code>const char *p</code> 应该是相容的，标准库中所有的字符串处理函数都是这样的。那么为什么 实参<code>char **argv</code> 与形参 <code>const char **p</code> 实际上不相容呢？</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/10/29/ansi-c-const.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
