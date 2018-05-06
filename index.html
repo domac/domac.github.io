@@ -71,11 +71,23 @@
 
 <p>Go不是面向对象的语言，所以它的类型系统特点是没有泛型、没有继承的，所有的类型都是一个interface。</p>
 
-<p>我觉得Go的类型主要是分两种的：</p>
+<p>首先Go的类型系统主要是静态类型的，主要分两种：</p>
 
-<p>一种是指定类型的变量类型（例如 int、string、float32等），在创建变量的时候已经确定具体类型</p>
+<ul>
+<li><p>一种是预声明类型/pre-declared type，在创建变量的时候已经确定具体类型。go默认的有几个预声明类型：boole,num,string type。这些预声明类型被用来构造其他的类型。</p></li>
 
-<p>一种是concrete类型，主要面向interface相关的类型，interface类型的变量总是具有相同的静态类型，即使在运行时在接口变量中的值可能改变，但该值始终满足接口</p>
+<li><p>一种是字面量类型/type literal（array,struct,pointer,slice,map,channel,function,interface）</p></li>
+</ul>
+
+<blockquote>
+<p>注意：type literal 中的struct,interface 特指匿名的类型，没有使用type包装，</p>
+</blockquote>
+
+<p>每一个类型都有一个底层类型(underlying type)</p>
+
+<p>在静态类型的基础上，Go提供了interface机制，它使得Go这样的静态语言拥有了一定的动态性，但却又不损失静态语言在类型安全方面拥有的编译时检查的优势。interface让我们程序设计中做到依赖于接口而不是实现，优先使用组合而不是继承，这是Go程序开发中抽象的方案。</p>
+
+<p>而reflect主要是面向interface相关的类型，interface类型的变量总是具有相同的静态类型（具有某种底层类型），即使在运行时在接口变量中的值可能改变，但该值始终满足接口</p>
 
 <p>Go语言中反射的操作主要定义在标准库reflect中，在标准库中定义了两种类型来表现运行时的对象信息，分别是：reflect.Value（反射对象的类型）和 reflect.Type（反射对象的值），所有反射操作都是基于这两个类型进行的。</p>
 
