@@ -89,7 +89,7 @@
 
 <p>而reflect主要是面向interface相关的类型，interface类型的变量总是具有相同的静态类型（具有某种底层类型），即使在运行时在接口变量中的值可能改变，但该值始终满足接口</p>
 
-<p>Go语言中反射的操作主要定义在标准库reflect中，在标准库中定义了两种类型来表现运行时的对象信息，分别是：reflect.Value（反射对象的类型）和 reflect.Type（反射对象的值），所有反射操作都是基于这两个类型进行的。</p>
+<p>Go语言中反射的操作主要定义在标准库reflect中，在标准库中定义了两种类型来表现运行时的对象信息，分别是：reflect.Type（反射对象的类型）和 reflect.Value（反射对象的值），所有反射操作都是基于这两个类型进行的。</p>
 
 <p>为了说明reflect处理类型的相关知识，我们先看一个例子：</p>
 <pre><code>file, err := os.Open(&quot;/tmp/test.log&quot;)
