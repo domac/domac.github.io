@@ -4,7 +4,7 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Thu, 31 May 2018 18:45:34 +0800</pubDate>
+    <pubDate>Thu, 31 May 2018 19:36:52 +0800</pubDate>
     <item>
       <title>consul集群搭建与Golang服务发现示例</title>
       <link>http://lihaoquan.me/2018/5/31/consul-in-action.html</link>
