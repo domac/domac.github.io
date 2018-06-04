@@ -228,17 +228,16 @@ go install
 <p>接着, 我们进行数据格式的定义, 写一个简单的例子:
 我们在 $GOPATH下新建一个测试项目 pblearn/packet
 在 $GOPATH/pblearn/packet 下, 创建一个名为 packet.proto 的文件, 然后编写如下的内容</p>
-<pre><code class="language-proto">package packet;
+<pre><code class="language-proto">syntax = &quot;proto2&quot;;
+package packet;
 message Header{
     required string messageId = 1;
-    required string topic = 2; //topic类型
+    required string topic = 2;
 }
-//byte类消息
 message BytesMessage{
     required Header  header= 1;
     required  bytes body = 2;    
 }
-//string类型的message
 message StringMessage{
     required Header header = 1;
     required string body = 2;
@@ -248,43 +247,52 @@ message StringMessage{
 <p>然后通过 –go_out 来使用 goprotobuf 提供的 Protobuf 插件 protoc-gen-go。这时候我们会生成一个名为 test.pb.go 的源文件, 参考如下</p>
 <pre><code class="language-bash">protoc --go_out=. *.proto
 </code></pre>
+<pre><code>注：若在编译过程中出现以下的报错
+
+MyRequest.proto:1:1: Expected top-level statement (e.g. &quot;message&quot;).
+
+可能起因: 实际上是由于在简体操作系统下,默认的proto文件,其实就是文本文件,的&quot;被读取编码&quot;是GB2312,如果proto文件不是使用该编码编写的,而是utf-8等其他格式,文件头会有乱码,即在message前会有1位乱码,导致protoc程序无法识别到messge开头的标识,导致了异常,
+
+解决: 修改GB2312编码保存后，继续编译成功.
+</code></pre>
 
 <p>命令执行后, pblearn/packet 下会生成一个go的文件 packet.pb.go, 这个就是我们消息操作对象</p>
 
 <p>最后,我们可以编写测试例子, 在 在 $GOPATH/pblearn/ 下,我们编写 main.go</p>
 <pre><code class="language-go">package main
- 
+
 import (
     // 辅助库
     &quot;github.com/golang/protobuf/proto&quot;
     // test.pb.go 的路径
-    &quot;pblearn/packet&quot;
+    &quot;./packet&quot;
 )
- 
+
 func main() {
- 
-    bodyData := &quot;guangzhou/fangcun/vip/company&quot;
- 
+
+    bodyData := &quot;shenzhen/nanshan/tencent/company&quot;
+
     p := &amp;packet.StringMessage{
         Body: proto.String(bodyData),
         Header: &amp;packet.Header{
-            MessageId: proto.String(&quot;20-05&quot;),
+            MessageId: proto.String(&quot;1234567890&quot;),
             Topic:     proto.String(&quot;golang&quot;),
         },
     }
- 
+
     pData, err := proto.Marshal(p)
- 
+
     if err != nil {
         println(err.Error())
     }
     println(string(pData))
- 
+
     p2 := &amp;packet.StringMessage{}
     proto.Unmarshal(pData, p2)
- 
+
     println(p2.GetHeader().GetTopic())
 }
+
 </code></pre>
 
 <p>通过运行例子 go run main.go  可以发现, 我们的数据格式可以正常的序列化和反序列化了.</p>
