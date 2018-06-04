@@ -140,7 +140,7 @@ message StringMessage{
 </code></pre>
 <pre><code>注：若在编译过程中出现以下的报错
 
-MyRequest.proto:1:1: Expected top-level statement (e.g. &quot;message&quot;).
+packet.proto:1:1: Expected top-level statement (e.g. &quot;message&quot;).
 
 可能起因: 实际上是由于在简体操作系统下,默认的proto文件,其实就是文本文件,的&quot;被读取编码&quot;是GB2312,如果proto文件不是使用该编码编写的,而是utf-8等其他格式,文件头会有乱码,即在message前会有1位乱码,导致protoc程序无法识别到messge开头的标识,导致了异常,
 
