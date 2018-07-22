@@ -50,6 +50,43 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">4</span>
+                            <span class="day">24</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/4/24/go-reverse-proxy.html">使用Go开发一个简单反向代理服务</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>最近，团队的小伙伴反映，我们这边一个短连接服务在一台普通的服务器上吞吐量受到限制，所以把服务迁移到高性能机器上，虽然硬件是数倍的提升但压测发现吞吐量并没有预期的效果。</p>
+
+<p>结合后台服务本身的特点初步原因分析：</p>
+
+<ul>
+<li><p>1、从下往上看：服务属于计算IO密集型，性能瓶颈多在于计算请求，但高配机压测过程中，受到单实例模块之间通讯采用串行调用的特点，虽然单点请求计算性能有很大提速，但总体并行上不去，CPU利用率低</p></li>
+
+<li><p>2、从上往下看： 吞吐量受服务器的接受能力影响很大，由于短连接接入层目前只有一个实例，无论部署在中配或是高配，除非是多实例模式或者类似nginx这种多worker工作模型，一般情况下，单实例accept的效果有限，高并发时容易成为瓶颈</p></li>
+
+<li><p>3、从服务进程的角度看，单个web api的请求accept队列（backlog）是有限制的，如果多实例部署也许能补短。</p></li>
+</ul>
+
+<p>分析到这里，很多人都想到可以通过扩容+分布式通讯的方式来弥补短板。是的，方法是摆在面前，但是你想到一个方法不难，难的是你要如何去验证你的想法。毕竟对于一个成熟的产品技术框架，不是随便都能重构的，一定要数据说话。</p>
+
+<p>不过如何调优不是本文的目的，本文的目的是如何使用Go来快速实现一个反向代理服务来验证前面的背景想法。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/4/24/go-reverse-proxy.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">4</span>
                             <span class="day">4</span>
                         </span>
                             </div>
@@ -125,39 +162,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/1/1/bit-operator.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">12</span>
-                            <span class="day">11</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/12/11/read-big-file-in-go.html">用Go统计大文件小点滴</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>今天，团队里面的小伙伴说手头上有一些几个G以上的文件，需要统计文件里面的数据（文件里面的数据很简单都是Key:Value这样的组织形式）。然后咱俩随便抽了一个5G多的文件，用很普通的方式写了几行代码，流程是 <code>读文件--&gt;扫文件--&gt;识别KV--&gt;统计</code>。</p>
-
-<p>然后程序跑了一趟，发现竟然要5分多钟。十分惊讶下，我想，明明很简单的逻辑的代码为什么要跑这么慢。然后我看了一下初版的代码，发现引起性能问题的几个点，分别是：</p>
-
-<ul>
-<li>strconv的频繁使用</li>
-<li>map[string]uint64形式的对象频繁调用</li>
-<li>为了识别KV，遍历文件时使用了 split 函数</li>
-</ul>
-
-<p>下面是最开始的代码：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/12/11/read-big-file-in-go.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
