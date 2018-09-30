@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Postgresql主从异步流复制方案 - domac的菜园子</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="postgresql master slave ha"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac的菜园子 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">9</span>
+                            <span class="day">29</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/9/29/postgresql-master-slave-ha.html">Postgresql主从异步流复制方案</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/db.html">db</a>
+                            <a class="tag label label-info" href="/tags/postgresql.html">postgresql</a>
+                            <a class="tag label label-info" href="/tags/pg.html">pg</a>
+                        </aside>
+                        <section class="brief"><p>数据库的备份工作在日常生产中极为重要，如果你咨询一个DBA如何才能设计出高可用的数据备份与恢复方案，相信很多人都会从架构上给出很多容灾的意见。但归根到底,如果业务环节中数据库还牵涉到分布式环境，我认为一个好的方案需要达到三大要求：</p>
+
+<ul>
+<li>多副本</li>
+<li>持久化</li>
+<li>一致性</li>
+</ul>
+
+<p>日常架构设计中，我们不仅要保证数据额的成功备份，还要保证备份的数据可以快速恢复。在众多备份恢复可靠性方案中 <code>主从复制</code> 技术，可以说是最常见的实现，本文主要是介绍postgresql主备数据库的异步流复制的环境搭建与主备切换的操作实践，除了能把一些基础的原理运用在日常的数据库运维中，也可以加深对Postgresql数据库的底层知识了解。</p>
+
+<!--more-->
+
+<p>下面的学习与实践主要针对PostgreSQL的异步流复制（本文没有涉及到同步复制、逻辑复制等，如果大家想了解其它的备份方案，可以阅读相关官方文档或其他资料介绍）。</p>
+
+<p>异步流复制的中心思想是：主库上提交事务时不需要等待备库接收WAL日志流并写入到备库WAL日志文件时便返回成功，因此异步流复制的TPS会相对同步流复制要高，延迟更低。</p>
+
+<h2 id="环境准备">环境准备</h2>
+
+<table>
+<thead>
+<tr>
+<th align="center">操作系统</th>
+<th align="center">服务器IP</th>
+<th align="center">节点名称</th>
+<th align="right">角色</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td align="center">centos 7.2</td>
+<td align="center">172.17.0.2</td>
+<td align="center">pghost1</td>
+<td align="right">主库</td>
+</tr>
+
+<tr>
+<td align="center">centos 7.2</td>
+<td align="center">172.17.0.5</td>
+<td align="center">pghost2</td>
+<td align="right">备库</td>
+</tr>
+</tbody>
+</table>
+
+<p>主要目录规范：</p>
+
+<ul>
+<li><p>数据目录： /data/pg10/pg_root</p></li>
+
+<li><p>表空间目录： /data/pg10/pg_tbs</p></li>
+
+<li><p>应用程序目录： /apps/svr/pgsql</p></li>
+</ul>
+
+<p>要注意的是：编译安装Pg我们使用的是root账户，但是一般情况下，我们对数据库的部署操作等应该使用非root的pg超级管理员账户，所以需要我们预先创建相关用户和目录，并设置相关权限：</p>
+<pre><code>$ groupadd postgres
+
+$ useradd postgres -g postgres
+
+$ passwd postgres
+
+$ mkdir -p /data/pg10/pg_root
+
+$ mkdir -p /data/pg10/tbs
+
+$ chown -R postgres:postgres /data/pg10
+</code></pre>
+
+<p>实验用的postgresql为10.0版本</p>
+
+<p>pghost1 和 pghost2 分别下载该版本的源码安装包</p>
+<pre><code>wget https://ftp.postgresql.org/pub/source/v10.0/postgresql-10.0.tar.gz
+</code></pre>
+
+<p>下载后进行解压</p>
+<pre><code>tar -zxvf postgresql-10.0.tar.gz
+</code></pre>
+
+<h4 id="安装前依赖">安装前依赖</h4>
+
+<p>由于 configure过程中依赖操作系统包zlib、readline等，所以我实用yum预先安装：</p>
+<pre><code>yum groupinstall &quot;Development tools”
+
+yum install -y bison flex readline readline-devel zlib zlib-devel
+</code></pre>
+
+<h2 id="主备库数据库安装">主备库数据库安装</h2>
+
+<p>安装前，我们先分别对pghost1 和 pghost2创建postgresql的偏好环境变量</p>
+<pre><code>vi /etc/profile.d/pgsql.sh
+</code></pre>
+
+<p>追加以下内容：</p>
+<pre><code>export PGPORT=1921
+export PGUSER=postgres
+export PGDATA=/data/pg10/pg_root
+export LANG=en_US.utf8
+export PGHOME=/apps/svr/pgsql
+export LD_LIBRARY_PATH=$PGHOME/lib:/lib64:/usr/lib64:/usr/local/lib64:/lib:/usr/lib:/usr/local/lib
+export PATH=$PGHOME/bin:$PATH:.
+export MANPATH=$PGHOME/share/man:$MANPATH
+
+alias rm='rm -i'
+alias ll='ls -lh'
+</code></pre>
+
+<p>保存文件，并让环境变量生效:</p>
+<pre><code>source /etc/profile.d/pgsql.sh
+</code></pre>
+
+<p>再进入刚刚解压的 postgresql-10.0 目录中，执行以下命令：</p>
+<pre><code>./configure —prefix=/apps/svr/pgsql_10.0/ --with-pgport=1921
+</code></pre>
+
+<p>之后进行编译安装：</p>
+<pre><code>gmake
+
+gmake install
+</code></pre>
+
+<p>安装完成后，我们可以使用以下命令确认是否安装成功：</p>
+<pre><code>$ postgres --version
+
+postgres (PostgreSQL) 10.0
+</code></pre>
+
+<h2 id="复制功能部署">复制功能部署</h2>
+
+<p>在启动数据库服务搭建主从结构前，有几个比较重要的配置文件需要我们额外地进行创建与设置的,它们分别是：</p>
+
+<ul>
+<li><p>postgreql.conf</p></li>
+
+<li><p>pg_hba.conf</p></li>
+
+<li><p>recovery.conf</p></li>
+
+<li><p>.pgpass</p></li>
+</ul>
+
+<p>下面我们会在实践中，具体地对上述的文件的配置进行相关说明</p>
+
+<p>上一节，我们编译安装好了postgresql，我们接下来切换操作用户</p>
+<pre><code>su postgresql
+</code></pre>
+
+<p>然后使用initdb工具初始化数据库：</p>
+<pre><code>initdb -D /data/pg10/pg_root -E UTF8 --locale=C -U postgres -W
+</code></pre>
+
+<p>执行上述命令后，在/data/pg10/pg_root目录下会产生系统数据文件，</p>
+<pre><code>PG_VERSION    pg_dynshmem    pg_multixact  pg_snapshots  pg_tblspc    postgresql.auto.conf
+base          pg_hba.conf    pg_notify     pg_stat       pg_twophase  postgresql.conf
+global        pg_ident.conf  pg_replslot   pg_stat_tmp   pg_wal
+pg_commit_ts  pg_logical     pg_serial     pg_subtrans   pg_xact
+</code></pre>
+
+<p>之后我们开始配置 <code>/data/pg10/pg_root/postgresql.conf</code>，修改以下几个关键项：</p>
+<pre><code>listen_addresses = '0.0.0.0'
+wal_level = replica             
+archive_mode = on            
+archive_command = '/bin/date'  
+max_wal_senders = 10         
+wal_keep_segments = 16
+hot_standby = on
+</code></pre>
+
+<blockquote>
+<p>注：主库和备库的 /data/pg10/pg_root/postgresql.conf 配置建议完全一致</p>
+</blockquote>
+
+<p>接下来我们在 <code>备库</code> 上配置 <code>/data/pg10/pg_root/pg_hba.conf</code></p>
+<pre><code>host    replication     repuser          172.17.0.2/32            md5
+host    replication     repuser          172.17.0.5/32            md5
+</code></pre>
+
+<p>其实最好主库也配置一份，因为主库和备库的角色不是静止的，在手动或库出现故障情况下，它们的角色会互相更换。</p>
+
+<p>之后，我们先启动主库 pghost1了 (记得切换到postgres用户)：</p>
+<pre><code>$ pg_ctl start
+
+...
+...
+database system is ready to accept connections
+ done
+server started
+</code></pre>
+
+<p>使用PostgreSQL的超级管理员postgres登录到创建流复制用户repuser，流复制用户需要有 REPLICATION权限和LOGIN权限</p>
+<pre><code>$ psql
+psql (10.0)
+Type &quot;help&quot; for help.
+
+postgres=# CREATE USER repuser REPLICATION  LOGIN CONNECTION LIMIT 5 ENCRYPTED PASSWORD 'domac123';
+
+CREATE ROLE
+</code></pre>
+
+<p>以上命令基本完成主库上的配置，接下来我们需要热备生成一个备库，制作备库过程中主库仍然可以读写，不影响业务，我们在主库上创建备份任务：</p>
+<pre><code>postgres=# select pg_start_backup('domacli_bak');
+
+ pg_start_backup
+-----------------
+ 0/2000060
+(1 row)
+</code></pre>
+
+<p>pg_start_backup() 函数会在主库上发起一个在线备份，命令执行后，将数据文件压缩拷贝到备份节点上:</p>
+<pre><code>$ tar czvf pg_root.tar.gz pg_root --exclude=pg_root/pg_wal
+
+$ scp pg_root.tar.gz postgres@172.17.0.5:/data/pg10
+</code></pre>
+
+<p>pg_wal目录不是必须复制的，可以排除这个目录，以节省空间，然后我们回到备库的/data/pg10下，执行主库备份文件的解压：</p>
+<pre><code>$ tar xvf pg_root.tar.gz
+</code></pre>
+
+<p>解压后，我们回到主节点，执行停止备份命令，结束这次备份流程</p>
+<pre><code>postgres=# select pg_stop_backup();
+
+NOTICE:  pg_stop_backup complete, all required WAL segments have been archived
+ pg_stop_backup
+----------------
+ 0/2000168
+(1 row)
+</code></pre>
+
+<p>以上的命令表示完成在线备份，但备库上扔需要做一些配置，我们回到备库上，配置 /data/pg10/pg_root/recovery.conf文件，如果该文件不存在，可以执行以下命令，在软件目录中复制一个：</p>
+<pre><code>cp $PGHOME/share/recovery.conf.sample /data/pg10/pg_root/recovery.conf
+</code></pre>
+
+<p>备库的 recovery.conf 配置以下参数</p>
+<pre><code>recovery_target_timeline = 'latest'
+standby_mode = on
+primary_conninfo = 'host=172.17.0.2  port=1921 user=repuser'
+</code></pre>
+
+<p>主要观察recovery.conf中的参数<code>primary_conninfo</code> 中的 <code>user=repuser</code>,  还记得我们前面在主库上创建的流传输用户repuser吗？由于主备直接数据同步需要在用户下执行操作，而主库上我们创建repuser的时候，为了安全我设置了密码, 但recovery.conf我们没有配置明文密码，那么程序的密码如何获得呢？</p>
+
+<p>我们建议把密码设置在 ~/.pgpass中：</p>
+<pre><code>$ cd ~
+$ touch .pgpass
+$ chmod 0600 .pgpass
+</code></pre>
+
+<p>填写以下内容：</p>
+<pre><code>172.17.0.2:1921:replication:repuser:domac123
+172.17.0.5:1921:replication:repuser:domac123
+</code></pre>
+
+<p>好了，当这些备注都就绪之后，我们可以开始启动我们的备库了：</p>
+<pre><code>$ pg_ctl start
+
+...
+
+database system is ready to accept read only connections
+ done
+server started
+</code></pre>
+
+<p>如果备库正常启动，我们可以在主备两库上观察WAL发生与接收进程是否都同时工作，以确认异步流工作是否正常工作</p>
+
+<p>主库上：</p>
+<pre><code>ps -ef | grep wal
+
+postgres  6939  6935  0 23:16 ?        00:00:00 postgres: wal writer process
+postgres  6983  6935  0 23:42 ?        00:00:00 postgres: wal sender process repuser 172.17.0.5(45910) streaming 0/3000140
+</code></pre>
+
+<p>备库上：</p>
+<pre><code>ps -ef | grep wal
+
+postgres 26481 26479  0 23:42 ?        00:00:00 postgres: wal receiver process   streaming 0/3000140
+postgres 26486 26448  0 23:42 ?        00:00:00 grep --color=auto wal
+</code></pre>
+
+<p>当然，稳妥起见，我们最好多动手动手，尝试在主库上创建并插入数据，观察备库上是否同步这些操作，我们再主库上创建一张表：</p>
+<pre><code>postgres=# create table test_ms(id int4);
+
+CREATE TABLE
+
+postgres=# insert into test_ms values(6);
+
+INSERT 0 1
+</code></pre>
+
+<p>主库上，我们创建test_ms表，并插入了一条数据，我们就可以在<code>备库</code>上进行查询观察是否同步成功：</p>
+<pre><code>postgres=# select * from test_ms;
+ id
+----
+  6
+(1 row)
+</code></pre>
+
+<p>接下来，我们再主库上，再操作</p>
+<pre><code>postgres=# insert into test_ms values(9);
+INSERT 0 1
+
+postgres=# delete from test_ms where id=6;
+DELETE 1
+</code></pre>
+
+<p>这个时候，我们发现备库的数据也都正常同步上了：</p>
+<pre><code>postgres=# select * from test_ms;
+ id
+----
+  9
+(1 row)
+</code></pre>
+
+<p>那么我们如果在备份上进行数据操作，情况会怎样呢？我们再备份上执行：</p>
+<pre><code>postgres=# insert into test_ms values(6);
+
+ERROR:  cannot execute INSERT in a read-only transaction
+STATEMENT:  insert into test_ms values(6);
+ERROR:  cannot execute INSERT in a read-only transaction
+</code></pre>
+
+<p>观察这些错误日志，我们可以了解到，异步流主从结构中，作为从节点的备库目前处于的是只读状态，它不能进行任何写入操作。</p>
+
+<h2 id="主备切换">主备切换</h2>
+
+<p>前面介绍了流复制的部署，但要注意的是主库和备库的角色不是静态存在的，在维护过程中可以对两者的进行角色的切换，举个例子，当主库挂掉的时候，需要迅速进行主备切换，让备库升级为主库，原主库降级到备库，主备切换是PostgreSQL高可用的基础，下面就介绍相关的操作。</p>
+
+<p>postgresql 9.0版本流复制只能通过创建文件方式进行主备切换，9.1后，开始支持使用pg_ctl promote触发方式，相比文件触发方式操作更方便</p>
+
+<p>操作前，我们先介绍一个系统函数查用来判断主备角色的方法：</p>
+<pre><code>postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ f
+(1 row)
+</code></pre>
+
+<p>如果返回 <strong><code>f</code></strong> 说明是主库，返回 <strong><code>t</code></strong> 说明是备库</p>
+
+<h4 id="pg-ctl-promote-切换方式">pg_ctl promote 切换方式</h4>
+
+<p>我们使用以下的步骤进行主备切换：</p>
+
+<p>1、关闭主库，建议使用 -m fast 模式关闭</p>
+<pre><code>$ pg_ctl stop -m fast
+</code></pre>
+
+<p>2、在备库上执行pg_ctl promote命令激活备库，如果recovery.conf变成recovery.done表示备库已切换成主库</p>
+<pre><code>pg_ctl promote
+waiting for server to promote....2018-09-30 00:10:30.222 UTC [26480] LOG:  received promote request
+LOG:  redo done at 0/4000028
+LOG:  last completed transaction was at log time 2018-09-29 23:50:52.502513+00
+LOG:  selected new timeline ID: 2
+LOG:  archive recovery complete
+LOG:  database system is ready to accept connections
+Sun Sep 30 00:10:30 UTC 2018
+Sun Sep 30 00:10:30 UTC 2018
+ done
+server promoted
+</code></pre>
+
+<p>命令执行后，如果原来的 recovery.conf 更名为 recovery.done, 表示切换成功</p>
+
+<p>3、这时如果需要将老的主库切换成备库，在老的主库的$PGDATA目录下也创建recovery.conf文件（创建方式跟之前介绍的一样，内容可以和原从库pghost2的一样，只是primary_conninfo的IP换成对端pghost2的IP）</p>
+
+<p>例如，主库上的 recovery.conf 设置为：</p>
+<pre><code>recovery_target_timeline = 'latest'
+standby_mode = on
+primary_conninfo = 'host=172.17.0.5  port=1921 user=repuser'
+</code></pre>
+
+<p>与此同时，和原备库pghost2一样，我们建议把repuser的密码设置在pghost1 ~/.pgpass中：</p>
+<pre><code>$ cd ~
+$ touch .pgpass
+$ chmod 0600 .pgpass
+</code></pre>
+
+<p>填写以下内容：</p>
+<pre><code>172.17.0.2:1921:replication:repuser:domac123
+172.17.0.5:1921:replication:repuser:domac123
+</code></pre>
+
+<p>4、启动老的主库pghost1，这时观察主、备进行是否正常，严格点可以在新的主库上对刚才的test_ms表进行操作，观察数据是否同步成功。</p>
+
+<p>我们再新主库（pghost2）上执行：</p>
+<pre><code>postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ f
+(1 row)
+</code></pre>
+
+<p>发现它目前的角色已经是主库了， 在新备库（pghost1）上继续执行：</p>
+<pre><code>postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ t
+(1 row)
+</code></pre>
+
+<p>发现它目前的角色也已经切换为备库了</p>
+
+<p>我们再pghost2上，执行数据插入操作：</p>
+<pre><code>postgres=# insert into test_ms values(11);
+INSERT 0 1
+</code></pre>
+
+<p>这时，pghost1上也观察到数据同步成功：</p>
+<pre><code>postgres=# select * from test_ms;
+ id
+----
+  9
+ 11
+(2 rows)
+</code></pre>
+
+<p>到这里为止，主从切换的演练基本完成了</p>
+
+<h2 id="总结">总结</h2>
+
+<p>异步流复制模式中，主库提交的事务不会等待备库接收WAL日志流并返回确认信息，因此异步流复制模式下主库与备库的数据版本上会存在一定的处理延迟，延迟的时间主要受主库压力、备库主机性能、网络带宽等影响，当正常情况下，主备的延迟通常在毫秒级的范围内，当主库宕机，这个延迟就主要受到故障发现与切换时间的影响而拉长，不够这些数据可以从架构或相关自动化运维手段不断优化设置。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2018 domac的菜园子.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by
+            <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+
+</html>
