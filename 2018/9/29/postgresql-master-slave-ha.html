@@ -59,7 +59,7 @@
                             <a class="tag label label-info" href="/tags/postgresql.html">postgresql</a>
                             <a class="tag label label-info" href="/tags/pg.html">pg</a>
                         </aside>
-                        <section class="brief"><p>数据库的备份工作在日常生产中极为重要，如果你咨询一个DBA如何才能设计出高可用的数据备份与恢复方案，相信很多人都会从架构上给出很多容灾的意见。但归根到底,如果业务环节中数据库还牵涉到分布式环境，我认为一个好的方案需要达到三大要求：</p>
+                        <section class="brief"><p>数据库的备份工作在日常生产中极为重要，如果你咨询一个DBA如何才能设计出高可用的数据备份与恢复方案，相信很多人都会从架构上给出很多容灾的意见。但归根到底,如果业务环节中数据库还牵涉到分布式环境，我认为一个好的方案需要达到三大要求：</p>
 
 <ul>
 <li>多副本</li>
@@ -67,13 +67,13 @@
 <li>一致性</li>
 </ul>
 
-<p>日常架构设计中，我们不仅要保证数据额的成功备份，还要保证备份的数据可以快速恢复。在众多备份恢复可靠性方案中 <code>主从复制</code> 技术，可以说是最常见的实现，本文主要是介绍postgresql主备数据库的异步流复制的环境搭建与主备切换的操作实践，除了能把一些基础的原理运用在日常的数据库运维中，也可以加深对Postgresql数据库的底层知识了解。</p>
+<p>日常架构设计中，我们不仅要保证数据额的成功备份，还要保证备份的数据可以快速恢复。在众多备份恢复可靠性方案中 <code>主从复制</code> 技术，可以说是最常见的实现，本文主要是介绍postgresql主备数据库的异步流复制的环境搭建与主备切换的操作实践，除了能把一些基础的原理运用在日常的数据库运维中，也可以加深对Postgresql数据库的底层知识了解。</p>
 
 <!--more-->
 
-<p>下面的学习与实践主要针对PostgreSQL的异步流复制（本文没有涉及到同步复制、逻辑复制等，如果大家想了解其它的备份方案，可以阅读相关官方文档或其他资料介绍）。</p>
+<p>下面的学习与实践主要针对PostgreSQL的异步流复制（本文没有涉及到同步复制、逻辑复制等，如果大家想了解其它的备份方案，可以阅读相关官方文档或其他资料介绍）。</p>
 
-<p>异步流复制的中心思想是：主库上提交事务时不需要等待备库接收WAL日志流并写入到备库WAL日志文件时便返回成功，因此异步流复制的TPS会相对同步流复制要高，延迟更低。</p>
+<p>异步流复制的中心思想是：主库上提交事务时不需要等待备库接收WAL日志流并写入到备库WAL日志文件时便返回成功，因此异步流复制的TPS会相对同步流复制要高，延迟更低。</p>
 
 <h2 id="环境准备">环境准备</h2>
 
@@ -92,7 +92,7 @@
 <td align="center">centos 7.2</td>
 <td align="center">172.17.0.2</td>
 <td align="center">pghost1</td>
-<td align="right">主库</td>
+<td align="right">主库</td>
 </tr>
 
 <tr>
@@ -114,7 +114,7 @@
 <li><p>应用程序目录： /apps/svr/pgsql</p></li>
 </ul>
 
-<p>要注意的是：编译安装Pg我们使用的是root账户，但是一般情况下，我们对数据库的部署操作等应该使用非root的pg超级管理员账户，所以需要我们预先创建相关用户和目录，并设置相关权限：</p>
+<p>要注意的是：编译安装Pg我们使用的是root账户，但是一般情况下，我们对数据库的部署操作等应该使用非root的pg超级管理员账户，所以需要我们预先创建相关用户和目录，并设置相关权限：</p>
 <pre><code>$ groupadd postgres
 
 $ useradd postgres -g postgres
@@ -130,7 +130,7 @@ $ chown -R postgres:postgres /data/pg10
 
 <p>实验用的postgresql为10.0版本</p>
 
-<p>pghost1 和 pghost2 分别下载该版本的源码安装包</p>
+<p>pghost1 和 pghost2 分别下载该版本的源码安装包</p>
 <pre><code>wget https://ftp.postgresql.org/pub/source/v10.0/postgresql-10.0.tar.gz
 </code></pre>
 
@@ -148,7 +148,7 @@ yum install -y bison flex readline readline-devel zlib zlib-devel
 
 <h2 id="主备库数据库安装">主备库数据库安装</h2>
 
-<p>安装前，我们先分别对pghost1 和 pghost2创建postgresql的偏好环境变量</p>
+<p>安装前，我们先分别对pghost1 和 pghost2创建postgresql的偏好环境变量</p>
 <pre><code>vi /etc/profile.d/pgsql.sh
 </code></pre>
 
@@ -210,7 +210,7 @@ postgres (PostgreSQL) 10.0
 <pre><code>initdb -D /data/pg10/pg_root -E UTF8 --locale=C -U postgres -W
 </code></pre>
 
-<p>执行上述命令后，在/data/pg10/pg_root目录下会产生系统数据文件，</p>
+<p>执行上述命令后，在/data/pg10/pg_root目录下会产生系统数据文件，</p>
 <pre><code>PG_VERSION    pg_dynshmem    pg_multixact  pg_snapshots  pg_tblspc    postgresql.auto.conf
 base          pg_hba.conf    pg_notify     pg_stat       pg_twophase  postgresql.conf
 global        pg_ident.conf  pg_replslot   pg_stat_tmp   pg_wal
@@ -291,13 +291,13 @@ NOTICE:  pg_stop_backup complete, all required WAL segments have been archived
 <pre><code>cp $PGHOME/share/recovery.conf.sample /data/pg10/pg_root/recovery.conf
 </code></pre>
 
-<p>备库的 recovery.conf 配置以下参数</p>
+<p>备库的 recovery.conf 配置以下参数</p>
 <pre><code>recovery_target_timeline = 'latest'
 standby_mode = on
 primary_conninfo = 'host=172.17.0.2  port=1921 user=repuser'
 </code></pre>
 
-<p>主要观察recovery.conf中的参数<code>primary_conninfo</code> 中的 <code>user=repuser</code>,  还记得我们前面在主库上创建的流传输用户repuser吗？由于主备直接数据同步需要在用户下执行操作，而主库上我们创建repuser的时候，为了安全我设置了密码, 但recovery.conf我们没有配置明文密码，那么程序的密码如何获得呢？</p>
+<p>主要观察recovery.conf中的参数<code>primary_conninfo</code> 中的 <code>user=repuser</code>,  还记得我们前面在主库上创建的流传输用户repuser吗？由于主备直接数据同步需要在用户下执行操作，而主库上我们创建repuser的时候，为了安全我设置了密码, 但recovery.conf我们没有配置明文密码，那么程序的密码如何获得呢？</p>
 
 <p>我们建议把密码设置在 ~/.pgpass中：</p>
 <pre><code>$ cd ~
@@ -320,7 +320,7 @@ database system is ready to accept read only connections
 server started
 </code></pre>
 
-<p>如果备库正常启动，我们可以在主备两库上观察WAL发生与接收进程是否都同时工作，以确认异步流工作是否正常工作</p>
+<p>如果备库正常启动，我们可以在主备两库上观察WAL发生与接收进程是否都同时工作，以确认异步流工作是否正常工作</p>
 
 <p>主库上：</p>
 <pre><code>ps -ef | grep wal
@@ -346,7 +346,7 @@ postgres=# insert into test_ms values(6);
 INSERT 0 1
 </code></pre>
 
-<p>主库上，我们创建test_ms表，并插入了一条数据，我们就可以在<code>备库</code>上进行查询观察是否同步成功：</p>
+<p>主库上，我们创建test_ms表，并插入了一条数据，我们就可以在<code>备库</code>上进行查询观察是否同步成功：</p>
 <pre><code>postgres=# select * from test_ms;
  id
 ----
@@ -370,7 +370,7 @@ DELETE 1
 (1 row)
 </code></pre>
 
-<p>那么我们如果在备份上进行数据操作，情况会怎样呢？我们再备份上执行：</p>
+<p>那么我们如果在备份上进行数据操作，情况会怎样呢？我们再备份上执行：</p>
 <pre><code>postgres=# insert into test_ms values(6);
 
 ERROR:  cannot execute INSERT in a read-only transaction
@@ -382,7 +382,7 @@ ERROR:  cannot execute INSERT in a read-only transaction
 
 <h2 id="主备切换">主备切换</h2>
 
-<p>前面介绍了流复制的部署，但要注意的是主库和备库的角色不是静态存在的，在维护过程中可以对两者的进行角色的切换，举个例子，当主库挂掉的时候，需要迅速进行主备切换，让备库升级为主库，原主库降级到备库，主备切换是PostgreSQL高可用的基础，下面就介绍相关的操作。</p>
+<p>前面介绍了流复制的部署，但要注意的是主库和备库的角色不是静态存在的，在维护过程中可以对两者的进行角色的切换，举个例子，当主库挂掉的时候，需要迅速进行主备切换，让备库升级为主库，原主库降级到备库，主备切换是PostgreSQL高可用的基础，下面就介绍相关的操作。</p>
 
 <p>postgresql 9.0版本流复制只能通过创建文件方式进行主备切换，9.1后，开始支持使用pg_ctl promote触发方式，相比文件触发方式操作更方便</p>
 
@@ -420,7 +420,7 @@ server promoted
 
 <p>命令执行后，如果原来的 recovery.conf 更名为 recovery.done, 表示切换成功</p>
 
-<p>3、这时如果需要将老的主库切换成备库，在老的主库的$PGDATA目录下也创建recovery.conf文件（创建方式跟之前介绍的一样，内容可以和原从库pghost2的一样，只是primary_conninfo的IP换成对端pghost2的IP）</p>
+<p>3、这时如果需要将老的主库切换成备库，在老的主库的$PGDATA目录下也创建recovery.conf文件（创建方式跟之前介绍的一样，内容可以和原从库pghost2的一样，只是primary_conninfo的IP换成对端pghost2的IP）</p>
 
 <p>例如，主库上的 recovery.conf 设置为：</p>
 <pre><code>recovery_target_timeline = 'latest'
@@ -475,11 +475,11 @@ INSERT 0 1
 (2 rows)
 </code></pre>
 
-<p>到这里为止，主从切换的演练基本完成了</p>
+<p>到这里为止，主从切换的演练基本完成了</p>
 
 <h2 id="总结">总结</h2>
 
-<p>异步流复制模式中，主库提交的事务不会等待备库接收WAL日志流并返回确认信息，因此异步流复制模式下主库与备库的数据版本上会存在一定的处理延迟，延迟的时间主要受主库压力、备库主机性能、网络带宽等影响，当正常情况下，主备的延迟通常在毫秒级的范围内，当主库宕机，这个延迟就主要受到故障发现与切换时间的影响而拉长，不够这些数据可以从架构或相关自动化运维手段不断优化设置。</p>
+<p>异步流复制模式中，主库提交的事务不会等待备库接收WAL日志流并返回确认信息，因此异步流复制模式下主库与备库的数据版本上会存在一定的处理延迟，延迟的时间主要受主库压力、备库主机性能、网络带宽等影响，当正常情况下，主备的延迟通常在毫秒级的范围内，当主库宕机，这个延迟就主要受到故障发现与切换时间的影响而拉长，不够这些数据可以从架构或相关自动化运维手段不断优化设置。</p>
 </section>
                     </div>
                 </div>
