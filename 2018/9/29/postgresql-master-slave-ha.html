@@ -440,6 +440,8 @@ $ chmod 0600 .pgpass
 </code></pre>
 
 <p>4、启动老的主库pghost1，这时观察主、备进行是否正常，严格点可以在新的主库上对刚才的test_ms表进行操作，观察数据是否同步成功。</p>
+<pre><code>pg_ctl start
+</code></pre>
 
 <p>我们再新主库（pghost2）上执行：</p>
 <pre><code>postgres=# select pg_is_in_recovery();
