@@ -4,7 +4,7 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Sun, 30 Sep 2018 10:22:18 +0800</pubDate>
+    <pubDate>Tue, 09 Oct 2018 14:57:58 +0800</pubDate>
     <item>
       <title>Postgresql主从异步流复制方案</title>
       <link>http://lihaoquan.me/2018/9/29/postgresql-master-slave-ha.html</link>
