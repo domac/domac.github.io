@@ -115,96 +115,76 @@
 </ul>
 
 <p>要注意的是：编译安装Pg我们使用的是root账户，但是一般情况下，我们对数据库的部署操作等应该使用非root的pg超级管理员账户，所以需要我们预先创建相关用户和目录，并设置相关权限：</p>
+<pre><code class="language-powershell">$ groupadd postgres
 
-<p>```bash
-$ groupadd postgres</p>
+$ useradd postgres -g postgres
 
-<p>$ useradd postgres -g postgres</p>
+$ passwd postgres
 
-<p>$ passwd postgres</p>
+$ mkdir -p /data/pg10/pg_root
 
-<p>$ mkdir -p /data/pg10/pg_root</p>
+$ mkdir -p /data/pg10/tbs
 
-<p>$ mkdir -p /data/pg10/tbs</p>
-
-<p>$ chown -R postgres:postgres /data/pg10
-```bash</p>
+$ chown -R postgres:postgres /data/pg10
+</code></pre>
 
 <p>实验用的postgresql为10.0版本</p>
 
 <p>pghost1 和 pghost2 分别下载该版本的源码安装包</p>
-
-<p><code>bash
-wget https://ftp.postgresql.org/pub/source/v10.0/postgresql-10.0.tar.gz
-</code>bash</p>
+<pre><code class="language-powershell">wget https://ftp.postgresql.org/pub/source/v10.0/postgresql-10.0.tar.gz
+</code></pre>
 
 <p>下载后进行解压</p>
-
-<p><code>bash
-tar -zxvf postgresql-10.0.tar.gz
-</code>bash</p>
+<pre><code class="language-powershell">tar -zxvf postgresql-10.0.tar.gz
+</code></pre>
 
 <h4 id="安装前依赖">安装前依赖</h4>
 
 <p>由于 configure过程中依赖操作系统包zlib、readline等，所以我实用yum预先安装：</p>
+<pre><code class="language-powershell">yum groupinstall &quot;Development tools”
 
-<p>```bash
-yum groupinstall &ldquo;Development tools”</p>
-
-<p>yum install -y bison flex readline readline-devel zlib zlib-devel
-```bash</p>
+yum install -y bison flex readline readline-devel zlib zlib-devel
+</code></pre>
 
 <h2 id="主备库数据库安装">主备库数据库安装</h2>
 
 <p>安装前，我们先分别对pghost1 和 pghost2创建postgresql的偏好环境变量</p>
-
-<p><code>bash
-vi /etc/profile.d/pgsql.sh
-</code>bash</p>
+<pre><code class="language-powershell">vi /etc/profile.d/pgsql.sh
+</code></pre>
 
 <p>追加以下内容：</p>
-
-<p>```bash
-export PGPORT=1921
+<pre><code class="language-powershell">export PGPORT=1921
 export PGUSER=postgres
 export PGDATA=/data/pg10/pg_root
 export LANG=en_US.utf8
 export PGHOME=/apps/svr/pgsql
 export LD_LIBRARY_PATH=$PGHOME/lib:/lib64:/usr/lib64:/usr/local/lib64:/lib:/usr/lib:/usr/local/lib
 export PATH=$PGHOME/bin:$PATH:.
-export MANPATH=$PGHOME/share/man:$MANPATH</p>
+export MANPATH=$PGHOME/share/man:$MANPATH
 
-<p>alias rm=&lsquo;rm -i&rsquo;
-alias ll=&lsquo;ls -lh&rsquo;
-```bash</p>
+alias rm='rm -i'
+alias ll='ls -lh'
+</code></pre>
 
 <p>保存文件，并让环境变量生效:</p>
-
-<p><code>bash
-source /etc/profile.d/pgsql.sh
-</code>bash</p>
+<pre><code class="language-powershell">source /etc/profile.d/pgsql.sh
+</code></pre>
 
 <p>再进入刚刚解压的 postgresql-10.0 目录中，执行以下命令：</p>
-
-<p><code>bash
-./configure —prefix=/apps/svr/pgsql_10.0/ --with-pgport=1921
-</code>bash</p>
+<pre><code class="language-powershell">./configure —prefix=/apps/svr/pgsql_10.0/ --with-pgport=1921
+</code></pre>
 
 <p>之后进行编译安装：</p>
+<pre><code class="language-powershell">gmake
 
-<p>```bash
-gmake</p>
-
-<p>gmake install
-```bash</p>
+gmake install
+</code></pre>
 
 <p>安装完成后，我们可以使用以下命令确认是否安装成功：</p>
+<pre><code class="language-powershell">$ postgres --version
 
-<p>```bash
-$ postgres --version</p>
-
-<p>postgres (PostgreSQL) 10.0
-```bash</p>
+postgres (PostgreSQL) 10.0
+</code></pre>
 
 <h2 id="复制功能部署">复制功能部署</h2>
 
@@ -223,228 +203,180 @@ $ postgres --version</p>
 <p>下面我们会在实践中，具体地对上述的文件的配置进行相关说明</p>
 
 <p>上一节，我们编译安装好了postgresql，我们接下来切换操作用户</p>
-
-<p><code>bash
-su postgresql
-</code>bash</p>
+<pre><code class="language-powershell">su postgresql
+</code></pre>
 
 <p>然后使用initdb工具初始化数据库：</p>
-
-<p><code>bash
-initdb -D /data/pg10/pg_root -E UTF8 --locale=C -U postgres -W
-</code>bash</p>
+<pre><code class="language-powershell">initdb -D /data/pg10/pg_root -E UTF8 --locale=C -U postgres -W
+</code></pre>
 
 <p>执行上述命令后，在/data/pg10/pg_root目录下会产生系统数据文件，</p>
-
-<p><code>bash
-PG_VERSION    pg_dynshmem    pg_multixact  pg_snapshots  pg_tblspc    postgresql.auto.conf
+<pre><code class="language-powershell">PG_VERSION    pg_dynshmem    pg_multixact  pg_snapshots  pg_tblspc    postgresql.auto.conf
 base          pg_hba.conf    pg_notify     pg_stat       pg_twophase  postgresql.conf
 global        pg_ident.conf  pg_replslot   pg_stat_tmp   pg_wal
 pg_commit_ts  pg_logical     pg_serial     pg_subtrans   pg_xact
-</code>bash</p>
+</code></pre>
 
 <p>之后我们开始配置 <code>/data/pg10/pg_root/postgresql.conf</code>，修改以下几个关键项：</p>
-
-<p><code>bash
-listen_addresses = '0.0.0.0'
+<pre><code class="language-powershell">listen_addresses = '0.0.0.0'
 wal_level = replica             
 archive_mode = on            
 archive_command = '/bin/date'  
 max_wal_senders = 10         
 wal_keep_segments = 16
 hot_standby = on
-</code>bash</p>
+</code></pre>
 
 <blockquote>
 <p>注：主库和备库的 /data/pg10/pg_root/postgresql.conf 配置建议完全一致</p>
 </blockquote>
 
 <p>接下来我们在 <code>备库</code> 上配置 <code>/data/pg10/pg_root/pg_hba.conf</code></p>
-
-<p><code>bash
-host    replication     repuser          172.17.0.2/32            md5
+<pre><code class="language-powershell">host    replication     repuser          172.17.0.2/32            md5
 host    replication     repuser          172.17.0.5/32            md5
-</code>bash</p>
+</code></pre>
 
 <p>其实最好主库也配置一份，因为主库和备库的角色不是静止的，在手动或库出现故障情况下，它们的角色会互相更换。</p>
 
 <p>之后，我们先启动主库 pghost1了 (记得切换到postgres用户)：</p>
+<pre><code class="language-powershell">$ pg_ctl start
 
-<p>```bash
-$ pg_ctl start</p>
-
-<p>&hellip;
-&hellip;
+...
+...
 database system is ready to accept connections
  done
 server started
-```bash</p>
+</code></pre>
 
 <p>使用PostgreSQL的超级管理员postgres登录到创建流复制用户repuser，流复制用户需要有 REPLICATION权限和LOGIN权限</p>
-
-<p>```bash
-$ psql
+<pre><code class="language-powershell">$ psql
 psql (10.0)
-Type &ldquo;help&rdquo; for help.</p>
+Type &quot;help&quot; for help.
 
-<p>postgres=# CREATE USER repuser REPLICATION  LOGIN CONNECTION LIMIT 5 ENCRYPTED PASSWORD &lsquo;domac123&rsquo;;</p>
+postgres=# CREATE USER repuser REPLICATION  LOGIN CONNECTION LIMIT 5 ENCRYPTED PASSWORD 'domac123';
 
-<p>CREATE ROLE
-```bash</p>
+CREATE ROLE
+</code></pre>
 
 <p>以上命令基本完成主库上的配置，接下来我们需要热备生成一个备库，制作备库过程中主库仍然可以读写，不影响业务，我们在主库上创建备份任务：</p>
+<pre><code class="language-powershell">postgres=# select pg_start_backup('domacli_bak');
 
-<p>```bash
-postgres=# select pg_start_backup(&lsquo;domacli_bak&rsquo;);</p>
-
-<h2 id="pg-start-backup">pg_start_backup</h2>
-
-<p>0/2000060
+ pg_start_backup
+-----------------
+ 0/2000060
 (1 row)
-```bash</p>
+</code></pre>
 
 <p>pg_start_backup() 函数会在主库上发起一个在线备份，命令执行后，将数据文件压缩拷贝到备份节点上:</p>
+<pre><code class="language-powershell">$ tar czvf pg_root.tar.gz pg_root --exclude=pg_root/pg_wal
 
-<p>```bash
-$ tar czvf pg_root.tar.gz pg_root --exclude=pg_root/pg_wal</p>
-
-<p>$ scp pg_root.tar.gz postgres@172.17.0.5:/data/pg10
-```bash</p>
+$ scp pg_root.tar.gz postgres@172.17.0.5:/data/pg10
+</code></pre>
 
 <p>pg_wal目录不是必须复制的，可以排除这个目录，以节省空间，然后我们回到备库的/data/pg10下，执行主库备份文件的解压：</p>
-
-<p><code>bash
-$ tar xvf pg_root.tar.gz
-</code>bash</p>
+<pre><code class="language-powershell">$ tar xvf pg_root.tar.gz
+</code></pre>
 
 <p>解压后，我们回到主节点，执行停止备份命令，结束这次备份流程</p>
+<pre><code class="language-powershell">postgres=# select pg_stop_backup();
 
-<p>```bash
-postgres=# select pg_stop_backup();</p>
-
-<p>NOTICE:  pg_stop_backup complete, all required WAL segments have been archived</p>
-
-<h2 id="pg-stop-backup">pg_stop_backup</h2>
-
-<p>0/2000168
+NOTICE:  pg_stop_backup complete, all required WAL segments have been archived
+ pg_stop_backup
+----------------
+ 0/2000168
 (1 row)
-```bash</p>
+</code></pre>
 
 <p>以上的命令表示完成在线备份，但备库上扔需要做一些配置，我们回到备库上，配置 /data/pg10/pg_root/recovery.conf文件，如果该文件不存在，可以执行以下命令，在软件目录中复制一个：</p>
-
-<p><code>bash
-cp $PGHOME/share/recovery.conf.sample /data/pg10/pg_root/recovery.conf
-</code>bash</p>
+<pre><code class="language-powershell">cp $PGHOME/share/recovery.conf.sample /data/pg10/pg_root/recovery.conf
+</code></pre>
 
 <p>备库的 recovery.conf 配置以下参数</p>
-
-<p><code>bash
-recovery_target_timeline = 'latest'
+<pre><code class="language-powershell">recovery_target_timeline = 'latest'
 standby_mode = on
 primary_conninfo = 'host=172.17.0.2  port=1921 user=repuser'
-</code>bash</p>
+</code></pre>
 
 <p>主要观察recovery.conf中的参数<code>primary_conninfo</code> 中的 <code>user=repuser</code>,  还记得我们前面在主库上创建的流传输用户repuser吗？由于主备直接数据同步需要在用户下执行操作，而主库上我们创建repuser的时候，为了安全我设置了密码, 但recovery.conf我们没有配置明文密码，那么程序的密码如何获得呢？</p>
 
 <p>我们建议把密码设置在 ~/.pgpass中：</p>
-
-<p><code>bash
-$ cd ~
+<pre><code class="language-powershell">$ cd ~
 $ touch .pgpass
 $ chmod 0600 .pgpass
-</code>bash
-填写以下内容：</p>
+</code></pre>
 
-<p><code>bash
-172.17.0.2:1921:replication:repuser:domac123
+<p>填写以下内容：</p>
+<pre><code class="language-powershell">172.17.0.2:1921:replication:repuser:domac123
 172.17.0.5:1921:replication:repuser:domac123
-</code>bash</p>
+</code></pre>
 
 <p>好了，当这些备注都就绪之后，我们可以开始启动我们的备库了：</p>
+<pre><code class="language-powershell">$ pg_ctl start
 
-<p>```bash
-$ pg_ctl start</p>
+...
 
-<p>&hellip;</p>
-
-<p>database system is ready to accept read only connections
+database system is ready to accept read only connections
  done
 server started
-```bash</p>
+</code></pre>
 
 <p>如果备库正常启动，我们可以在主备两库上观察WAL发生与接收进程是否都同时工作，以确认异步流工作是否正常工作</p>
 
 <p>主库上：</p>
+<pre><code class="language-powershell">ps -ef | grep wal
 
-<p>```bash
-ps -ef | grep wal</p>
-
-<p>postgres  6939  6935  0 23:16 ?        00:00:00 postgres: wal writer process
+postgres  6939  6935  0 23:16 ?        00:00:00 postgres: wal writer process
 postgres  6983  6935  0 23:42 ?        00:00:00 postgres: wal sender process repuser 172.17.0.5(45910) streaming 0/3000140
-```bash</p>
+</code></pre>
 
 <p>备库上：</p>
+<pre><code class="language-powershell">ps -ef | grep wal
 
-<p>```bash
-ps -ef | grep wal</p>
-
-<p>postgres 26481 26479  0 23:42 ?        00:00:00 postgres: wal receiver process   streaming 0/3000140
+postgres 26481 26479  0 23:42 ?        00:00:00 postgres: wal receiver process   streaming 0/3000140
 postgres 26486 26448  0 23:42 ?        00:00:00 grep --color=auto wal
-```bash</p>
+</code></pre>
 
 <p>当然，稳妥起见，我们最好多动手动手，尝试在主库上创建并插入数据，观察备库上是否同步这些操作，我们再主库上创建一张表：</p>
+<pre><code class="language-powershell">postgres=# create table test_ms(id int4);
 
-<p>```bash
-postgres=# create table test_ms(id int4);</p>
+CREATE TABLE
 
-<p>CREATE TABLE</p>
+postgres=# insert into test_ms values(6);
 
-<p>postgres=# insert into test_ms values(6);</p>
-
-<p>INSERT 0 1
-```bash</p>
+INSERT 0 1
+</code></pre>
 
 <p>主库上，我们创建test_ms表，并插入了一条数据，我们就可以在<code>备库</code>上进行查询观察是否同步成功：</p>
-
-<p>```bash
-postgres=# select * from test_ms;</p>
-
-<h2 id="id">id</h2>
-
-<p>6
+<pre><code class="language-powershell">postgres=# select * from test_ms;
+ id
+----
+  6
 (1 row)
-```bash</p>
+</code></pre>
 
 <p>接下来，我们再主库上，再操作</p>
+<pre><code class="language-powershell">postgres=# insert into test_ms values(9);
+INSERT 0 1
 
-<p>```bash
-postgres=# insert into test_ms values(9);
-INSERT 0 1</p>
-
-<p>postgres=# delete from test_ms where id=6;
+postgres=# delete from test_ms where id=6;
 DELETE 1
-```bash</p>
+</code></pre>
 
 <p>这个时候，我们发现备库的数据也都正常同步上了：</p>
-
-<p>```bash
-postgres=# select * from test_ms;</p>
-
-<h2 id="id-1">id</h2>
-
-<p>9
+<pre><code class="language-powershell">postgres=# select * from test_ms;
+ id
+----
+  9
 (1 row)
-```bash</p>
+</code></pre>
 
 <p>那么我们如果在备份上进行数据操作，情况会怎样呢？我们再备份上执行：</p>
+<pre><code class="language-powershell">postgres=# insert into test_ms values(6);
 
-<p>```bash
-postgres=# insert into test_ms values(6);</p>
-
-<p>ERROR:  cannot execute INSERT in a read-only transaction
+ERROR:  cannot execute INSERT in a read-only transaction
 STATEMENT:  insert into test_ms values(6);
 ERROR:  cannot execute INSERT in a read-only transaction
-```bash</p>
+</code></pre>
 
 <p>观察这些错误日志，我们可以了解到，异步流主从结构中，作为从节点的备库目前处于的是只读状态，它不能进行任何写入操作。</p>
 
@@ -455,15 +387,12 @@ ERROR:  cannot execute INSERT in a read-only transaction
 <p>postgresql 9.0版本流复制只能通过创建文件方式进行主备切换，9.1后，开始支持使用pg_ctl promote触发方式，相比文件触发方式操作更方便</p>
 
 <p>操作前，我们先介绍一个系统函数查用来判断主备角色的方法：</p>
-
-<p>```bash
-postgres=# select pg_is_in_recovery();</p>
-
-<h2 id="pg-is-in-recovery">pg_is_in_recovery</h2>
-
-<p>f
+<pre><code class="language-powershell">postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ f
 (1 row)
-```bash</p>
+</code></pre>
 
 <p>如果返回 <strong><code>f</code></strong> 说明是主库，返回 <strong><code>t</code></strong> 说明是备库</p>
 
@@ -472,15 +401,11 @@ postgres=# select pg_is_in_recovery();</p>
 <p>我们使用以下的步骤进行主备切换：</p>
 
 <p>1、关闭主库，建议使用 -m fast 模式关闭</p>
-
-<p><code>bash
-$ pg_ctl stop -m fast
-</code>bash</p>
+<pre><code class="language-powershell">$ pg_ctl stop -m fast
+</code></pre>
 
 <p>2、在备库上执行pg_ctl promote命令激活备库，如果recovery.conf变成recovery.done表示备库已切换成主库</p>
-
-<p><code>bash
-pg_ctl promote
+<pre><code class="language-powershell">pg_ctl promote
 waiting for server to promote....2018-09-30 00:10:30.222 UTC [26480] LOG:  received promote request
 LOG:  redo done at 0/4000028
 LOG:  last completed transaction was at log time 2018-09-29 23:50:52.502513+00
@@ -491,82 +416,64 @@ Sun Sep 30 00:10:30 UTC 2018
 Sun Sep 30 00:10:30 UTC 2018
  done
 server promoted
-</code>bash</p>
+</code></pre>
 
 <p>命令执行后，如果原来的 recovery.conf 更名为 recovery.done, 表示切换成功</p>
 
 <p>3、这时如果需要将老的主库切换成备库，在老的主库的$PGDATA目录下也创建recovery.conf文件（创建方式跟之前介绍的一样，内容可以和原从库pghost2的一样，只是primary_conninfo的IP换成对端pghost2的IP）</p>
 
 <p>例如，主库上的 recovery.conf 设置为：</p>
-
-<p><code>bash
-recovery_target_timeline = 'latest'
+<pre><code class="language-powershell">recovery_target_timeline = 'latest'
 standby_mode = on
 primary_conninfo = 'host=172.17.0.5  port=1921 user=repuser'
-</code>bash</p>
+</code></pre>
 
 <p>与此同时，和原备库pghost2一样，我们建议把repuser的密码设置在pghost1 ~/.pgpass中：</p>
-
-<p><code>bash
-$ cd ~
+<pre><code class="language-powershell">$ cd ~
 $ touch .pgpass
 $ chmod 0600 .pgpass
-</code>bash
-填写以下内容：</p>
+</code></pre>
 
-<p><code>bash
-172.17.0.2:1921:replication:repuser:domac123
+<p>填写以下内容：</p>
+<pre><code class="language-powershell">172.17.0.2:1921:replication:repuser:domac123
 172.17.0.5:1921:replication:repuser:domac123
-</code>bash</p>
+</code></pre>
 
 <p>4、启动老的主库pghost1，这时观察主、备进行是否正常，严格点可以在新的主库上对刚才的test_ms表进行操作，观察数据是否同步成功。</p>
-
-<p><code>bash
-pg_ctl start
-</code>bash</p>
+<pre><code class="language-powershell">pg_ctl start
+</code></pre>
 
 <p>我们在新主库（pghost2）上执行：</p>
-
-<p>```bash
-postgres=# select pg_is_in_recovery();</p>
-
-<h2 id="pg-is-in-recovery-1">pg_is_in_recovery</h2>
-
-<p>f
+<pre><code class="language-powershell">postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ f
 (1 row)
-```bash</p>
+</code></pre>
 
 <p>发现它目前的角色已经是主库了， 在新备库（pghost1）上继续执行：</p>
-
-<p>```bash
-postgres=# select pg_is_in_recovery();</p>
-
-<h2 id="pg-is-in-recovery-2">pg_is_in_recovery</h2>
-
-<p>t
+<pre><code class="language-powershell">postgres=# select pg_is_in_recovery();
+ pg_is_in_recovery
+-------------------
+ t
 (1 row)
-```bash</p>
+</code></pre>
 
 <p>发现它目前的角色也已经切换为备库了</p>
 
 <p>我们再pghost2上，执行数据插入操作：</p>
-
-<p><code>bash
-postgres=# insert into test_ms values(11);
+<pre><code class="language-powershell">postgres=# insert into test_ms values(11);
 INSERT 0 1
-</code>bash</p>
+</code></pre>
 
 <p>这时，pghost1上也观察到数据同步成功：</p>
-
-<p>```bash
-postgres=# select * from test_ms;</p>
-
-<h2 id="id-2">id</h2>
-
-<p>9
+<pre><code class="language-powershell">postgres=# select * from test_ms;
+ id
+----
+  9
  11
 (2 rows)
-```bash</p>
+</code></pre>
 
 <p>到这里为止，主从切换的演练基本完成了</p>
 

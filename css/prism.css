@@ -1,5 +1,5 @@
 /* PrismJS 1.15.0
-https://prismjs.com/download.html?#themes=prism-okaidia&languages=markup+css+clike+javascript+actionscript+apacheconf+applescript+c+csharp+bash+basic+cpp+aspnet+coffeescript+ruby+css-extras+d+docker+elixir+markup-templating+erlang+fsharp+git+go+groovy+less+haskell+http+ini+java+julia+latex+markdown+matlab+nim+objectivec+perl+php+php-extras+sql+scss+python+r+jsx+typescript+rust+sass+stylus+scala+smarty+swift+yaml+haml&plugins=line-highlight+line-numbers+toolbar+highlight-keywords+show-language */
+https://prismjs.com/download.html?#themes=prism-okaidia&languages=markup+css+clike+javascript+actionscript+apacheconf+applescript+c+csharp+bash+basic+cpp+aspnet+coffeescript+ruby+css-extras+d+docker+elixir+markup-templating+erlang+fsharp+git+go+groovy+less+haskell+http+ini+java+julia+latex+markdown+matlab+nim+objectivec+perl+php+php-extras+sql+powershell+scss+python+r+jsx+typescript+rust+sass+stylus+scala+smarty+swift+yaml+haml&plugins=line-highlight+line-numbers+toolbar+highlight-keywords+show-language */
 /**
  * okaidia theme for JavaScript, CSS and HTML
  * Loosely based on Monokai textmate theme by http://www.monokai.nl/
@@ -133,7 +133,7 @@ https://prismjs.com/download.html?#themes=prism-okaidia&languages=markup+css+cli
      left: 0;
      right: 0;
      padding: inherit 0;
-     margin-top: 1em; /* Same as .prismâ€™s padding-top */
+     margin-top: 1em; /* Same as .prism’s padding-top */
  
      background: hsla(24, 20%, 50%,.08);
      background: linear-gradient(to right, hsla(24, 20%, 50%,.1) 70%, hsla(24, 20%, 50%,0));
