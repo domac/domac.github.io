@@ -207,7 +207,10 @@ postgres (PostgreSQL) 10.0
 </code></pre>
 
 <p>然后使用initdb工具初始化数据库：</p>
-<pre><code class="language-powershell">initdb -D /data/pg10/pg_root -E UTF8 --locale=C -U postgres -W
+<pre><code class="language-powershell">
+echo &quot;123456&quot; &gt;&gt; /data/pg10/pgpass
+
+initdb -D /data/pg10/pg_root -E UTF8 --locale=C -U postgres --pwfile=/data/pg10/pgpass
 </code></pre>
 
 <p>执行上述命令后，在/data/pg10/pg_root目录下会产生系统数据文件，</p>
@@ -218,12 +221,12 @@ pg_commit_ts  pg_logical     pg_serial     pg_subtrans   pg_xact
 </code></pre>
 
 <p>之后我们开始配置 <code>/data/pg10/pg_root/postgresql.conf</code>，修改以下几个关键项：</p>
-<pre><code class="language-powershell">listen_addresses = '0.0.0.0'
+<pre><code class="language-powershell">listen_addresses = '*'
 wal_level = replica             
 archive_mode = on            
 archive_command = '/bin/date'  
 max_wal_senders = 10         
-wal_keep_segments = 16
+wal_keep_segments = 512
 hot_standby = on
 </code></pre>
 
@@ -239,7 +242,7 @@ host    replication     repuser          172.17.0.5/32            md5
 <p>其实最好主库也配置一份，因为主库和备库的角色不是静止的，在手动或库出现故障情况下，它们的角色会互相更换。</p>
 
 <p>之后，我们先启动主库 pghost1了 (记得切换到postgres用户)：</p>
-<pre><code class="language-powershell">$ pg_ctl start
+<pre><code class="language-powershell">$ pg_ctl start -D $PGDATA
 
 ...
 ...
@@ -249,7 +252,7 @@ server started
 </code></pre>
 
 <p>使用PostgreSQL的超级管理员postgres登录到创建流复制用户repuser，流复制用户需要有 REPLICATION权限和LOGIN权限</p>
-<pre><code class="language-powershell">$ psql
+<pre><code class="language-powershell">$ psql -U postgres -p 1921
 psql (10.0)
 Type &quot;help&quot; for help.
 
@@ -300,6 +303,10 @@ primary_conninfo = 'host=172.17.0.2  port=1921 user=repuser'
 <p>主要观察recovery.conf中的参数<code>primary_conninfo</code> 中的 <code>user=repuser</code>,  还记得我们前面在主库上创建的流传输用户repuser吗？由于主备直接数据同步需要在用户下执行操作，而主库上我们创建repuser的时候，为了安全我设置了密码, 但recovery.conf我们没有配置明文密码，那么程序的密码如何获得呢？</p>
 
 <p>我们建议把密码设置在 ~/.pgpass中：</p>
+
+<blockquote>
+<p>你也可以直接在上面的recovery.conf 设置 primary_conninfo = &lsquo;host=172.17.0.2  port=1921 user=repuser password=domac123&rsquo;, 但这样会有安全风险</p>
+</blockquote>
 <pre><code class="language-powershell">$ cd ~
 $ touch .pgpass
 $ chmod 0600 .pgpass
@@ -336,7 +343,61 @@ postgres 26481 26479  0 23:42 ?        00:00:00 postgres: wal receiver process  
 postgres 26486 26448  0 23:42 ?        00:00:00 grep --color=auto wal
 </code></pre>
 
-<p>当然，稳妥起见，我们最好多动手动手，尝试在主库上创建并插入数据，观察备库上是否同步这些操作，我们再主库上创建一张表：</p>
+<h3 id="使用-pg-basebackup-方式部署流复制">使用 pg_basebackup 方式部署流复制</h3>
+
+<p>接下来，介绍一种操作相对简洁的方式，上述我们配置操作所牵涉到的主要步骤有：</p>
+
+<ul>
+<li><p>pg_start_backup</p></li>
+
+<li><p>两台服务器之间的数据拷贝</p></li>
+
+<li><p>pg_stop_backup</p></li>
+</ul>
+
+<p>以上三个步骤可以合成一步完成，PostgreSQL提供内置的pg_basebackup命令行工具支持对主库发起一个在线基准备份，并自动进入备份模式进行数据库基准备份，备份完成后自动从备份模式退出，不需要执行额外的pg_start_backup 和pg_stop_backup 命令显式地声明进入备份模式和退出备份模式，pg_basebackup工具是对数据库实例级进行的物理备份，因此这个工具通常作为备份工具对据库进行基准备份</p>
+
+<p>pg_basebackup工具发起备份需要超级用户权限或REPLICATION权限，注意max_wal_senders参数配置，因为pg_basebackup工具将消耗至少一个WAL发送进程。本节将演示通过pg_basebackup工具部署异步流复制，之前已经在pghost2上部署了一个备库，我们先将这个备库删除，之后通过pg_basebackup工具重新做一次备库，删除pghost2上的备库只需要先停备库之后删除备库数据库数据文件即可，如下所示：</p>
+
+<p>进入pghost2服务器上（172.17.0.5）</p>
+<pre><code class="language-powershell">$ pg_ctl stop -m fast
+waiting for server to shut down.... done
+server stopped
+
+$ rm -rf $PGDATA
+$ rm -rf /data/pg10/pg_tbs
+</code></pre>
+
+<p>接下来，在pghost2上，使用pg_basebackup触发基准备份</p>
+<pre><code class="language-powershell">pg_basebackup -D $PGDATA -Fp -Xs -v -P -h 172.17.0.2 -p 1921  -U repuser
+</code></pre>
+
+<p>执行后，会看到相关的日志输出</p>
+<pre><code class="language-powershell">pg_basebackup: initiating base backup, waiting for checkpoint to complete
+pg_basebackup: checkpoint completed
+pg_basebackup: write-ahead log start point: 0/20007A8 on timeline 1
+pg_basebackup: starting background WAL receiver
+22655/22655 kB (100%), 1/1 tablespace
+pg_basebackup: write-ahead log end point: 0/2000888
+pg_basebackup: waiting for background process to finish streaming ...
+pg_basebackup: base backup completed
+</code></pre>
+
+<p>从以上日志信息看出pg_basebackup命令首先对数据库做一次checkpoint，之后基于时间点做一个全库基准备份，全备过程中会拷贝$PGDATA数据文件和表空间文件到备库节点对应目录</p>
+
+<p>最后，跟之前使用pg_start_backup的方式一样，备库记得配置recovery.conf</p>
+<pre><code class="language-powershell">recovery_target_timeline = 'latest'
+standby_mode = on
+primary_conninfo = 'host=172.17.0.2  port=1921 user=repuser password=domac123'
+</code></pre>
+
+<p>如果也配置了pgpass文件，可以使用下属的配置：</p>
+<pre><code class="language-powershell">recovery_target_timeline = 'latest'
+standby_mode = on
+primary_conninfo = 'host=172.17.0.2  port=1921 user=repuser'
+</code></pre>
+
+<p>到此为止，主备的配置基本完成，当然，稳妥起见，我们最好多动手动手，尝试在主库上创建并插入数据，观察备库上是否同步这些操作，我们再主库上创建一张表：</p>
 <pre><code class="language-powershell">postgres=# create table test_ms(id int4);
 
 CREATE TABLE
@@ -405,7 +466,7 @@ ERROR:  cannot execute INSERT in a read-only transaction
 </code></pre>
 
 <p>2、在备库上执行pg_ctl promote命令激活备库，如果recovery.conf变成recovery.done表示备库已切换成主库</p>
-<pre><code class="language-powershell">pg_ctl promote
+<pre><code class="language-powershell">pg_ctl promote -D $PGDATA
 waiting for server to promote....2018-09-30 00:10:30.222 UTC [26480] LOG:  received promote request
 LOG:  redo done at 0/4000028
 LOG:  last completed transaction was at log time 2018-09-29 23:50:52.502513+00
@@ -423,6 +484,12 @@ server promoted
 <p>3、这时如果需要将老的主库切换成备库，在老的主库的$PGDATA目录下也创建recovery.conf文件（创建方式跟之前介绍的一样，内容可以和原从库pghost2的一样，只是primary_conninfo的IP换成对端pghost2的IP）</p>
 
 <p>例如，主库上的 recovery.conf 设置为：</p>
+<pre><code class="language-powershell">recovery_target_timeline = 'latest'
+standby_mode = on
+primary_conninfo = 'host=172.17.0.5  port=1921 user=repuser password=domac123'
+</code></pre>
+
+<p>如果要求更高的安全性，可以参考如下配置：</p>
 <pre><code class="language-powershell">recovery_target_timeline = 'latest'
 standby_mode = on
 primary_conninfo = 'host=172.17.0.5  port=1921 user=repuser'
