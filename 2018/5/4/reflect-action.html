@@ -94,7 +94,7 @@
 <p>Go语言中反射的操作主要定义在标准库reflect中，在标准库中定义了两种类型来表现运行时的对象信息，分别是：reflect.Type（反射对象的类型）和 reflect.Value（反射对象的值），所有反射操作都是基于这两个类型进行的。</p>
 
 <p>为了说明reflect处理类型的相关知识，我们先看一个例子：</p>
-<pre><code>file, err := os.Open(&quot;/tmp/test.log&quot;)
+<pre><code class="language-go">file, err := os.Open(&quot;/tmp/test.log&quot;)
 if err != nil {
     panic(err)
 }
@@ -110,7 +110,7 @@ fmt.Printf(&quot;%v\n&quot;, reflect.TypeOf(w))
 </code></pre>
 
 <p>程序输出</p>
-<pre><code>*os.File
+<pre><code class="language-sh">*os.File
 *os.File
 </code></pre>
 
@@ -140,20 +140,20 @@ io.Writer，这点很重要！</p>
 <p>我们使用反射除了运行时判断真实类型，无非也是想在运行时更新变量的值</p>
 
 <p>再看一个例子：</p>
-<pre><code>a := 12
+<pre><code class="language-go">a := 12
 b := reflect.ValueOf(&amp;a)
 b.Set(reflect.ValueOf(int64(48)))
 fmt.Println(a)
 </code></pre>
 
 <p>上面的代码，我们目的是在运行时把变量a的值从12修改为48，但单当我们运行代码的时候，会抛出异常</p>
-<pre><code>panic: reflect: reflect.Value.Set using unaddressable value
+<pre><code class="language-sh">panic: reflect: reflect.Value.Set using unaddressable value
 </code></pre>
 
 <p>unaddressable ? 也就是上面我们的变量b其实是unaddressable的，哪怕b有一个指针指向变量a，但无法这样的方式来更新变量a的值。</p>
 
 <p>那么如何让b变为addressable呢？ 再来看下面的示范：</p>
-<pre><code>x := 12
+<pre><code class="language-go">x := 12
 a := reflect.ValueOf(2)
 println(a.CanAddr()) //false
 
@@ -176,28 +176,28 @@ println(d.CanAddr()) //true
 <p>d可取址，因为Elem()方法，可以获取变量对应的可取址地址的value</p>
 
 <p>官方对Elem()的解释是：</p>
-<pre><code>Elem returns the value that the interface v contains
+<pre><code class="language-sh">Elem returns the value that the interface v contains
 </code></pre>
 
 <p>所以，上面由于只有d可取值，也就是只有可寻址的reflect.Value直接调用reflect.Value.Set来更新值,否则会抛出以下的异常：</p>
-<pre><code>panic: reflect: reflect.Value.SetInt using unaddressable value
+<pre><code class="language-sh">panic: reflect: reflect.Value.SetInt using unaddressable value
 </code></pre>
 
 <p>ok，也就是说我们可以通过Elem()来让我们某些不可取址的value变为addressable，那么我再重写一下上面的代码：</p>
-<pre><code>a := 12
+<pre><code class="language-go">a := 12
 b := reflect.ValueOf(&amp;a).Elem()
 b.Set(reflect.ValueOf(int64(48)))
 fmt.Println(a)
 </code></pre>
 
 <p>当我们以为一切正常的时候，这个时候，我们又得到一个异常信息：</p>
-<pre><code>panic: reflect.Set: value of type int64 is not assignable to type int
+<pre><code class="language-sh">panic: reflect.Set: value of type int64 is not assignable to type int
 </code></pre>
 
 <p>从这个异常看出b现在是addressable了，但却变成了unassignable了！为什么呢？</p>
 
 <p>我们回顾下，interface类型的变量总是具有相同的静态类型，也就是说我们通过反射来对interface进行设值，这个值的静态类型必须是相同的，否则会分配不成功，我们再更改下例子的代码：</p>
-<pre><code>a := 12
+<pre><code class="language-go">a := 12
 b := reflect.ValueOf(&amp;a).Elem()
 b.Set(reflect.ValueOf(48))
 fmt.Println(a)
@@ -223,7 +223,7 @@ fmt.Println(a)
 <p>我们尝试思考下如何可以接收任意类型slices,并统一返回[]interface{}?</p>
 
 <p>也许你可能会说：“这不是很容易吗？直接处理就行了”，于是你可能会这样处理：</p>
-<pre><code>func handleSlice(in []interface{}) (out []interface{}) {
+<pre><code class="language-go">func handleSlice(in []interface{}) (out []interface{}) {
     out = make([]interface{}, len(in))
     for i, v := range in {
         out[i] = v
@@ -233,11 +233,11 @@ fmt.Println(a)
 </code></pre>
 
 <p>于是我们尝试把一个[]int的slice作为入参的时候，还没到运行时，我们已经收到报错信息：</p>
-<pre><code>cannot use slice (type []int) as type []interface {} in argument to handleSlice4
+<pre><code class="language-sh">cannot use slice (type []int) as type []interface {} in argument to handleSlice4
 </code></pre>
 
 <p>原因很简单，我们的入参类型是[]int，它只能作为一个interface的隐藏类型，但不能作为[]interface的隐藏类型，所以上面的处理方法是不恰当的，我们应该这样写：</p>
-<pre><code>func handleSlice(arg interface{}) (out []interface{}, ok bool) {
+<pre><code class="language-go">func handleSlice(arg interface{}) (out []interface{}, ok bool) {
     argValue := reflect.ValueOf(arg)
     if argValue.Type().Kind() == reflect.Slice {
         length := argValue.Len()
@@ -259,7 +259,7 @@ fmt.Println(a)
 <p>我们使用反射的一个比较常见的功能是用于类型的转换，如下面的代码片段，我们目的是要把一个未知类型的值转化为字符串并返回</p>
 
 <p><a href="https://github.com/domac/mafio/blob/master/util/stringutil.go">stringutil.go</a></p>
-<pre><code>... ...
+<pre><code class="language-go">... ...
 
 func ToStr(value interface{}, args ...int) (s string) {
     switch v := value.(type) {
@@ -304,7 +304,7 @@ func ToStr(value interface{}, args ...int) (s string) {
 </code></pre>
 
 <p>再比方说我们日常最常用的“技巧” --- 字符串与byte数组互相转换</p>
-<pre><code>func BytesToString(b []byte) string {
+<pre><code class="language-go">func BytesToString(b []byte) string {
     bh := (*reflect.SliceHeader)(unsafe.Pointer(&amp;b))
     sh := reflect.StringHeader{bh.Data, bh.Len}
     return *(*string)(unsafe.Pointer(&amp;sh))
@@ -318,7 +318,7 @@ func StringToBytes(s string) []byte {
 </code></pre>
 
 <p>上面例子两个 reflect 例子, 我们以 BytesToString为测试对象，看下一些基准测试：</p>
-<pre><code>func BenchmarkDirectConvert(b *testing.B) {
+<pre><code class="language-go">func BenchmarkDirectConvert(b *testing.B) {
     for i := 0; i &lt; b.N; i++ {
         b := []byte(&quot;I am gopher&quot;)
         _ = string(b)
@@ -345,7 +345,7 @@ BenchmarkReflectConvert-4       200000000             6.78 ns/op           0 B/o
 <h4 id="三-单机版的mapreduce">三、单机版的MapReduce</h4>
 
 <p>下面是通过反射实现一个简单的单机版简单的类MR演示</p>
-<pre><code>package main
+<pre><code class="language-go">package main
 
 import (
     &quot;fmt&quot;
@@ -378,7 +378,7 @@ func main() {
 <p>实现reflect.Type池主要的为了某程度提升reflect的性能，避免重复操作耗时</p>
 
 <p>下面是一个屏蔽用户名字展示的测试例子：</p>
-<pre><code>type User struct {
+<pre><code class="language-go">type User struct {
     Name string
     Age  int
 }
@@ -422,7 +422,7 @@ BenchmarkFiltNameWithCache-4     5000000               268 ns/op              48
 </code></pre>
 
 <p>虽然不明显，但通过对部分数据的重用可以起到优化反射的作用,优化效果还是要看具体的业务实现常见， 当然如果可以把上面的缓存方法设计得更通用些，可以这样：</p>
-<pre><code>var cache = map[*uintptr]map[string]uintptr{}
+<pre><code class="language-go">var cache = map[*uintptr]map[string]uintptr{}
 
 func filtNameWithCache(u *User, message string) {
     itab := *(**uintptr)(unsafe.Pointer(&amp;u))

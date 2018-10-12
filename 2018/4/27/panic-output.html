@@ -62,7 +62,7 @@
 <!--more-->
 
 <p>我们一个通用的方法是</p>
-<pre><code>err := execFunc()
+<pre><code class="language-go">err := execFunc()
 if err != nil {
     outputToFile(err)
 }
@@ -81,7 +81,7 @@ if err != nil {
 <p>3、windows里面没有stdout和stderr的输出方式，也没办法像unix那样使用“&gt;&gt;”进行标准输出的重新向，这个如何破？</p>
 
 <p>我们先试试一个简单的例子：</p>
-<pre><code>package main
+<pre><code class="language-go">package main
 
 import (
     &quot;fmt&quot;;
@@ -125,7 +125,7 @@ func main() {
 <p><img src="http://og0usnhfv.bkt.clouddn.com/rob.png" alt="rob say" /></p>
 
 <p>看来是把变量直接赋值到底层是不行的，图上所说，推荐使用syscall.Dup的方式。我们再改写下 <code>InitPanicFile()</code> 函数：</p>
-<pre><code>func InitPanicFile() error {
+<pre><code class="language-go">func InitPanicFile() error {
     log.Println(&quot;init panic file in unix mode&quot;)
     file, err := os.OpenFile(panicFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
     if err != nil {
@@ -140,7 +140,7 @@ func main() {
 </code></pre>
 
 <p>我们运行程序，发现panic正常定向到我们的文件里面去了：</p>
-<pre><code>$ tail -f /tmp/panic.log
+<pre><code class="language-sh">$ tail -f /tmp/panic.log
 
 panic: test panic
 
@@ -151,7 +151,7 @@ goroutine 1 [running]:
 </code></pre>
 
 <p>不过经过实践，上面的代码是有些bug的，原因是我们上面的file是一个局部变量，放系统发生gc的时候，会触发file里面的 <code>runtime.SetFinalizer(f.file, (*file).close)</code>, 会引起句柄会被回收， 如果我们代码是长期运行在后台的话，建议代码调整如下的形式：</p>
-<pre><code>var globalFile *os.File
+<pre><code class="language-go">var globalFile *os.File
 
 func InitPanicFile() error {
     log.Println(&quot;init panic file in unix mode&quot;)
@@ -171,7 +171,7 @@ func InitPanicFile() error {
 <p>接下来，我们要延伸思考下，如果服务是运行在windows上面该如何破？</p>
 
 <p>使用<code>syscall.Dup2</code>的例子windows下会编译直接报错:</p>
-<pre><code>undefined: syscall.Dup2
+<pre><code class="language-sh">undefined: syscall.Dup2
 
 ... ...
 
@@ -181,7 +181,7 @@ syscall.Dup2 is a linux/OSX only thing. there's no windows equivalent。
 <p>记得我前面的文件，介绍过go调用DLL的方法 <a href="http://lihaoquan.me/2018/4/4/go-windows-dll.html">《使用Go结合windows dll开发程序》</a> ，其实我们也可以想到，可以直接使用DLL的调用达到功能效果：</p>
 
 <p>代码如下：</p>
-<pre><code>package main
+<pre><code class="language-go">package main
 
 import (
     &quot;log&quot;

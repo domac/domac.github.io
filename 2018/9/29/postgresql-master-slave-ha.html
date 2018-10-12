@@ -369,7 +369,7 @@ $ rm -rf /data/pg10/pg_tbs
 </code></pre>
 
 <p>接下来，在pghost2上，使用pg_basebackup触发基准备份</p>
-<pre><code class="language-powershell">pg_basebackup -D $PGDATA -Fp -Xs -v -P -h 172.17.0.2 -p 1921  -U repuser
+<pre><code class="language-powershell">pg_basebackup -D $PGDATA -Fp -Xs -v -P -h 172.17.0.2 -p 1921  -U repuser -W
 </code></pre>
 
 <p>执行后，会看到相关的日志输出</p>

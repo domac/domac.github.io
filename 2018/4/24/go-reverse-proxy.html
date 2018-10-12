@@ -95,7 +95,7 @@
 <p>ReverseProxy提供了ServerHTTP方法，这意味着我们可以跟普通http handler一样简单地使用它来处理请求</p>
 
 <p>ReverseProxy 暴露了NewSingleHostReverseProxy的方法</p>
-<pre><code>// NewSingleHostReverseProxy returns a new ReverseProxy that rewrites
+<pre><code class="language-go">// NewSingleHostReverseProxy returns a new ReverseProxy that rewrites
 // URLs to the scheme, host, and base path provided in target. If the
 // target's path is &quot;/base&quot; and the incoming request was for &quot;/dir&quot;,
 // the target request will be for /base/dir.
@@ -116,7 +116,7 @@ func NewSingleHostReverseProxy(target *url.URL) *ReverseProxy {
 </code></pre>
 
 <p>这样，我们可以通过一行代码就基本上实现了主体的反向代理功能了，如下：</p>
-<pre><code>httputil.NewSingleHostReverseProxy(address)
+<pre><code class="language-go">httputil.NewSingleHostReverseProxy(address)
 </code></pre>
 
 <h2 id="实现">实现</h2>
