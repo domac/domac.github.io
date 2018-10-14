@@ -49,6 +49,37 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">5</span>
+                            <span class="day">4</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/5/4/reflect-action.html">golang reflect实践</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>之前看过很多Go技术的文章和一些技术群里面的交流，主流意见都是认为反射（reflect）是导致性能的主要元凶，叫开发者少用为妙；主要是他们使用反射的业务场景离不开下面的情况：</p>
+
+<ul>
+<li><p>reflect涉及到内存分配以及后续的GC</p></li>
+
+<li><p>reflect实现里面有大量的枚举，也就是for循环，比如类型之类的</p></li>
+</ul>
+
+<p>一开始我也“遵循”的，直到最近项目需要，越来越多的场景需要用到反射机制才能灵活应对，毕竟某些情况某些情景下性能不是特别高的要求，模块的灵活性扩展性（够有能力处理各种输入类型，而这些类型可能无法共享同一个接口，也可能布局未知）才是占据重要的位置。反射不但指计算机程序在运行时（Run time）可以访问、检测和修改它本身状态或行为的一种能力，也是元编程的一种形式，我们常见的RPC库或者一些ORM框架基本都是使用反射来实现核心的功能，所以本文主要是最近使用反射的一些总结</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/5/4/reflect-action.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">4</span>
                             <span class="day">27</span>
                         </span>
@@ -125,35 +156,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/4/4/go-windows-dll.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">3</span>
-                            <span class="day">11</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/3/11/network-promisc-mode.html">关于网络的混杂模式</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="什么是网络的混杂模式">什么是网络的混杂模式</h2>
-
-<p>混杂模式（promiscuous mode）是指一台机器的网卡能够接收所有经过它的数据流，而不论其目的地址是否是它。</p>
-
-<p><a href="https://zh.wikipedia.org/wiki/%E6%B7%B7%E6%9D%82%E6%A8%A1%E5%BC%8F">维基百科</a>：一般计算机网卡都工作在非混杂模式下，此时网卡只接受来自网络端口的目的地址指向自己的数据。当网卡工作在混杂模式下时，网卡将来自接口的所有数据都捕获并交给相应的驱动程序（即不验证MAC地址）。网卡的混杂模式一般在网络管理员分析网络数据作为网络故障诊断手段时用到，同时这个模式也被网络黑客利用来作为网络数据窃听的入口。</p>
-
-<p>网卡具有如下的几种工作模式：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/3/11/network-promisc-mode.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

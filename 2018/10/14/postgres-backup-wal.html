@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Postgresql备份与增量恢复 - domac的菜园子</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="postgres-backup-wal"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac的菜园子 <sup>life should be func</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
+                            <span class="day">14</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/10/14/postgres-backup-wal.html">Postgresql备份与增量恢复</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/db.html">db</a>
+                            <a class="tag label label-info" href="/tags/postgresql.html">postgresql</a>
+                            <a class="tag label label-info" href="/tags/pg.html">pg</a>
+                        </aside>
+                        <section class="brief"><p>之前，我们在 <a href="https://lihaoquan.me/2018/9/29/postgresql-master-slave-ha.html">《Postgresql主从异步流复制方案》</a> 一节中，部署了Postgresql的主从异步流复制环境。主从复制的目的是为了实现数据的备份，实现数据的高可用性和容错行。下面主要简单地介绍下我们运维Postgresql数据库时的场景备份与恢复方案。</p>
+
+<h2 id="增量备份">增量备份</h2>
+
+<p>PostgreSQL在做写入操作时，对数据文件做的任何修改信息，首先会写入WAL日志（预写日志），然后才会对数据文件做物理修改。当数据库服务器掉重启时，PostgreSQL在启动时会首先读取WAL日志，对数据文件进行恢复。因此，从理论上讲，如果我们有一个数据库的基础备份（也称为全备），再配合WAL日志，是可以将数据库恢复到任意时间点的。</p>
+
+<p>上面的知识点很重要，因为我们场景的增量备份说白了就是通过<code>基础备份</code> + <code>增量WAL日志</code> 进行<code>重做</code>恢复的。</p>
+
+<!--more-->
+
+<h3 id="增量备份设置">增量备份设置</h3>
+
+<p>为了演示相关功能，我们基于 <a href="https://lihaoquan.me/2018/9/29/postgresql-master-slave-ha.html">《Postgresql主从异步流复制方案》</a> 一节中的环境pghost1服务器上，创
+建相关管理目录</p>
+
+<p>切换到 postgres 用户下</p>
+<pre><code class="language-sh">mkdir -p /data/pg10/backups
+mkdir -p /data/pg10/archive_wals
+</code></pre>
+
+<p>backups目录则可以用来存放基础备份</p>
+
+<p>archive_wals目录自然用来存放归档了</p>
+
+<p>接下来我们修改我们的postgresql.conf文件的相关设置</p>
+<pre><code class="language-ini">wal_level = replica
+
+archive_mode = on
+
+archive_command = '/usr/bin/lz4 -q -z %p /data/pg10/archive_wals/%f.lz4'
+</code></pre>
+
+<p><code>archive_command</code> 参数的默认值是个空字符串，它的值可以是一条shell命令或者一个复杂的shell脚本。</p>
+
+<p>在archive_command的shell命令或脚本中可以用 <code>%p</code> 表示将要归档的WAL文件的包含完整路径信息的文件名，用 <code>%f</code> 代表不包含路径信息的WAL文件的文件名。</p>
+
+<p>修改wal_level和archive_mode参数都需要重新启动数据库才可以生效，修改archive_command不需要重启，只需要reload即可，例如：</p>
+<pre><code class="language-sql">postgres=# SELECT pg_reload_conf();
+
+postgres=# show archive_command ; 
+</code></pre>
+
+<h3 id="创建基础备份">创建基础备份</h3>
+
+<p>我们使用之前介绍过的pg_basebackup命令进行基础备份的创建， 基础备份很重要，我们的数据恢复不能没有它，建议我们根据相关业务策略，周期性生成我们的基础备份。</p>
+<pre><code class="language-sh">$ pg_basebackup -Ft -Pv -Xf -z -Z5 -p 25432 -D /data/pg10/backups/
+</code></pre>
+
+<p>这样，我们就成功生成我们的基础数据备份了</p>
+
+<h2 id="设置还原点">设置还原点</h2>
+
+<p>一般我们需要根据重要事件发生时创建一个还原点，通过基础备份和归档恢复到事件发生之前的状态。</p>
+
+<p>创建还原点的系统函数为：pg_create_restore_point，它的定义如下：</p>
+<pre><code class="language-sql">postgres=#  SELECT pg_create_restore_point('domac-201810141800');
+</code></pre>
+
+<h2 id="恢复到指定还原点">恢复到指定还原点</h2>
+
+<p>接下来，我们通过一个示例，让我们的数据还原到我们设置的还原点上</p>
+
+<p>首先，我们创建一张测试表：</p>
+<pre><code class="language-sql">CREATE TABLE test_restore(
+    id SERIAL PRIMARY KEY,
+    ival INT NOT NULL DEFAULT 0,
+    description TEXT,
+    created_time TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+</code></pre>
+
+<p>初始化一些测试数据作为基础数据，如下所示：</p>
+<pre><code class="language-sql">postgres=# INSERT INTO test_restore (ival) VALUES (1);
+INSERT 0 1
+postgres=# INSERT INTO test_restore (ival) VALUES (2);
+INSERT 0 1
+postgres=# INSERT INTO test_restore (ival) VALUES (3);
+INSERT 0 1
+postgres=# INSERT INTO test_restore (ival) VALUES (4);
+INSERT 0 1
+
+postgres=# select * from test_restore;
+ id | ival | description |         created_time
+----+------+-------------+-------------------------------
+  1 |    1 |             | 2018-10-14 11:13:41.57154+00
+  2 |    2 |             | 2018-10-14 11:13:44.250221+00
+  3 |    3 |             | 2018-10-14 11:13:46.311291+00
+  4 |    4 |             | 2018-10-14 11:13:48.820479+00
+(4 rows)
+</code></pre>
+
+<p>并且按照上文的方法创建一个基础备份。如果是测试，有一点需要注意，由于WAL文件是写满16MB才会进行归档，测试阶段可能写入会非常少，可以在执行完 <code>基础备份</code>之后，手动进行一次WAL切换。例如：</p>
+<pre><code class="language-sql">postgres=# select pg_switch_wal();
+ pg_switch_wal
+---------------
+ 0/1D01B858
+(1 row)
+</code></pre>
+
+<p>或者通过设置archive_timeout参数，在达到timeout阈值时强行切换到新的WAL段。</p>
+
+<p>接下来，创建一个还原点，如下所示：</p>
+<pre><code class="language-sql">postgres=# select pg_create_restore_point('domac-1014');
+ pg_create_restore_point
+-------------------------
+ 0/1E0001A8
+(1 row)
+</code></pre>
+
+<p>接下来我们对数据做一些变更, 我们删除test_restore的所有数据：</p>
+<pre><code class="language-sql">postgres=# delete from test_restore;
+DELETE 4
+</code></pre>
+
+<p>下面进行恢复到名称为“domac-1014”还原点的实验，如下所示：</p>
+
+<p>停止数据库</p>
+<pre><code class="language-sh">$ pg_ctl stop -D /data/pg10/db
+</code></pre>
+
+<p>移除旧的数据目录</p>
+<pre><code class="language-sh">$ rm -rf /data/pg10/db
+
+$ mkdir db &amp;&amp; chmod 0700 db
+
+$ tar -xvf /data/pg10/backups/base.tar.gz -C /data/pg10/db
+
+cp $PGHOME/share/recovery.conf.sample /pgdata/10/data/recovery.conf
+
+chmod 0600 /pgdata/10/data/recovery.conf
+
+</code></pre>
+
+<p>修改 recovery.conf, 修改以下配置信息：</p>
+<pre><code class="language-ini">restore_command = '/usr/bin/lz4 -d /data/pg10/archive_wals/%f.lz4 %p'
+recovery_target_name = 'domac-1014
+</code></pre>
+
+<p>然后启动数据库进入恢复状态，观察日志，如下所示：</p>
+<pre><code class="language-sh">bash-4.2$ pg_ctl start -D /data/pg10/db
+waiting for server to start....2018-10-14 11:26:56.949 UTC [8397] LOG:  listening on IPv4 address &quot;0.0.0.0&quot;, port 25432
+2018-10-14 11:26:56.949 UTC [8397] LOG:  listening on IPv6 address &quot;::&quot;, port 25432
+2018-10-14 11:26:56.952 UTC [8397] LOG:  listening on Unix socket &quot;/tmp/.s.PGSQL.25432&quot;
+2018-10-14 11:26:56.968 UTC [8398] LOG:  database system was interrupted; last known up at 2018-10-14 09:26:59 UTC
+2018-10-14 11:26:57.049 UTC [8398] LOG:  starting point-in-time recovery to &quot;domac-1014&quot;
+/data/pg10/archive_wals/00000002.history.lz4: No such file or directory
+2018-10-14 11:26:57.052 UTC [8398] LOG:  restored log file &quot;00000002.history&quot; from archive
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:57.077 UTC [8398] LOG:  restored log file &quot;000000020000000000000016&quot; from archive
+2018-10-14 11:26:57.191 UTC [8398] LOG:  redo starts at 0/16000060
+2018-10-14 11:26:57.193 UTC [8398] LOG:  consistent recovery state reached at 0/16000130
+2018-10-14 11:26:57.193 UTC [8397] LOG:  database system is ready to accept read only connections
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:57.217 UTC [8398] LOG:  restored log file &quot;000000020000000000000017&quot; from archive
+ done
+server started
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:57.384 UTC [8398] LOG:  restored log file &quot;000000020000000000000018&quot; from archive
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:57.513 UTC [8398] LOG:  restored log file &quot;000000020000000000000019&quot; from archive
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:57.699 UTC [8398] LOG:  restored log file &quot;00000002000000000000001A&quot; from archive
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:57.805 UTC [8398] LOG:  restored log file &quot;00000002000000000000001B&quot; from archive
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:57.982 UTC [8398] LOG:  restored log file &quot;00000002000000000000001C&quot; from archive
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:58.116 UTC [8398] LOG:  restored log file &quot;00000002000000000000001D&quot; from archive
+/data/pg10/archive_w : decoded 16777216 bytes
+2018-10-14 11:26:58.310 UTC [8398] LOG:  restored log file &quot;00000002000000000000001E&quot; from archive
+2018-10-14 11:26:58.379 UTC [8398] LOG:  recovery stopping at restore point &quot;domac-1014&quot;, time 2018-10-14 11:17:20.680941+00
+2018-10-14 11:26:58.379 UTC [8398] LOG:  recovery has paused
+2018-10-14 11:26:58.379 UTC [8398] HINT:  Execute pg_wal_replay_resume() to continue.
+
+</code></pre>
+
+<p>重启后，我们对test_restore表进行查询，看数据是否正常恢复：</p>
+<pre><code class="language-sql">postgres=# select * from test_restore;
+ id | ival | description |         created_time
+----+------+-------------+-------------------------------
+  1 |    1 |             | 2018-10-14 11:13:41.57154+00
+  2 |    2 |             | 2018-10-14 11:13:44.250221+00
+  3 |    3 |             | 2018-10-14 11:13:46.311291+00
+  4 |    4 |             | 2018-10-14 11:13:48.820479+00
+(4 rows)
+</code></pre>
+
+<p>可以看到数据已经恢复到指定的还原点：<code>domac-1014</code>。</p>
+
+<blockquote>
+<p>这时，recovery.conf可以移除，避免下次数据重启，数据再次恢复到该还原点</p>
+</blockquote>
+
+<h2 id="总结">总结</h2>
+
+<p>备份和恢复是数据库管理中非常重要的工作，日常运维中，我们需要根据需要进行相关策略的备份，并且周期性地进行恢复测试，保证数据的安全。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2018 domac的菜园子.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by
+            <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+
+</html>
