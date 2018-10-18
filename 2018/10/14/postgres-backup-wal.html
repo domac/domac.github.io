@@ -104,7 +104,7 @@ postgres=# show archive_command ;
 <h3 id="创建基础备份">创建基础备份</h3>
 
 <p>我们使用之前介绍过的pg_basebackup命令进行基础备份的创建， 基础备份很重要，我们的数据恢复不能没有它，建议我们根据相关业务策略，周期性生成我们的基础备份。</p>
-<pre><code class="language-sh">$ pg_basebackup -Ft -Pv -Xf -z -Z5 -p 25432 -D /data/pg10/backups/
+<pre><code class="language-sh">$ pg_basebackup -Ft -Pv -Xf -z -Z5  -U postgres -p 25432 -D /data/pg10/backups/
 </code></pre>
 
 <p>这样，我们就成功生成我们的基础数据备份了</p>
