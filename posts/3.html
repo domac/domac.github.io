@@ -49,6 +49,33 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">4</span>
+                            <span class="day">4</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/4/4/go-windows-dll.html">使用Go结合windows dll开发程序</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>Go程序有一个优点是很好地做到&rdquo;跨平台&rdquo;,一般开发的情况,我们使用内置的相关模块实现相关功能,通过 <code>GOOS=操作系统代号  go build</code> 就能编译出对应平台的二进制文件. 然后把二进制文件扔往对应的服务器无论是linux或windows, 基本都能正常运行.</p>
+
+<p>但是Go也不是完全的跨平台,个别情况下并没有提供Windows下的相关方法，只能通过syscall包去调用Win库.</p>
+
+<p>本文主要说说我们做跨平台的时候,针对windows的一些处理: 一种常见的方式是我们需要在go的代码里面使用个别的dll文件。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/4/4/go-windows-dll.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">3</span>
                             <span class="day">11</span>
                         </span>
@@ -131,35 +158,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/12/11/read-big-file-in-go.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">14</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/11/14/ats-caching.html">ATS缓存组件使用总结</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="一-简介">一、简介</h2>
-
-<p>Apache Traffic Server基本可以用一句话概括：它不仅是HTTP代理服务器, 还是HTTP缓存服务器，且可以缓存任何字节流数据。</p>
-
-<h2 id="二-使用情况">二、使用情况</h2>
-
-<p>由于是做电商，为了满足日常业务的发展，最初的nginx-proxycache的方式已经不能满足我们的大并发量而且大流量对象的缓存需要。这个时候我调研过squid、varnish等缓存代理，最后基于同行的使用报告和自己搭建使用一段时间后，最终我们就决定采用ATS作为缓存中心的核心层。具体的原因有以下几点：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/11/14/ats-caching.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

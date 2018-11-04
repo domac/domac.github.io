@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>[K&amp;R]tail的c语言实现 - domac的菜园子</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="tail example in c"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac的菜园子 <sup>coder at work</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">4</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/11/4/tail-example-in-c.html">[K&amp;R]tail的c语言实现</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/c.html">c</a>
+                        </aside>
+                        <section class="brief"><p>下面的实现是来自K&amp;R-C的习题实现:</p>
+<pre><code>编写程序tail，将输入中的n行打印出来。默认情况下，n的值为10，但可通过一个可选参数改变n的值，因此命令 tail -n 将打印其输入的最后n行。无论输入或n的值是否合理，该程序都应该能正常运行,编写的程序要充分利用存储空间
+</code></pre>
+
+<blockquote>
+<p>下面的例子只简单实现一次输入输出，并不实现系统 tail -f 一样的监控文件的实时输出</p>
+</blockquote>
+
+<h3 id="tail-c">tail.c</h3>
+
+<!--more-->
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+
+#define MAXLINE 1000
+
+void tail(int n);
+static int mygetline(char *s, int len);
+
+int main(int argc, char *argv[]) {
+  int n = 10;
+  char *arg;
+  while (--argc &gt; 0) {
+    arg = *(++argv);
+    if (*arg == '-') {
+      n = atoi(++arg);
+    }
+  }
+  tail(n);
+}
+
+void tail(int n) {
+  printf(&quot;show %d lines: \n&quot;, n);
+  int count = 0;
+  char *lines[n];
+
+  char s[MAXLINE];
+  int w;
+  char *p;
+
+  while ((w = mygetline(s, MAXLINE)) != 0) {
+    p = malloc(w);
+    if (p == NULL) {
+      printf(&quot;memory alloc error&quot;);
+      return;
+    } else {
+      strcpy(p, s);
+
+      if (count &gt;= n) {
+        free(lines[count % n]);
+      }
+      lines[count % n] = p;
+      count++;
+    }
+  }
+
+  int start = 0;
+  int end = n;
+
+  if (count &gt;= n) {
+    start = count;
+    end = count + n;
+  }
+
+  for (; start &lt; end; start++) {
+    printf(&quot;%s\n&quot;, lines[start % n]);
+    free(lines[start % n]);
+  }
+}
+
+static int mygetline(char *s, int len) {
+  static char c;
+  if (c == EOF) {
+    return 0;
+  }
+
+  int i = 0;
+
+  while ((c = getchar()) != '\n' &amp;&amp; c != EOF &amp;&amp; i &lt; len - 1) {
+    *(s + i++) = c;
+  }
+
+  if (c == '\n') {
+    *(s + i) = '\n';
+  }
+
+  *(s + i) = '\0';
+  return i;
+}
+</code></pre>
+
+<p>运行例子：</p>
+<pre><code class="language-sh">cc tail.c &amp;&amp; ./a.out -10 &lt; input.txt
+</code></pre>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2018 domac的菜园子.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by
+            <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+
+</html>
