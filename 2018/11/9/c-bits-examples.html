@@ -73,9 +73,6 @@ int main() {
   printf(&quot;getbits(%u (%x), %d, %d) = %u (%X)\n&quot;, x, x, p, n, z, z);
 }
 
-// //some intermediate helpful observations from
-// http://stackoverflow.com/questions/197614/k-r-question-need-help-understanding-getbits-method-in-chapter-2
-// this is helpful b/c it shows the things happening in binary
 // ff94             11111111100.101.00  # original number
 // &gt;&gt; p+1-n     [2] 0011111111100.101.  # shift desired bits to right
 // &amp; ~(~0 &lt;&lt; n) [7] 0000000000000.101.  # clear all the other (left) bits
