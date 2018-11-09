@@ -144,7 +144,7 @@ go tool pprof [binary] prof.cpu 来进行分析。</p></li>
 
 <p>在没有使用go-torch之前，我们要分析一分profile文件的时候，遇到结构简单的还好，但遇到一些调用关系复杂的，我相信大部分程序员都觉得无从下手，如下图：</p>
 
-<p><img src="http://og0usnhfv.bkt.clouddn.com/hard_profile.png" alt="hard-to-read-profile" /></p>
+<p><img src="/media/2018/hard_profile.png" alt="hard-to-read-profile" /></p>
 
 <p>这样的结构，带给我们的是晦涩难懂的感觉，我们需要寻求更直观，更简单的分析工具。</p>
 
@@ -157,7 +157,7 @@ go tool pprof [binary] prof.cpu 来进行分析。</p></li>
 
 <p>下图是火焰图的一个事例展示：</p>
 
-<p><img src="http://og0usnhfv.bkt.clouddn.com/go-torch.png" alt="df" /></p>
+<p><img src="/media/2018/go-torch.png" alt="df" /></p>
 
 <p>这样的展示方式相比之前的树状的，有了更直观的表现，</p>
 
@@ -322,7 +322,7 @@ Entering interactive mode (type &quot;help&quot; for commands)
 
 <p>这样我们可以得到一个完整的程序调用性能采样profile的输出,如下图：</p>
 
-<p><img src="http://og0usnhfv.bkt.clouddn.com/profile_simple1.png" alt="web-pprof" /></p>
+<p><img src="/media/2018/profile_simple1.png" alt="web-pprof" /></p>
 
 <p>就像评分报告一样，模块间的调用耗时都能从图中得到展现，但是, 这种图有个缺点，就是层次很深的话，这周发散性的层级关系有点不友好，我们可能需要换一种展示方式来告诉我们应用是否有问题</p>
 
@@ -340,7 +340,7 @@ Entering interactive mode (type &quot;help&quot; for commands)
 
 <p><code>torch.svg</code> 是go-torch采样结束后自动生成的profile文件，我们也照旧用浏览器进行打开：</p>
 
-<p><img src="http://og0usnhfv.bkt.clouddn.com/flame1.png" alt="f1" /></p>
+<p><img src="/media/2018/flame1.png" alt="f1" /></p>
 
 <p>嗯，这样体验好多了，接下来我们可以基于这个火焰图诊断一下我们的web服务是否是“健康”的！</p>
 
@@ -414,7 +414,7 @@ func getStatsTags(r *http.Request) map[string]string {
 
 <p>生成新的profile后，浏览器打开</p>
 
-<p><img src="http://og0usnhfv.bkt.clouddn.com/flame2.png" alt="f2" /></p>
+<p><img src="/media/2018/flame2.png" alt="f2" /></p>
 
 <p>可以看到，之前的os.Hostname在火焰图上没有了，我们解决了一个bug~</p>
 
@@ -423,13 +423,13 @@ func getStatsTags(r *http.Request) map[string]string {
 
 <p>我们发现下图的一个地方（绿色框中的地方）：</p>
 
-<p><img src="http://og0usnhfv.bkt.clouddn.com/f3.png" alt="f3" /></p>
+<p><img src="/media/2018/f3.png" alt="f3" /></p>
 
 <p>从统计数据看到，绿色框标识的地方，采用数只有140，而这个函数应该也是每次调用/advance的时候都会被调用一次的，也就是说这里出现问题了。</p>
 
 <p>我们在火焰图上再点进去，发现了可疑的地方了：</p>
 
-<p><img src="http://og0usnhfv.bkt.clouddn.com/f4.png" alt="f4" /></p>
+<p><img src="/media/2018/f4.png" alt="f4" /></p>
 
 <p>绿色标识的地方所示，addTagsToName这个方法调用，为什么会出现两次呢？</p>
 
@@ -966,7 +966,7 @@ ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName 
 
 <p>我们再生产新的火焰图：</p>
 
-<p><img src="http://og0usnhfv.bkt.clouddn.com/f5.png" alt="f5" /></p>
+<p><img src="/media/2018/f5.png" alt="f5" /></p>
 
 <p>从火焰图看到，我们的性能采用报告也在合理正常的范围！</p>
 
