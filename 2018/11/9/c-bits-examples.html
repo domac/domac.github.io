@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>C语言的位操作常见例子 - domac的菜园子</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="c-bits-examples"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac的菜园子 <sup>coder at work</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">9</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/11/9/c-bits-examples.html">C语言的位操作常见例子</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/c.html">c</a>
+                        </aside>
+                        <section class="brief"><p>我们每一种计算机语言最终都会通过编译器转换成机器语言来执行，所以在编程中，位操作是常见且高效的数据处理手段之一，下面列出一些基于C语言的场景实例，便于日常开发中学习和使用</p>
+
+<h3 id="例一-编写函数-getbits-x-p-n-从数值x的第p位开始返回n位数值">例一，编写函数 getbits(x,p,n) 从数值x的第p位开始返回n位数值</h3>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+int getbits(unsigned x, int p, int n);
+
+int main() {
+  unsigned x = 0xF994;
+  int p = 4;
+  int n = 3;
+  int z = getbits(x, p, n);
+
+  printf(&quot;getbits(%u (%x), %d, %d) = %u (%X)\n&quot;, x, x, p, n, z, z);
+}
+
+// //some intermediate helpful observations from
+// http://stackoverflow.com/questions/197614/k-r-question-need-help-understanding-getbits-method-in-chapter-2
+// this is helpful b/c it shows the things happening in binary
+// ff94             11111111100.101.00  # original number
+// &gt;&gt; p+1-n     [2] 0011111111100.101.  # shift desired bits to right
+// &amp; ~(~0 &lt;&lt; n) [7] 0000000000000.101.  # clear all the other (left) bits
+
+int getbits(unsigned x, int p, int n) { return x &gt;&gt; (p - n + 1) &amp; ~(~0 &lt;&lt; n); }
+</code></pre>
+
+<!--more-->
+
+<h3 id="例二-编写一个函数setbits-x-p-n-y-该函数返回对x执行下列的操作的结果的值-将x中从左第p位开始的n个-二进制-位设置为y中最右边n位的值-x的其余各位保持不变">例二，编写一个函数setbits(x,p,n,y),该函数返回对x执行下列的操作的结果的值：将x中从左第p位开始的n个（二进制）位设置为y中最右边n位的值，x的其余各位保持不变</h3>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+unsigned setbits(unsigned x, unsigned p, unsigned n, unsigned y);
+
+int intLen(unsigned x);
+
+int main() {
+
+  unsigned x = 171; // 1010 1011 --- &gt; 101[0 1]011
+  unsigned p = 3;
+  unsigned n = 2;
+  unsigned y = 38; // 0010 0110
+
+  printf(&quot;result : %u \n&quot;, setbits(x, p, n, y));
+
+  return 1;
+}
+
+int intLen(unsigned x) {
+  int len = 0;
+  for (; x; x &gt;&gt;= 1) {
+    len++;
+  }
+  return len;
+}
+
+unsigned setbits(unsigned x, unsigned p, unsigned n, unsigned y) {
+
+  int length_y = intLen(y);
+  int length_x = intLen(x);
+
+  if (length_x - p - n &lt; 0) {
+    printf(&quot;move over size by x&quot;);
+    return 0;
+  }
+
+  if (length_y &lt; n) {
+    printf(&quot;move over size by y&quot;);
+    return 0;
+  }
+
+  // int pos = p -n + 1;
+  // unsigned cpy = y &amp; ~ (~0 &lt;&lt; n);
+  // unsigned xx = (x &gt;&gt; pos) &amp; (~0 &lt;&lt; n);
+  // return xx |= cpy;
+
+  unsigned tail = length_x - (p + n);
+
+  // x需要分离的子数据
+  unsigned sub = x &amp; ~(~0 &lt;&lt; tail);
+
+  // y 中需要替换的n位数据
+  unsigned cpy = y &amp; ~(~0 &lt;&lt; n);
+
+  // x向右移位，保留左边
+  x &gt;&gt;= length_x - p;
+
+  // x再向左移，这样最右边的n为可以为0
+  x &lt;&lt;= n;
+
+  //这样可以把y的拷贝值拷贝过去
+  x |= cpy;
+
+  // x再向左推进， 把刚刚的分离的n为先补0先
+  x &lt;&lt;= tail;
+
+  // x的分离再补充回数值
+  x |= sub;
+
+  return x;
+}
+</code></pre>
+
+<h3 id="例三-编写一个函数invert-x-p-n-该函数返回对x执行下列操作后的结果的值-将x中左起第p位开始的n个-二进制-位求反-即-1变成0-0变成1-x的其余各位保持不变">例三，编写一个函数invert(x,p,n), 该函数返回对x执行下列操作后的结果的值：将x中左起第p位开始的n个（二进制）位求反（即，1变成0，0变成1），x的其余各位保持不变</h3>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+unsigned invert(unsigned x, unsigned p, unsigned n);
+
+int intLen(unsigned x);
+
+int main() {
+  unsigned x = 171; // 1010 1011 --- &gt; 101[0 1]011
+  printf(&quot;result: %u\n&quot;, invert(x, 3, 2));
+  return 1;
+}
+
+int intLen(unsigned x) {
+  int len = 0;
+  for (; x; x &gt;&gt;= 1) {
+    len++;
+  }
+  return len;
+}
+
+unsigned invert(unsigned x, unsigned p, unsigned n) {
+
+  int length_x = intLen(x);
+
+  if (length_x - p - n &lt; 0) {
+    printf(&quot;move over size by x&quot;);
+    return 0;
+  }
+
+  unsigned tail = length_x - (p + n);
+
+  // x需要分离的子数据
+  unsigned sub = x &amp; ~(~0 &lt;&lt; tail);
+
+  // 0001 01[0 1]
+  x &gt;&gt;= tail;
+
+  // x ^= 0011
+  // 0001 0110
+  x ^= ~(~0 &lt;&lt; n);
+
+  // 101[10]000
+  x &lt;&lt;= tail;
+
+  // 101[10]011
+  x |= sub;
+
+  return x;
+}
+</code></pre>
+
+<h3 id="例四-编写一个函数rightrot-x-n-该函数返回将x循环右移-即从最右端移出的为将从最左端移入-n-二进制-位后所得到的值">例四，编写一个函数rightrot(x,n)：该函数返回将x循环右移（即从最右端移出的为将从最左端移入）n (二进制) 位后所得到的值</h3>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+int intLen(unsigned x);
+
+unsigned rightrot(unsigned x, int n);
+
+int main() {
+  unsigned x = 171; // 1010 1011
+  int n = 5;
+
+  // assert x = 01011 101 = 93
+  printf(&quot;result = %u\n&quot;, rightrot(x, n));
+  return 1;
+}
+
+int intLen(unsigned x) {
+  int len = 0;
+  for (; x; x &gt;&gt;= 1) {
+    len++;
+  }
+  return len;
+}
+
+unsigned rightrot(unsigned x, int n) {
+  int length_x = intLen(x);
+  if (length_x) {
+    n %= length_x;
+    if (n) {
+      // x需要分离的子数据
+      unsigned sub = x &amp; ~(~0 &lt;&lt; n);
+
+      // x 向右移动n位
+      x &gt;&gt;= n;
+
+      //计算左边位置需要填报多少位
+      int mov = length_x - n;
+
+      //通过上面分离的子串构造新的等长新串
+      unsigned subx = sub &lt;&lt; mov;
+
+      subx ^= x;
+
+      return subx;
+
+    } else {
+      return x;
+    }
+  }
+  return 0;
+}
+</code></pre>
+
+<h3 id="例五-在求对二的补码时-表达式-x-x-1-可以删除x中最右边值为1的一个二进制位-用这一方法重写bitcount函数-以加快其执行速度">例五，在求对二的补码时，表达式 x&amp;(x-1) 可以删除x中最右边值为1的一个二进制位。用这一方法重写bitcount函数，以加快其执行速度</h3>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+int bitcount(unsigned x);
+
+int main() {
+  printf(&quot;%d's bit count: %d\n&quot;, 1023, bitcount(1023));
+  printf(&quot;%d's bit count: %d\n&quot;, 1024, bitcount(1024));
+}
+
+int bitcount(unsigned x) {
+  int len = 0;
+  for (; x; x &amp;= x - 1) {
+    len++;
+  }
+  return len;
+}
+</code></pre>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2018 domac的菜园子.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by
+            <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+
+</html>
