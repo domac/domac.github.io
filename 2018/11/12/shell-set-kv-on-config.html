@@ -65,6 +65,15 @@
 
 <!--more-->
 
+<p>用于测试的配置文件 test.conf</p>
+<pre><code class="language-sh">$ cat test.conf 
+
+max.connections = 100
+test.log_path = &quot;/tmp/test.log&quot;
+fsync=on
+
+</code></pre>
+
 <h4 id="值带引号的方式">值带引号的方式</h4>
 <pre><code class="language-sh">#!/bin/bash
 
@@ -86,7 +95,7 @@ set_key_value() {
 
 
 set_key_value &quot;max.connections&quot; &quot;1024&quot;
-set_key_value &quot;max.log_path&quot; &quot;/data/logs/test.log&quot;
+set_key_value &quot;test.log_path&quot; &quot;/data/logs/test.log&quot;
 
 </code></pre>
 
