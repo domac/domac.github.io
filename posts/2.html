@@ -49,6 +49,37 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">9</span>
+                            <span class="day">29</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/9/29/postgresql-master-slave-ha.html">Postgresql主从异步流复制方案</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>数据库的备份工作在日常生产中极为重要，如果你咨询一个DBA如何才能设计出高可用的数据备份与恢复方案，相信很多人都会从架构上给出很多容灾的意见。但归根到底,如果业务环节中数据库还牵涉到分布式环境，我认为一个好的方案需要达到三大要求：</p>
+
+<ul>
+<li>多副本</li>
+<li>持久化</li>
+<li>一致性</li>
+</ul>
+
+<p>日常架构设计中，我们不仅要保证数据额的成功备份，还要保证备份的数据可以快速恢复。在众多备份恢复可靠性方案中 <code>主从复制</code> 技术，可以说是最常见的实现，本文主要是介绍postgresql主备数据库的异步流复制的环境搭建与主备切换的操作实践，除了能把一些基础的原理运用在日常的数据库运维中，也可以加深对Postgresql数据库的底层知识了解。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/9/29/postgresql-master-slave-ha.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">7</span>
                             <span class="day">22</span>
                         </span>
@@ -129,29 +160,6 @@ type Locker interface {
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/5/4/reflect-action.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">4</span>
-                            <span class="day">27</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/4/27/panic-output.html">如何把panic信息重定向</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>根据“墨菲定律”，我们编写的后台的服务都有出现crash的可能，一种情况是Go的后台服务我们经常也会遇到panic的情况。出问题不可怕，我们需要分析并解决问题，不过panic处理的信息，默认是直接标准输出的，我们希望能捕获它指向我们特定的文件以便能做后续问题的跟踪排查，而不是一次性输出难以跟踪。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/4/27/panic-output.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

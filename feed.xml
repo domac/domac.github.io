@@ -4,7 +4,13 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Sat, 10 Nov 2018 07:40:13 +0800</pubDate>
+    <pubDate>Mon, 12 Nov 2018 15:00:41 +0800</pubDate>
+    <item>
+      <title>通过sed命令对kv方式的配文件进行修改</title>
+      <link>http://lihaoquan.me/2018/11/12/shell-set-kv-on-config.html</link>
+      <description>&lt;p&gt;sed是unix下的面向字符流的编辑器，即stream editor, 它是面向行的，以行为单位进行处理，同时，sed是非交互式的，一旦执行便要处理完整个文件。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;日常后台服务配置文件多以key-value的方式存在，例如ini文件、toml文件或一些自定义配置文件，当我们某些情况下需要编写自动化脚本对配置文件进行更改的时候，我们可以通过shell的sed命令进行正则匹配快速修改，十分简单快捷，减少很多“高级语言”编写的繁琐，下面主要列出两种比较常见的配置变更情况和命令参考例子：&lt;/p&gt;&#xA;&#xA;&lt;!--more--&gt;&#xA;&#xA;&lt;h4 id=&#34;值带引号的方式&#34;&gt;值带引号的方式&lt;/h4&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-sh&#34;&gt;#!/bin/bash&#xA;&#xA;CONF=test.conf&#xA;&#xA;set_key_value() {&#xA;    local key=${1}&#xA;    local value=${2}&#xA;    if [ -n $value ]; then&#xA;        #echo $value&#xA;        local current=$(sed -n -e &amp;quot;s/^\($key = &#39;\)\([^ &#39;]*\)\(.*\)$/\2/p&amp;quot; $CONF) # value带单引号&#xA;        if [ -n $current ];then&#xA;            echo &amp;quot;setting $CONF : $key = $value&amp;quot;&#xA;            value=&amp;quot;$(echo &amp;quot;${value}&amp;quot; | sed &#39;s|[&amp;amp;]|\\&amp;amp;|g&#39;)&amp;quot;&#xA;            sed -i &amp;quot;s|^[#]*[ ]*${key}\([ ]*\)=.*|${key} = &#39;${value}&#39;|&amp;quot; ${CONF}&#xA;        fi&#xA;    fi&#xA;}&#xA;&#xA;&#xA;set_key_value &amp;quot;max.connections&amp;quot; &amp;quot;1024&amp;quot;&#xA;set_key_value &amp;quot;max.log_path&amp;quot; &amp;quot;/data/logs/test.log&amp;quot;&#xA;&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;h4 id=&#34;值不带引号的方式&#34;&gt;值不带引号的方式&lt;/h4&gt;&#xA;&lt;pre&gt;&lt;code class=&#34;language-sh&#34;&gt;CONF=test.conf&#xA;&#xA;set_key_value() {&#xA;    local key=${1}&#xA;    local value=${2}&#xA;    if [ -n $value ]; then&#xA;        #echo $value&#xA;        local current=$(sed -n -e &amp;quot;s/^\($key = \)\([^ &#39;]*\)\(.*\)$/\2/p&amp;quot; $CONF) # value不带单引号&#xA;        if [ -n $current ];then&#xA;            echo &amp;quot;setting $CONF : $key = $value&amp;quot;&#xA;            value=&amp;quot;$(echo &amp;quot;${value}&amp;quot; | sed &#39;s|[&amp;amp;]|\\&amp;amp;|g&#39;)&amp;quot;&#xA;            sed -i &amp;quot;s|^[#]*[ ]*${key}\([ ]*\)=.*|${key} = ${value}|&amp;quot; ${CONF}&#xA;        fi&#xA;    fi&#xA;}&#xA;&#xA;set_key_value &amp;quot;fsync&amp;quot; &amp;quot;off&amp;quot;&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;</description>
+      <pubDate>Mon, 12 Nov 2018 14:50:49 +0000</pubDate>
+    </item>
     <item>
       <title>C语言的位操作常见例子</title>
       <link>http://lihaoquan.me/2018/11/9/c-bits-examples.html</link>

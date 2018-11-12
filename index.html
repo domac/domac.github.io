@@ -50,6 +50,31 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">11</span>
+                            <span class="day">12</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/11/12/shell-set-kv-on-config.html">通过sed命令对kv方式的配文件进行修改</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>sed是unix下的面向字符流的编辑器，即stream editor, 它是面向行的，以行为单位进行处理，同时，sed是非交互式的，一旦执行便要处理完整个文件。</p>
+
+<p>日常后台服务配置文件多以key-value的方式存在，例如ini文件、toml文件或一些自定义配置文件，当我们某些情况下需要编写自动化脚本对配置文件进行更改的时候，我们可以通过shell的sed命令进行正则匹配快速修改，十分简单快捷，减少很多“高级语言”编写的繁琐，下面主要列出两种比较常见的配置变更情况和命令参考例子：</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/11/12/shell-set-kv-on-config.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
                             <span class="day">9</span>
                         </span>
                             </div>
@@ -142,37 +167,6 @@ int getbits(unsigned x, int p, int n) { return x &gt;&gt; (p - n + 1) &amp; ~(~0
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/10/14/postgres-backup-wal.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">9</span>
-                            <span class="day">29</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/9/29/postgresql-master-slave-ha.html">Postgresql主从异步流复制方案</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>数据库的备份工作在日常生产中极为重要，如果你咨询一个DBA如何才能设计出高可用的数据备份与恢复方案，相信很多人都会从架构上给出很多容灾的意见。但归根到底,如果业务环节中数据库还牵涉到分布式环境，我认为一个好的方案需要达到三大要求：</p>
-
-<ul>
-<li>多副本</li>
-<li>持久化</li>
-<li>一致性</li>
-</ul>
-
-<p>日常架构设计中，我们不仅要保证数据额的成功备份，还要保证备份的数据可以快速恢复。在众多备份恢复可靠性方案中 <code>主从复制</code> 技术，可以说是最常见的实现，本文主要是介绍postgresql主备数据库的异步流复制的环境搭建与主备切换的操作实践，除了能把一些基础的原理运用在日常的数据库运维中，也可以加深对Postgresql数据库的底层知识了解。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/9/29/postgresql-master-slave-ha.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
