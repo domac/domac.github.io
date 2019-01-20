@@ -49,6 +49,35 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">3</span>
+                            <span class="day">11</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/3/11/network-promisc-mode.html">关于网络的混杂模式</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="什么是网络的混杂模式">什么是网络的混杂模式</h2>
+
+<p>混杂模式（promiscuous mode）是指一台机器的网卡能够接收所有经过它的数据流，而不论其目的地址是否是它。</p>
+
+<p><a href="https://zh.wikipedia.org/wiki/%E6%B7%B7%E6%9D%82%E6%A8%A1%E5%BC%8F">维基百科</a>：一般计算机网卡都工作在非混杂模式下，此时网卡只接受来自网络端口的目的地址指向自己的数据。当网卡工作在混杂模式下时，网卡将来自接口的所有数据都捕获并交给相应的驱动程序（即不验证MAC地址）。网卡的混杂模式一般在网络管理员分析网络数据作为网络故障诊断手段时用到，同时这个模式也被网络黑客利用来作为网络数据窃听的入口。</p>
+
+<p>网卡具有如下的几种工作模式：</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/3/11/network-promisc-mode.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">1</span>
                             <span class="day">1</span>
                         </span>
@@ -131,42 +160,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/11/14/ats-caching.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
-                            <span class="day">29</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/10/29/ansi-c-const.html">C语言的限定符修饰问题</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>最近阅读 《<a href="https://book.douban.com/subject/2377310/">Expert C Programming</a>》，有一个问题是这样的：</p>
-<pre><code>foo(const char **p) {}
-
-main(int argc, char **argv)
-{
-    foo(argv)
-}
-</code></pre>
-
-<p>如果编译这段代码，编译器会发出一条警告信息如下：</p>
-<pre><code>warning: argument is incompatible with prototype
-</code></pre>
-
-<p>一般情况很多人会认为实参<code>char *s</code> 与形参 <code>const char *p</code> 应该是相容的，标准库中所有的字符串处理函数都是这样的。那么为什么 实参<code>char **argv</code> 与形参 <code>const char **p</code> 实际上不相容呢？</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/10/29/ansi-c-const.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
