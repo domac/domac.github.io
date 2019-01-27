@@ -50,6 +50,31 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">5</span>
+                            <span class="day">31</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/5/31/consul-in-action.html">consul集群搭建与Golang服务发现示例</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>传统单机应用动态性不强，不会频繁地更新和重新发布，也较少地进行自动伸缩。但随着互联网分布式系统的普及，服务与服务之间的伸缩性和可扩展性的要求也越来越大。为了满足服务的垂直和水平的扩张，以往一般使用预定义的端口配置服务，当新的服务需要上线或当期服务需要冗余扩展的时候，我们需要静态化地“注册”相关ip与端口信息到一个地方，再通过程序之间定时“更新”的方法去同步信息,但这种手段问题是非常多的，例如我们需要连接kafka的master的时候，如果服务信息发生变更，客户端是很难知道的。其中一个简单粗暴的方法是配置hosts文件，使用预定义的“域名”作为服务的连接依据，但这样也是麻烦的，服务变更的时候，要手动更改hosts文件，当服务器上的服务相对多的情况下，维护量就想当恐怖了。</p>
+
+<p>其实就一句话：服务多，问题多</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/5/31/consul-in-action.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">5</span>
                             <span class="day">4</span>
                         </span>
                             </div>
@@ -129,33 +154,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/4/24/go-reverse-proxy.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">4</span>
-                            <span class="day">4</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/4/4/go-windows-dll.html">使用Go结合windows dll开发程序</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>Go程序有一个优点是很好地做到&rdquo;跨平台&rdquo;,一般开发的情况,我们使用内置的相关模块实现相关功能,通过 <code>GOOS=操作系统代号  go build</code> 就能编译出对应平台的二进制文件. 然后把二进制文件扔往对应的服务器无论是linux或windows, 基本都能正常运行.</p>
-
-<p>但是Go也不是完全的跨平台,个别情况下并没有提供Windows下的相关方法，只能通过syscall包去调用Win库.</p>
-
-<p>本文主要说说我们做跨平台的时候,针对windows的一些处理: 一种常见的方式是我们需要在go的代码里面使用个别的dll文件。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/4/4/go-windows-dll.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

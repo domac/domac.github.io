@@ -49,6 +49,37 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">11</span>
+                            <span class="day">4</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/11/4/tail-example-in-c.html">tail的c语言简单实现</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>下面的实现是来自K&amp;R-C的习题实现:</p>
+<pre><code>编写程序tail，将输入中的n行打印出来。默认情况下，n的值为10，但可通过一个可选参数改变n的值，因此命令 tail -n 将打印其输入的最后n行。无论输入或n的值是否合理，该程序都应该能正常运行,编写的程序要充分利用存储空间
+</code></pre>
+
+<blockquote>
+<p>下面的例子只简单实现一次输入输出，并不实现系统 tail -f 一样的监控文件的实时输出</p>
+</blockquote>
+
+<h3 id="tail-c">tail.c</h3>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/11/4/tail-example-in-c.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">10</span>
                             <span class="day">14</span>
                         </span>
@@ -133,31 +164,6 @@ type Locker interface {
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/7/22/go-sync-cond.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">5</span>
-                            <span class="day">31</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/5/31/consul-in-action.html">consul集群搭建与Golang服务发现示例</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>传统单机应用动态性不强，不会频繁地更新和重新发布，也较少地进行自动伸缩。但随着互联网分布式系统的普及，服务与服务之间的伸缩性和可扩展性的要求也越来越大。为了满足服务的垂直和水平的扩张，以往一般使用预定义的端口配置服务，当新的服务需要上线或当期服务需要冗余扩展的时候，我们需要静态化地“注册”相关ip与端口信息到一个地方，再通过程序之间定时“更新”的方法去同步信息,但这种手段问题是非常多的，例如我们需要连接kafka的master的时候，如果服务信息发生变更，客户端是很难知道的。其中一个简单粗暴的方法是配置hosts文件，使用预定义的“域名”作为服务的连接依据，但这样也是麻烦的，服务变更的时候，要手动更改hosts文件，当服务器上的服务相对多的情况下，维护量就想当恐怖了。</p>
-
-<p>其实就一句话：服务多，问题多</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/5/31/consul-in-action.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

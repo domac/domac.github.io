@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>Page 1 - domac的菜园子</title>
+    <title>Linux内核学习：内存管理 - domac的菜园子</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.me is my blog"/>
+    <meta name="description" content="linux-mem-manage"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,11 +39,8 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
-            
-            
-            
-            <article class="article" style="margin-bottom: 4em;">
+        <div id="article-single">
+            <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -57,6 +54,10 @@
                                 <a href="/2019/1/27/linux-mem-manage.html">Linux内核学习：内存管理</a>
                             </h5>
                         </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/linux.html">linux</a>
+                            <a class="tag label label-info" href="/tags/%e5%86%85%e6%a0%b8.html">内核</a>
+                        </aside>
                         <section class="brief"><p>理解Linux内存管理能够更好地理解进程的虚拟空间排布（当一个进程需要某块内存时，它会把自己的一个内存地址交由OS处理）。</p>
 
 <p>虽然进程只关心如何使用自己的线性排列的虚拟地址，而不需要关心物理内存的实际容量，以及如何使用真实的物理内存，但内存管理是内核最复杂的同时也是最重要的一部分；它是协作处理器与内核的关键流程，所以本文我们主要介绍Linux内存管理的相关知识点。</p>
@@ -192,121 +193,16 @@
 
 <p>二、如果数据存储在伙伴系统直接提供的页中，那么其地址总是出现在2的幂次整数倍附近。这对CPU高速缓存有负面的影响，由于这种地址分布，使得某些缓存行过度使用，而某些则几乎为空。通过slab着色，slab分配器能均匀地分布对象，以实现均匀的缓存利用。</p>
 </section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2019/1/27/linux-mem-manage.html">继续阅读</a>
-                        </aside>
                     </div>
                 </div>
             </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">1</span>
-                            <span class="day">20</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2019/1/20/linux-kernel-learning-process.html">Linux内核学习：进程</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="进程基本概念">进程基本概念</h2>
-
-<p>进程是Unix及其衍生操作系统的根本，通常我们把一个程序的执行称为一个进程，换句话说，进程用于描述程序的执行过程。进程不能笼统地作为程序+执行的结果，从内核的观点看，进程的目的就是担当分配系统资源的实体，也是操作系统进行资源分配的一个基本单位。</p>
-
-<blockquote>
-<p>进程所涉及的资源一般指：内存地址空间、文件描述符、线程栈和寄存器等。</p>
-</blockquote>
-
-<p>进程并不仅仅局限于一段可执行的代码段，通常进程还包含各种资源（打开的文件、挂起的信号、内存管理信息、处理器状态、一个或多个内存映射的内存地址空间以及一个或多个线程，当然还包含用来存放全局变量的数据段等）。</p>
-
-<p>总结一句就是：程序本身并不是进程，进程（内核也叫任务）是处于执行期间的程序以及相关的资源的总称。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2019/1/20/linux-kernel-learning-process.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">12</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/11/12/shell-set-kv-on-config.html">通过sed命令对kv方式的配置文件进行修改</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>sed是unix下的面向字符流的编辑器，即stream editor, 它是面向行的，以行为单位进行处理，同时，sed是非交互式的，一旦执行便要处理完整个文件。</p>
-
-<p>日常后台服务配置文件多以key-value的方式存在，例如ini文件、toml文件或一些自定义配置文件，当我们某些情况下需要编写自动化脚本对配置文件进行更改的时候，我们可以通过shell的sed命令进行正则匹配快速修改，十分简单快捷，减少很多“高级语言”编写的繁琐，下面主要列出两种比较常见的配置变更情况和命令参考例子：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/11/12/shell-set-kv-on-config.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">9</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/11/9/c-bits-examples.html">C语言的位操作常见例子</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>我们每一种计算机语言最终都会通过编译器转换成机器语言来执行，所以在编程中，位操作是常见且高效的数据处理手段之一，下面列出一些基于C语言的场景实例，便于日常开发中学习和使用</p>
-
-<h3 id="例一-编写函数-getbits-x-p-n-从数值x的第p位开始返回n位数值">例一，编写函数 getbits(x,p,n) 从数值x的第p位开始返回n位数值</h3>
-<pre><code class="language-c">#include &lt;stdio.h&gt;
-
-int getbits(unsigned x, int p, int n);
-
-int main() {
-  unsigned x = 0xF994;
-  int p = 4;
-  int n = 3;
-  int z = getbits(x, p, n);
-
-  printf(&quot;getbits(%u (%x), %d, %d) = %u (%X)\n&quot;, x, x, p, n, z, z);
-}
-
-// ff94             11111111100.101.00  # original number
-// &gt;&gt; p+1-n     [2] 0011111111100.101.  # shift desired bits to right
-// &amp; ~(~0 &lt;&lt; n) [7] 0000000000000.101.  # clear all the other (left) bits
-
-int getbits(unsigned x, int p, int n) { return x &gt;&gt; (p - n + 1) &amp; ~(~0 &lt;&lt; n); }
-</code></pre>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/11/9/c-bits-examples.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            
-            <div class="article-pager text-center">
-                
-                <a class="btn btn-lg btn-info" href="/posts/2.html">后一页</a>
-            </div>
         </div>
+        
+<section id="comment">
+    
+    
+</section>
+
     </div>
 </section>
 <footer id="footer">
