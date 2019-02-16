@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Linux内核学习：虚拟文件系统 - domac的菜园子</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="linux-vfs"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac的菜园子 <sup>coder at work</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">2</span>
+                            <span class="day">16</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/2/16/linux-vfs.html">Linux内核学习：虚拟文件系统</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/linux.html">linux</a>
+                            <a class="tag label label-info" href="/tags/%e5%86%85%e6%a0%b8.html">内核</a>
+                        </aside>
+                        <section class="brief"><p>Linux的成功因素之一是它具有与其它操作系统和谐共存的能力，其中代表作之一就是虚拟文件系统（VFS）。</p>
+
+<p>VFS的思想是把不同类型文件的共同信息放入内核，具体思路是通过Linux在用户进程（或C库）和文件系统之间引入了一个抽象层，该抽象层称之为虚拟文件系统（VFS）。</p>
+
+<p><img src="/media/2019/vfs.jpg" alt="vfs arch" /></p>
+
+<p>VFS的任务主要是提供一种操作文件、目录以及其他对象的统一方法还有它必须能够与各种方法给出的具体文件系统实现达成妥协。</p>
+
+<!--more-->
+
+<h3 id="虚拟文件系统的类型">虚拟文件系统的类型</h3>
+
+<p>VFS的类型主要分三种：</p>
+
+<ul>
+<li><p>基于磁盘的文件系统：是在非易失介质上存储文件的经典方法，用以在多次会话之间保持文件的内容。</p></li>
+
+<li><p>特殊文件系统：在内核中生成，是一种使用用户应用程序与用户通讯的方法。它位于内核软件层，用来处理与Unix标准文件系统相关的所有系统调用（Linux的 proc文件系统就是这一类的最佳示例）</p></li>
+
+<li><p>网络文件系统：是基于磁盘文件系统和虚拟文件系统之间的折中，这些文件系统允许轻易访问属于其它网络计算机的文件系统所包含的文件（常见的网络文件系统有：NFS、Coda、AFS、CIFS、NCP等）</p></li>
+</ul>
+
+<h3 id="通用文件模型">通用文件模型</h3>
+
+<p>通用文件模型严格反映传统Unix文件系统的文件模型，从本质上,Liunx不能对一个特点的函数进行硬编码来执行诸如read() 和 ioctl() 这类的操作，而是对每个操作都必须使用一个指针，指向要访问的具体文件系统的适当函数。通过通用文件模型，VFS使得用户可以直接使用open()、read()、write() 这样的调用而无须考虑具体这样的文件系统。</p>
+
+<p>VFS采用了面向对象的设计思路，使用了一组数据结构来表示通用文件对象，这些对象组成了Linux的通用文件模型。</p>
+
+<p>1）超级快对象（superblock object）：存放已安装文件系统有关的信息</p>
+
+<p>superblock的数据结构</p>
+
+<p><img src="/media/2019/superblock.gif" alt="superblock" /></p>
+
+<p>2）索引节点对象(inode object)：存放具体文件的一般信息（内核在操作文件或目录时需要的全部信息）。一个索引节点代表文件系统中的一个文件，但是索引节点仅当文件被访问时，才在内存中创建。</p>
+
+<p>inode的数据结构</p>
+
+<p><img src="/media/2019/inode.gif" alt="inode" /></p>
+
+<p>3）文件对象(file object)：它代表由进程打开的文件。这类信息仅当进程访问期间存在于内核内存中。文件对象（不是物理文件）由相应的open()系统调用创建，由close()系统调用撤销。</p>
+
+<p>file的数据结构</p>
+
+<p><img src="/media/2019/file.gif" alt="file" /></p>
+
+<p>4）目录项对象(dentry object)：不是指目录，VFS把目录作为一个文件看待，这里的目录项对象指的是路径的一个组成部分，与对应文件进行链接的有关信息。</p>
+
+<p>dentry的数据结构</p>
+
+<p><img src="/media/2019/dentry.gif" alt="dentry" /></p>
+
+<p>VFS对象之间的关系如下：</p>
+
+<p><img src="/media/2019/major_objects.gif" alt="major_objects" /></p>
+
+<p>进程与VFS对象之间的交互如下：</p>
+
+<p><img src="/media/2019/process_vfs.png" alt="process_vfs" /></p>
+
+<h3 id="目录项目高速缓存-dcache">目录项目高速缓存（dcache）</h3>
+
+<p>为了最大限度地提高处理目录项对象的效率，Linux使用目录项高速缓存，它由2种类型的数据结构组成：</p>
+
+<ul>
+<li><p>一个处于<code>正在使用</code>、<code>未使用</code>、<code>负状态</code>的目录对象的集合：正在使用和未使用的目录项对象对应一个有效的索引节点，负状态的目录项对象没有对应的有效索引节点</p></li>
+
+<li><p>一个散列表，从中能够快速获取与给定的文件名和目录名对应的目录项对象。</p></li>
+</ul>
+
+<h3 id="小结">小结</h3>
+
+<p>VFS是一个胶水层，位于内核的底层和用户层之间。它提供了各种抽象数据结构来表示文件和inode。而真实文件系统必须填充这些结构，使得应用程序无需考虑底层文件系统，总是可以使用同样的接口访问和操作文件。</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2019 domac的菜园子.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by
+            <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+
+</html>

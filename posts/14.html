@@ -49,6 +49,91 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">7</span>
+                            <span class="day">9</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2016/7/9/learning-k8s-1.html">k8s基本概念</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>Kubernetes是在群集中管理跨多台主机容器化应用的开源系统。它为容器化应用提供了<code>资源调度</code>、<code>部署</code>、<code>服务发现</code>、<code>扩展</code>等功能。</p>
+
+<p><strong>TL;DR</strong></p>
+
+<h3 id="主要功能用途">主要功能用途：</h3>
+
+<ol>
+<li><p>使用Docker对我们的应用进行打包、实例化和运行。</p></li>
+
+<li><p>以集群的方式运行和管理跨主机的容器。</p></li>
+
+<li><p>解决跨主机容器的通讯问题。</p></li>
+
+<li><p>提供自我修复的功能，保证系统运行的健壮性。</p></li>
+</ol>
+
+<h3 id="核心概念">核心概念</h3>
+
+<p>先看下K8s的架构图</p>
+
+<p><img src="/media/2016/20160709_k8s.png" alt="k8s" /></p>
+
+<p>核心组件：</p>
+
+<ul>
+<li><p>Node</p>
+
+<p>节点是Kubernates系统中的一台工作机器，既从属主机。它可以是物理机，也可以是虚拟机。每一个节点都包含了Pod运行所需的必要服务，例如Docker、kubelet和网络
+代理（proxy），节点受Kubernates系统中的主节点控制。</p>
+
+<p>和Pod、Service不一样，节点本身并不属于Kubernates的概念，它是云平台中的虚拟机或实体机。所以当一个节点加入到Kubernates系统中时，它将会创建一个数据结构
+来记录该节点的信息。另外，不是所有节点都能加入到Kubernates系统中，只有那些通过验证的节点才能成为Kubernates节点。</p>
+
+<p>你可以通过下面的命令获取节点运行情况列表：</p>
+<pre><code>$ kubectl get nodes
+
+NAME          LABELS                               STATUS
+172.19.17.99  kubernetes.io/hostname=172.19.17.99  Ready
+</code></pre></li>
+
+<li><p>Pod</p>
+
+<p>Pod是一组并置的应用容器，这些容器是共享磁盘卷的。</p>
+
+<p>Pod是可以被创建，调度，并与Kubernetes管理最小部署单元。Pod可以单独创建。由于Pods没有受管的生命周期，如果他们进程死掉了，他们将不会重新创建。出于这个原因，建议您使用复制控制器（我们将在后面介绍），即使你创造了单独的Pod。</p>
+
+<p>所有在Pod的应用使用相同的网络命名空间，IP地址及端口空间。他们可以找到并互相使用localhost沟通。每个Pod有一个与跨网络的其他物理计算机和容器充分沟通的扁平网络共享命名空间中的IP地址。</p></li>
+
+<li><p>Service</p>
+
+<p>服务为一组Pod提供单一稳定的名称和地址。他们作为基本负载均衡器而存在。是一系列Pod以及这些Pod的访问策略的抽象。</p>
+
+<p>Pod大多数被设计为长期运行的，但具备时效性，一旦单个进程死亡，Pod也跟着退出。如果Pod退出，复制控制器使用新的Pod替换它。每个Pod都有自己专用的IP地址，这使得容器具有相同的端口，即使他们共享相同的主机。但每次Pod由复制控制器启动，Pod将获取一个新的IP地址。</p></li>
+
+<li><p>Replication Controller</p>
+
+<p>复制控制器管理Pod的生命周期。它们保证指定数量的Pod在任何给定的时间都在运行。他们通过创建或删除Pod做到这一点。出于这个原因，建议您使用复制控制器，即使你创造了单独的Pod。</p></li>
+
+<li><p>Label</p>
+
+<p>Label(标签)是一组附加在对象上的键值对。标签常用来从一组对象中选取符合条件的对象，这也是Kubernates中目前为止最重要的节点分组方法。标签的本质是附属在对象上的非系统属性类的元数据，
+即它不是名字、Id以及对象的硬件属性，而是一些附加的键值对。</p></li>
+</ul>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2016/7/9/learning-k8s-1.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">6</span>
                             <span class="day">24</span>
                         </span>
@@ -1218,83 +1303,6 @@ func main() {
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2016/6/22/about-go-inject.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">6</span>
-                            <span class="day">20</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/6/20/using-nsq.html">NSQ使用总结</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><blockquote>
-<p>最近, 由于需要使用NSQ作为队列的支撑工作, 于是对NSQ进行了相关的研究与源码的阅读.</p>
-
-<p>以下是本人使用过程中对NSQ的一些认知与实践总结</p>
-</blockquote>
-
-<h3 id="1-nsq基础">1. NSQ基础</h3>
-
-<p>NSQ是一个基于Go语言的分布式实时消息平台。</p>
-
-<p>NSQ可用于大规模系统中的实时消息服务，并且每天能够处理数亿级别的消息，其设计目标是为在分布式环境下运行的去中心化服务提供一个强大的基础架构。NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故障、故障容错、高可用性以及能够保证消息的可靠传递的特征。NSQ非常容易配置和部署，且具有最大的灵活性，支持众多消息协议。</p>
-
-<h4 id="1-1-nsq工具组件主要包含">1.1 NSQ工具组件主要包含:</h4>
-
-<blockquote>
-<p>nsqd：一个负责接收、排队、转发消息到客户端的守护进程</p>
-
-<p>nsqlookupd：管理拓扑信息并提供最终一致性的发现服务的守护进程</p>
-
-<p>nsqadmin：一套Web用户界面，可实时查看集群的统计数据和执行各种各样的管理任务</p>
-</blockquote>
-
-<h4 id="1-2-核心概念">1.2 核心概念</h4>
-
-<blockquote>
-<p>topic: topic是nsq的消息发布的逻辑<code>关键词</code>。当程序初次发布带topic的消息时,如果topic不存在,则会被创建。</p>
-
-<p>channels: 当生产者每次发布消息的时候,消息会采用多播的方式被拷贝到各个channel中,channel起到队列的作用。</p>
-
-<p>messages: 数据流的形式。</p>
-</blockquote>
-
-<h4 id="1-3-消息的生命周期">1.3 消息的生命周期</h4>
-
-<p>NSQ提倡co-locating的部署方式, 也就是生产者与nsqd尽量在同一个实例环境中。生产者不需要负责发现其他的nsqd实例, 它们只管往自己的nsqd中投放消息。</p>
-
-<p>具体的流程方式为:</p>
-
-<ol>
-<li><p>生产者往本地的nsqd中发送消息.这个过程会开启一个连接, 并发送一个带有topic和消息体的PUB的命令到nsqd中. 我们假如是发送一个events的topic</p></li>
-
-<li><p>events topic 会对消息进行copy,并多路发送到各个channel中, 我们假设有三个channel, 那么这个流程会如下图描述所示:</p>
-
-<p><img src="/media/20160620_nsq.png" alt="nsq" /></p></li>
-
-<li><p>在channel中的每条消息会被放进队列中, 直到消息被worker所消费掉, 如果队列占用的内存超出限制, 消息会被写进硬盘</p></li>
-
-<li><p>nsqd节点会首先向nsqlookd节点广播它的位置信息, 一旦这些信息被nsqlookupd注册上, workers就会发现这些nsqd节点,包括这些节点的events topic</p></li>
-
-<li><p>相关过程如下图</p>
-
-<p><img src="/media/20160620_nsq-lookups.png" alt="nsqlookup" /></p></li>
-
-<li><p>每个worker会订阅各个nsqd的host信息, 表示它已经准备好消息的接收.</p></li>
-</ol>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/20/using-nsq.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

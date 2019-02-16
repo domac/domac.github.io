@@ -49,6 +49,35 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">2</span>
+                            <span class="day">16</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/2/16/linux-vfs.html">Linux内核学习：虚拟文件系统</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>Linux的成功因素之一是它具有与其它操作系统和谐共存的能力，其中代表作之一就是虚拟文件系统（VFS）。</p>
+
+<p>VFS的思想是把不同类型文件的共同信息放入内核，具体思路是通过Linux在用户进程（或C库）和文件系统之间引入了一个抽象层，该抽象层称之为虚拟文件系统（VFS）。</p>
+
+<p><img src="/media/2019/vfs.jpg" alt="vfs arch" /></p>
+
+<p>VFS的任务主要是提供一种操作文件、目录以及其他对象的统一方法还有它必须能够与各种方法给出的具体文件系统实现达成妥协。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2019/2/16/linux-vfs.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">1</span>
                             <span class="day">27</span>
                         </span>
@@ -129,50 +158,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/11/12/shell-set-kv-on-config.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">9</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/11/9/c-bits-examples.html">C语言的位操作常见例子</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>我们每一种计算机语言最终都会通过编译器转换成机器语言来执行，所以在编程中，位操作是常见且高效的数据处理手段之一，下面列出一些基于C语言的场景实例，便于日常开发中学习和使用</p>
-
-<h3 id="例一-编写函数-getbits-x-p-n-从数值x的第p位开始返回n位数值">例一，编写函数 getbits(x,p,n) 从数值x的第p位开始返回n位数值</h3>
-<pre><code class="language-c">#include &lt;stdio.h&gt;
-
-int getbits(unsigned x, int p, int n);
-
-int main() {
-  unsigned x = 0xF994;
-  int p = 4;
-  int n = 3;
-  int z = getbits(x, p, n);
-
-  printf(&quot;getbits(%u (%x), %d, %d) = %u (%X)\n&quot;, x, x, p, n, z, z);
-}
-
-// ff94             11111111100.101.00  # original number
-// &gt;&gt; p+1-n     [2] 0011111111100.101.  # shift desired bits to right
-// &amp; ~(~0 &lt;&lt; n) [7] 0000000000000.101.  # clear all the other (left) bits
-
-int getbits(unsigned x, int p, int n) { return x &gt;&gt; (p - n + 1) &amp; ~(~0 &lt;&lt; n); }
-</code></pre>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/11/9/c-bits-examples.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
