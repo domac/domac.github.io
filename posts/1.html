@@ -50,6 +50,39 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">2</span>
+                            <span class="day">17</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/2/17/2pc.html">分布式系统学习：二阶段提交</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h3 id="cap理论">CAP理论</h3>
+
+<p>在学习分布式的相关知识点前，一定要先掌握CAP定理：</p>
+
+<ul>
+<li><p>C(onsistency) 一致性：分布式环境中，CAP关注的粒度是数据，而不是系统，而数据往往存在于多个副本之中，一致性是指多个副本之间，在同一时刻能否有同样的值（内容和组织上的数据）</p></li>
+
+<li><p>A(vailability) 可用性：系统提供的服务必须一直处于可用的状态。即使集群中一部分节点故障。换句话说就是用户在容忍的时间范围内返回用户期望的结果</p></li>
+
+<li><p>P(artition-resiliene) 分区容错性：系统在遇到节点故障，或者网络分区时（断网），依然能对外提供一致性和可用性的服务，在分布式系统架构中，通常由多个节点组成，由于节点通讯往往依赖网络，网络在现实中不是100%可靠的，所以分区容错是分布式的一个 <code>“最基本要求”</code> ，所以一般我们常见的CAP架构只有 AP和CP。</p></li>
+</ul>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2019/2/17/2pc.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">2</span>
                             <span class="day">16</span>
                         </span>
                             </div>
@@ -133,31 +166,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2019/1/20/linux-kernel-learning-process.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">12</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/11/12/shell-set-kv-on-config.html">通过sed命令对kv方式的配置文件进行修改</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>sed是unix下的面向字符流的编辑器，即stream editor, 它是面向行的，以行为单位进行处理，同时，sed是非交互式的，一旦执行便要处理完整个文件。</p>
-
-<p>日常后台服务配置文件多以key-value的方式存在，例如ini文件、toml文件或一些自定义配置文件，当我们某些情况下需要编写自动化脚本对配置文件进行更改的时候，我们可以通过shell的sed命令进行正则匹配快速修改，十分简单快捷，减少很多“高级语言”编写的繁琐，下面主要列出两种比较常见的配置变更情况和命令参考例子：</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/11/12/shell-set-kv-on-config.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
