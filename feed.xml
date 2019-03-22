@@ -4,7 +4,13 @@
     <link>http://localhost/</link>
     <description>lihaoquan.me is my blog</description>
     <managingEditor>domacode@gmail.com (lihaoquan)</managingEditor>
-    <pubDate>Sun, 17 Feb 2019 22:00:28 +0800</pubDate>
+    <pubDate>Fri, 22 Mar 2019 10:33:43 +0800</pubDate>
+    <item>
+      <title>Nginx对网段内ip的连接数限流配置</title>
+      <link>http://lihaoquan.me/2019/3/22/nginx-limit-conn-by-network-segments.html</link>
+      <description>&lt;p&gt;Nginx中的所谓连接数限制，其实是tcp连接，也就是请求方通过三次握手后成功建立的连接状态。Nginx一般为我们提供了 &lt;code&gt;ngx_http_limit_conn_module&lt;/code&gt; 模块来提供限制连接功能。该模块可以根据定义的键来限制每个键值的连接数，如同一个IP来源的连接数。&lt;/p&gt;&#xA;&#xA;&lt;h2 id=&#34;ngx-http-limit-conn-module指令解释&#34;&gt;ngx_http_limit_conn_module指令解释&lt;/h2&gt;&#xA;&lt;pre&gt;&lt;code&gt;Syntax:    limit_conn zone number;&#xA;Default:    —&#xA;Context:    http, server, location&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;该指令描述会话状态存储区域。键的状态中保存了当前连接数，键的值可以是特定变量的任何非空值（空值将不会被考虑）。$variable定义键，zone=name定义区域名称。&#xA;常见使用例子：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt;limit_conn_zone $binary_remote_addr zone=addr:10m;&#xA;&#xA;server {&#xA;    location /download/ {&#xA;        limit_conn addr 1;&#xA;    }&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;上面例子表示当请求访问 /download/ 时， 同一时刻只能一个请求连接会成功进行资源下载。&lt;/p&gt;&#xA;&#xA;&lt;h3 id=&#34;网段限制&#34;&gt;网段限制&lt;/h3&gt;&#xA;&#xA;&lt;p&gt;常见的limit_conn_zone 配置一般设置 $binary_remote_addr 或 $server_name，进行单一ip或主机级的连接数限制。&lt;/p&gt;&#xA;&#xA;&lt;p&gt;但有时候我们希望能对某ip网段进行连接数限制，那我们可以这么做：&lt;/p&gt;&#xA;&lt;pre&gt;&lt;code&gt;http {&#xA;&#xA;... ...&#xA;&#xA;    limit_conn_zone $ip_segment zone=network_segment:10m;&#xA;&#xA;    server {&#xA;            ... ...&#xA;            set $ip_segment $remote_addr;&#xA;&#xA;            if ( $ip_segment ~ ^(\d+)\.(\d+)\.(\d+)\.(\d+) ) {&#xA;                set $ip_segment $1.$2.$3;&#xA;            }&#xA;&#xA;            location /download/ {&#xA;                limit_conn network_segment 10; &#xA;                #limit_rate  200k;&#xA;            }&#xA;&#xA;    }&#xA;}&#xA;&lt;/code&gt;&lt;/pre&gt;&#xA;&#xA;&lt;p&gt;这样基本能满足Nginx对网段内所有ip的连接数做统一的连接数限制了。&lt;/p&gt;&#xA;</description>
+      <pubDate>Fri, 22 Mar 2019 10:09:12 +0000</pubDate>
+    </item>
     <item>
       <title>分布式系统学习：二阶段提交</title>
       <link>http://lihaoquan.me/2019/2/17/2pc.html</link>

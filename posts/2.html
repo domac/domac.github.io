@@ -49,6 +49,39 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">1</span>
+                            <span class="day">20</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/1/20/linux-kernel-learning-process.html">Linux内核学习：进程</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><h2 id="进程基本概念">进程基本概念</h2>
+
+<p>进程是Unix及其衍生操作系统的根本，通常我们把一个程序的执行称为一个进程，换句话说，进程用于描述程序的执行过程。进程不能笼统地作为程序+执行的结果，从内核的观点看，进程的目的就是担当分配系统资源的实体，也是操作系统进行资源分配的一个基本单位。</p>
+
+<blockquote>
+<p>进程所涉及的资源一般指：内存地址空间、文件描述符、线程栈和寄存器等。</p>
+</blockquote>
+
+<p>进程并不仅仅局限于一段可执行的代码段，通常进程还包含各种资源（打开的文件、挂起的信号、内存管理信息、处理器状态、一个或多个内存映射的内存地址空间以及一个或多个线程，当然还包含用来存放全局变量的数据段等）。</p>
+
+<p>总结一句就是：程序本身并不是进程，进程（内核也叫任务）是处于执行期间的程序以及相关的资源的总称。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2019/1/20/linux-kernel-learning-process.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">11</span>
                             <span class="day">12</span>
                         </span>
@@ -138,35 +171,6 @@ int getbits(unsigned x, int p, int n) { return x &gt;&gt; (p - n + 1) &amp; ~(~0
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/11/4/tail-example-in-c.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">10</span>
-                            <span class="day">14</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/10/14/postgres-backup-wal.html">Postgresql备份与数据恢复</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>之前，我们在 <a href="https://lihaoquan.me/2018/9/29/postgresql-master-slave-ha.html">《Postgresql主从异步流复制方案》</a> 一节中，部署了Postgresql的主从异步流复制环境。主从复制的目的是为了实现数据的备份，实现数据的高可用性和容错行。下面主要简单地介绍下我们运维Postgresql数据库时的场景备份与恢复方案。</p>
-
-<h2 id="增量备份">增量备份</h2>
-
-<p>PostgreSQL在做写入操作时，对数据文件做的任何修改信息，首先会写入WAL日志（预写日志），然后才会对数据文件做物理修改。当数据库服务器掉重启时，PostgreSQL在启动时会首先读取WAL日志，对数据文件进行恢复。因此，从理论上讲，如果我们有一个数据库的基础备份（也称为全备），再配合WAL日志，是可以将数据库恢复到任意时间点的。</p>
-
-<p>上面的知识点很重要，因为我们场景的增量备份说白了就是通过<code>基础备份</code> + <code>增量WAL日志</code> 进行<code>重做</code>恢复的。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/10/14/postgres-backup-wal.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

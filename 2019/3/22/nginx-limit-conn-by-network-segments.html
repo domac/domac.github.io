@@ -3,9 +3,9 @@
 <head lang="en">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>nginx - domac的菜园子</title>
+    <title>Nginx对网段内ip的连接数限流配置 - domac的菜园子</title>
     <meta name="keywords" content="go,golang,go语言"/>
-    <meta name="description" content="lihaoquan.me is my blog"/>
+    <meta name="description" content="nginx limit conn by network segments"/>
     <link rel="stylesheet" href="/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="/css/prism.css"/>
     <link rel="stylesheet" href="/css/style.css"/>
@@ -39,12 +39,8 @@
 
 <section id="main">
     <div class="container">
-        <div id="article-list">
-            
-            <h2 class="tag text-center">nginx</h2>
-
-            
-            <article class="article" style="margin-bottom: 1em;">
+        <div id="article-single">
+            <article class="article">
                 <div class="row">
                     <div class="col-md-10 col-md-offset-1 panel panel-default">
                         <header class="header">
@@ -58,43 +54,69 @@
                                 <a href="/2019/3/22/nginx-limit-conn-by-network-segments.html">Nginx对网段内ip的连接数限流配置</a>
                             </h5>
                         </header>
-                        
                         <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2019/3/22/nginx-limit-conn-by-network-segments.html">继续阅读</a>
+                            <a class="tag label label-info" href="/tags/nginx.html">nginx</a>
                         </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 1em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">6</span>
-                            <span class="day">23</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2016/6/23/build-web-app-with-docker-gin-mongodb-nginx.html">用Docker定制Golang&#43;Gin&#43;Mongodb&#43;Nginx的开发环境</a>
-                            </h5>
-                        </header>
-                        
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2016/6/23/build-web-app-with-docker-gin-mongodb-nginx.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
+                        <section class="brief"><p>Nginx中的所谓连接数限制，其实是tcp连接，也就是请求方通过三次握手后成功建立的连接状态。Nginx一般为我们提供了 <code>ngx_http_limit_conn_module</code> 模块来提供限制连接功能。该模块可以根据定义的键来限制每个键值的连接数，如同一个IP来源的连接数。</p>
 
-            
-            <div class="article-pager text-center">
-                
-                
-            </div>
+<h2 id="ngx-http-limit-conn-module指令解释">ngx_http_limit_conn_module指令解释</h2>
+<pre><code>Syntax:    limit_conn zone number;
+Default:    —
+Context:    http, server, location
+</code></pre>
+
+<p>该指令描述会话状态存储区域。键的状态中保存了当前连接数，键的值可以是特定变量的任何非空值（空值将不会被考虑）。$variable定义键，zone=name定义区域名称。
+常见使用例子：</p>
+<pre><code>limit_conn_zone $binary_remote_addr zone=addr:10m;
+
+server {
+    location /download/ {
+        limit_conn addr 1;
+    }
+</code></pre>
+
+<p>上面例子表示当请求访问 /download/ 时， 同一时刻只能一个请求连接会成功进行资源下载。</p>
+
+<h3 id="网段限制">网段限制</h3>
+
+<p>常见的limit_conn_zone 配置一般设置 $binary_remote_addr 或 $server_name，进行单一ip或主机级的连接数限制。</p>
+
+<p>但有时候我们希望能对某ip网段进行连接数限制，那我们可以这么做：</p>
+<pre><code>http {
+
+... ...
+
+    limit_conn_zone $ip_segment zone=network_segment:10m;
+
+    server {
+            ... ...
+            set $ip_segment $remote_addr;
+
+            if ( $ip_segment ~ ^(\d+)\.(\d+)\.(\d+)\.(\d+) ) {
+                set $ip_segment $1.$2.$3;
+            }
+
+            location /download/ {
+                limit_conn network_segment 10; 
+                #limit_rate  200k;
+            }
+
+    }
+}
+</code></pre>
+
+<p>这样基本能满足Nginx对网段内所有ip的连接数做统一的连接数限制了。</p>
+</section>
+                    </div>
+                </div>
+            </article>
         </div>
+        
+<section id="comment">
+    
+    
+</section>
+
     </div>
 </section>
 <footer id="footer">
