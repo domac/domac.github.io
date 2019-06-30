@@ -313,6 +313,8 @@ http://127.0.0.1:31511
 
 <h3 id="4-1-配置-docker-的-proxy">4.1 配置 Docker 的 proxy</h3>
 
+<p>我们可以对docker的registry设置<code>阿里云镜像源 (参考 2.5 )</code> 行代理设置，除了这个方法，我们也可以采用下面的方式：</p>
+
 <p>Kubernetes 的一些 docker 镜像是需要借助梯子才能拉取到的，为此需要为 Docker 配置 Proxy。</p>
 
 <p>参考 <a href="https://docs.docker.com/config/daemon/systemd/#httphttps-proxy">https://docs.docker.com/config/daemon/systemd/#httphttps-proxy</a></p>
@@ -605,7 +607,7 @@ kubernetes-dashboard   NodePort    10.102.227.67   &lt;none&gt;        443:31537
 
 <p>通过谷歌浏览器访问 <a href="https://192.168.159.101:31537">https://192.168.159.101:31537</a></p>
 
-<p><img src="/media/2019/d1.jpg" alt="d1" /></p>
+<p><img src="/media/2019/d1.png" alt="d1" /></p>
 
 <p>创建kubernetes-dashboard管理员角色</p>
 <pre><code class="language-bash">kubectl create serviceaccount dashboard -n default
@@ -625,7 +627,7 @@ kubernetes-dashboard   NodePort    10.102.227.67   &lt;none&gt;        443:31537
 
 <p>把这个toke贴到上面的登录页的令牌框中，点击确认页面成功调整到管理页面</p>
 
-<p><img src="/media/2019/d2.jpg" alt="d2" /></p>
+<p><img src="/media/2019/d2.png" alt="d2" /></p>
 
 <p>以后，我们直接通过浏览器访问 <a href="https://192.168.159.101:31537/#!/cluster?namespace=default">https://192.168.159.101:31537/#!/cluster?namespace=default</a> 就能进入管理后台</p>
 
