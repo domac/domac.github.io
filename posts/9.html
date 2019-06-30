@@ -50,6 +50,341 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">2</span>
+                            <span class="day">25</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/2/25/create-kubernetes-single-node-mode.html">深入学习Kubernetes(一):单节点k8s安装</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>Kubernetes 是Google的一种基于容器的开源服务编排解决方案，在我们进行Kubernetes的学习前,为了对Kubernetes的工作有一个大概的认识, 我们需要先安装一个单节点的实例服务,用于平常的开发与测试。在官网
+中，有各种各样的搭建方式，但这里我们想要有更贴近实际的例子，只有这样才能让docker和k8s体现出关系的紧密。</p>
+
+<p>我们先看k8s的架构图，以便对它的部署有个直观的了解</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/an-introduction-to-kubernetes-21-638.jpg" alt="arch-k8s" /></p>
+
+<h2 id="环境准备">环境准备</h2>
+
+<p>本文的例子是基于Centos 7的Linux版本，大家也可以使用ubuntu或其他发行版，软件搭建的方式基本是差不多的，为了让例子更简单，
+本文省去了网络Fannel的安装与配置，只做基本通用的开发环境搭建，希望对大家有帮助。</p>
+
+<p>本例子用于测试的服务器ip为：192.168.139.149</p>
+
+<h3 id="yum源">yum源</h3>
+
+<p>为了让国内下载etcd和kubernetes更流畅，我们先切换阿里云的yum源</p>
+<pre><code>$ wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
+
+$ yum makecache
+</code></pre>
+
+<h3 id="关闭防火墙服务">关闭防火墙服务</h3>
+
+<p>centos7 默认使用firewall为防火墙，而Kubernetes的Master与工作Node之间会有大量的网络通信，安全的做法是在防火墙上配置各种需要相互通讯的端口号，在一个安全的内部网络环境中可以关闭防火墙服务；</p>
+
+<p>这里我们将其更改为iptables，具体步骤如下：</p>
+<pre><code>$ systemctl disable firewalld.service
+$ systemctl stop firewalld.service
+</code></pre>
+
+<p>安装iptables，其操作为：</p>
+<pre><code>$ yum install -y iptables-services
+$ systemctl start iptables.service
+$ systemctl enable iptables.service
+</code></pre>
+
+<h3 id="安装etcd和kubernetes软件-docker会在安装kubernetes的过程中被安装">安装etcd和Kubernetes软件（docker会在安装kubernetes的过程中被安装）</h3>
+<pre><code>$ yum install -y etcd kubernetes
+</code></pre>
+
+<h3 id="配置修改">配置修改</h3>
+
+<p>安装完服务组件后，我们需要修改相关的配置</p>
+
+<p>Docker配置文件 /etc/sysconfig/docker，其中的OPTIONS的内容设置为：</p>
+<pre><code>$ vim /etc/sysconfig/docker
+
+OPTIONS='--selinux-enabled=false --insecure-registry gcr.io'
+</code></pre>
+
+<p>Kubernetes修改apiserver的配置文件，在/etc/kubernetes/apiserver中</p>
+<pre><code>$ vim /etc/kubernetes/apiserver
+ KUBE_ADMISSION_CONTROL=&quot;--admission_control=NamespaceLifecycle,NamespaceExists,
+ LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota&quot;
+</code></pre>
+
+<p>去掉 <code>ServiceAccount</code> 选项。否则会在往后的pod创建中，会出现类似以下的错误：</p>
+<pre><code> Error from server: error when creating &quot;mysql-rc.yaml&quot;: Pod &quot;mysql&quot; is forbidden:
+ no API token found for service account default/default, 
+ retry after the token is automatically created and added to the service account
+</code></pre>
+
+<h3 id="切换docker-hub-镜像源">切换docker hub 镜像源</h3>
+
+<p>在国内为了稳定pull镜像，我们最好使用Daocloud的镜像服务 :)</p>
+<pre><code>curl -sSL https://get.daocloud.io/daotools/set_mirror.sh | sh -s http://dbe35452.m.daocloud.io
+</code></pre>
+
+<h3 id="按顺序启动所有服务">按顺序启动所有服务</h3>
+<pre><code>systemctl start etcd
+systemctl start docker
+systemctl start kube-apiserver.service
+systemctl start kube-controller-manager.service
+systemctl start kube-scheduler.service
+systemctl start kubelet.service
+systemctl start kube-proxy.service
+</code></pre>
+
+<p>然后，我们检验下kubernetes的服务是否跑起来</p>
+<pre><code>ps -ef | grep kube
+</code></pre>
+
+<p>到目前为止，一个单机版的Kubernetes的环境就安装启动完成了。接下来，我就基于这个单机版，撸起袖子，认真干！！！</p>
+
+<h2 id="启动mysql容器服务">启动MySQL容器服务</h2>
+
+<p>我们先拉取mysql的服务镜像 ：</p>
+<pre><code>sudo docker pull mysql
+或
+docker pull hub.c.163.com/library/mysql:latest
+</code></pre>
+
+<h3 id="启动mysql服务">启动MySQL服务</h3>
+
+<p>首先为MySQL服务创建一个RC定义文件：mysql-rc.yaml，下面给出了该文件的完整内容</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: mysql
+spec:
+  replicas: 1
+  selector:
+    app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: hub.c.163.com/library/mysql
+        ports: 
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: &quot;123456&quot;
+</code></pre>
+
+<p>yaml定义文件说明：</p>
+
+<ul>
+<li>kind：表明此资源对象的类型，例如上面表示的是一个RC</li>
+<li>spec: 对RC的相关属性定义，比如说spec.selector是RC的Pod标签（Label）选择器，既监控和管理拥有这些表情的Pod实例，确保当前集群上始终有且
+仅有replicas个Pod实例在运行。</li>
+<li>spec.template定义pod的模板，这些模板会在当集群中的pod数量小于replicas时，被作为依据去创建新的Pod</li>
+</ul>
+
+<p>创建好 mysql-rc.yaml后， 为了将它发布到Kubernetes中，我们在Master节点执行命令</p>
+<pre><code>$ kubectl create -f mysql-rc.yaml
+replicationcontroller &quot;mysql” created
+</code></pre>
+
+<p>接下来，我们用kuberctl命令查看刚刚创建的RC:</p>
+<pre><code>$ kubectl get rc
+
+NAME      DESIRED   CURRENT   READY     AGE
+mysql     1         1         0         14s
+</code></pre>
+
+<p>查看Pod的创建情况，可以运行下面的命令：</p>
+<pre><code>$ kubectl get pods
+
+NAME          READY     STATUS              RESTARTS   AGE
+mysql-b0gk0   0/1       ContainerCreating   0          3s
+</code></pre>
+
+<p>可见pod的状态处于ContainerCreating，我们需要耐心等待一下，直到状态为Running</p>
+<pre><code>NAME          READY     STATUS    RESTARTS   AGE
+mysql-b0gk0   1/1       Running   0          6m
+</code></pre>
+
+<p>最后，我们创建一个与之关联的Kubernetes Service - MySQL的定义文件：mysql-svc.yaml</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Service
+metadata: 
+  name: mysql
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: mysql
+</code></pre>
+
+<p>其中 metadata.name是Service的服务名，port定义服务的端口，spec.selector确定了哪些Pod的副本对应本地的服务。</p>
+
+<p>运行kuberctl命令，创建service：</p>
+<pre><code>$ kubectl create -f mysql-svc.yaml
+
+service &quot;mysql&quot; created
+</code></pre>
+
+<p>然后我们查看service的状态</p>
+<pre><code>$ kubectl get svc
+
+NAME         CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+kubernetes   10.254.0.1      &lt;none&gt;        443/TCP    18m
+mysql        10.254.185.20   &lt;none&gt;        3306/TCP   14s
+</code></pre>
+
+<p>注意到MySQL服务被分配了一个值为 <code>10.254.185.20</code>的CLUSTER-IP，这是一个虚地址，随后，Kubernetes集群中的其他新创建的Pod就可以通过Service
+的CLUSTER-IP+端口6379来连接和访问它了。</p>
+
+<h2 id="启动web容器服务">启动Web容器服务</h2>
+
+<p>先拉取一个测试镜像到本地</p>
+<pre><code>docker pull kubeguide/tomcat-app:v1
+</code></pre>
+
+<p>上面我们定义和启动了MySQL的服务，接下来我们用同样的步骤，完成Tomcat应用的服务启动过程，首先我们创建对应的RC文件
+myweb-rc.yaml，具体内容如下：</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: myweb
+spec:
+  replicas: 5
+  selector:
+    app: myweb
+  template:
+    metadata:
+      labels:
+        app: myweb
+    spec:
+      containers:
+      - name: myweb
+        image: docker.io/kubeguide/tomcat-app:v1
+        ports: 
+        - containerPort: 8080
+        env:
+        - name: MYSQL_SERVICE_HOST
+          value: &quot;mysql&quot;
+        - name: MYSQL_SERVICE_PORT
+          value: &quot;3306&quot;
+</code></pre>
+
+<p>与mysql一样，我们创建rc服务：</p>
+<pre><code>$ kubectl create -f myweb-rc.yaml
+replicationcontroller &quot;myweb&quot; created
+
+$ kubectl get rc
+NAME      DESIRED   CURRENT   READY     AGE
+mysql     1         1         0         14m
+myweb     5         5         0         10s
+</code></pre>
+
+<p>接着，我们看下pods的状态：</p>
+<pre><code>$ kubectl get pods
+NAME          READY     STATUS    RESTARTS   AGE
+mysql-b0gk0   1/1       Running   0          15m
+myweb-1oyb7   1/1       Running   0          43s
+myweb-8ffs6   1/1       Running   0          43s
+myweb-xge1t   1/1       Running   0          43s
+myweb-xr214   1/1       Running   0          43s
+myweb-zia37   1/1       Running   0          43s
+</code></pre>
+
+<p>wow..从命理结果我们发现，我们yaml中声明的5个副本都被创建并运行起来了，我们隐约感受到k8s的威力咯</p>
+
+<p>我们创建对应的Service, 相关的myweb-svc文件如下：</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Service
+metadata: 
+  name: myweb
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+      nodePort: 30001
+  selector:
+    app: myweb
+</code></pre>
+
+<p>运行kubectl create 命令进行创建</p>
+<pre><code>$ kubectl create  -f myweb-svc.yaml
+service &quot;myweb&quot; created
+</code></pre>
+
+<p>最后，我们使用kubectl查看前面创建的Service</p>
+<pre><code>[root@kdev tmp]# kubectl get services
+NAME         CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+kubernetes   10.254.0.1      &lt;none&gt;        443/TCP    4h
+mysql        10.254.185.20   &lt;none&gt;        3306/TCP   4m
+myweb        10.254.18.53    &lt;nodes&gt;       8080/TCP   57s
+</code></pre>
+
+<h2 id="验证与总结">验证与总结</h2>
+
+<p>通过上面的几个步骤，我们可以成功实现了一个简单的K8s单机版例子，我们可以在浏览器输入 <a href="http://192.168.139.149:30001/demo/">http://192.168.139.149:30001/demo/</a> 来测试我们发布的web应用。</p>
+<pre><code>$ curl http://192.168.139.149:30001
+
+
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+    &lt;head&gt;
+        &lt;meta charset=&quot;UTF-8&quot; /&gt;
+        &lt;title&gt;Apache Tomcat/8.0.35&lt;/title&gt;
+        &lt;link href=&quot;favicon.ico&quot; rel=&quot;icon&quot; type=&quot;image/x-icon&quot; /&gt;
+        &lt;link href=&quot;favicon.ico&quot; rel=&quot;shortcut icon&quot; type=&quot;image/x-icon&quot; /&gt;
+        &lt;link href=&quot;tomcat.css&quot; rel=&quot;stylesheet&quot; type=&quot;text/css&quot; /&gt;
+    &lt;/head&gt;
+
+    &lt;body&gt;
+        &lt;div id=&quot;wrapper&quot;&gt;
+            &lt;div id=&quot;navigation&quot; class=&quot;curved container&quot;&gt;
+                &lt;span id=&quot;nav-home&quot;&gt;&lt;a href=&quot;http://tomcat.apache.org/&quot;&gt;Home&lt;/a&gt;&lt;/span&gt;
+                &lt;span id=&quot;nav-hosts&quot;&gt;&lt;a href=&quot;/docs/&quot;&gt;Documentation&lt;/a&gt;&lt;/span&gt;
+                &lt;span id=&quot;nav-config&quot;&gt;&lt;a href=&quot;/docs/config/&quot;&gt;Configuration&lt;/a&gt;&lt;/span&gt;
+                &lt;span id=&quot;nav-examples&quot;&gt;&lt;a href=&quot;/examples/&quot;&gt;Examples&lt;/a&gt;&lt;/span&gt;
+                &lt;span id=&quot;nav-wiki&quot;&gt;&lt;a href=&quot;http://wiki.apache.org/tomcat/FrontPage&quot;&gt;Wiki&lt;/a&gt;&lt;/span&gt;
+                &lt;span id=&quot;nav-lists&quot;&gt;&lt;a href=&quot;http://tomcat.apache.org/lists.html&quot;&gt;Mailing Lists&lt;/a&gt;&lt;/span&gt;
+                &lt;span id=&quot;nav-help&quot;&gt;&lt;a href=&quot;http://tomcat.apache.org/findhelp.html&quot;&gt;Find Help&lt;/a&gt;&lt;/span&gt;
+                &lt;br class=&quot;separator&quot; /&gt;
+            &lt;/div&gt;
+            &lt;div id=&quot;asf-box&quot;&gt;
+                &lt;h1&gt;Apache Tomcat/8.0.35&lt;/h1&gt;
+            &lt;/div&gt;
+...
+...
+...
+</code></pre>
+
+<p>但我们不只是要搭建环境那么简单，我们希望更深入一下，比如说运用这里例子拓展一下深度：</p>
+
+<ul>
+<li><p>研究 RC、Service等文件格式</p></li>
+
+<li><p>熟悉 kuberctl 的命令</p></li>
+
+<li><p>手工停止某个Service对应的容器进程，然后观察有什么现象发生</p></li>
+
+<li><p>修改RC文件，改变副本数量，重新发布，观察结果</p></li>
+</ul>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/2/25/create-kubernetes-single-node-mode.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">2</span>
                             <span class="day">2</span>
                         </span>
                             </div>
@@ -337,925 +672,6 @@ func main() {
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/1/10/consistent-hashing.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">1</span>
-                            <span class="day">1</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/1/1/Profiling-and-Optimizing-Go-using-go-torch.html">Go代码调优利器-火焰图</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="前言">前言</h2>
-
-<p>作为DevOps，我们在日常搞的项目,从开发到测试然后上线，我们基本都局限在功能的单元测试，对一些性能上的细节很多人包括我自己，往往都选择视而不见，
-后果往往让工具应用产生不可预测的灾难（it&rsquo;s true）。有些人说底层的东西，或者代码层面的性能调优太深入了，性能提升可以用硬件来补，但我觉得这只是自欺欺人的想法，提升硬件配置这种土豪方法不能一直长存的，更何况
-现在我们的工具哪个不是分布式的，哪个不是集群上跑的，为了冗余也好，为了易于横向扩展也罢，不可能保证所有的服务器都具备高性能的，我们不能让某些低配的服务器运行我们有性能缺陷的代码产生短板，成为瓶颈。</p>
-
-<p>我记得2016年参与了一些通用服务agent的开发，由于要运行于公司全网几乎所有服务器中，生产上的环境复杂程度超乎我们想象。</p>
-
-<p><em>一个问题到达很深入的时候，就已经是共同的问题</em></p>
-
-<p>更何况Go语言已经为开发者内置配套了很多性能调优监控的好工具和方法，这大大提升了我们profile分析的效率，除了编码技巧，不断在实战项目中磨炼自己
-对性能问题分析的能力，对日后我们在项目的把控力和一些功能布局都是很有帮助。</p>
-
-<h2 id="golang的性能调优手段">Golang的性能调优手段</h2>
-
-<h3 id="go语言内置的cpu和heap-profiler">Go语言内置的CPU和Heap profiler</h3>
-
-<p>Go强大之处是它已经在语言层面集成了profile采样工具,并且允许我们在程序的运行时使用它们，</p>
-
-<p>使用Go的profiler我们能获取以下的样本信息：</p>
-
-<ul>
-<li>CPU profiles</li>
-<li>Heap profiles</li>
-<li>block profile、traces等</li>
-</ul>
-
-<h3 id="go语言常见的profiling使用场景">Go语言常见的profiling使用场景</h3>
-
-<ul>
-<li><p><strong>基准测试文件</strong>：例如使用命令go test . -bench . -cpuprofile prof.cpu 生成采样文件后，再通过命令
-go tool pprof [binary] prof.cpu 来进行分析。</p></li>
-
-<li><p><strong>import _ net/http/pprof</strong>：如果我们的应用是一个web服务，我们可以在http服务启动的代码文件(eg: main.go)添加 import _ net/http/pprof，这样我们的服务
-便能自动开启profile功能，有助于我们直接分析采样结果。</p></li>
-
-<li><p>通过在代码里面调用 runtime.StartCPUProfile或者runtime.WriteHeapProfile</p></li>
-</ul>
-
-<p>更多调试的使用，建议可以阅读The Go Blog的 <a href="https://blog.golang.org/profiling-go-programs">Profiling Go Programs</a></p>
-
-<h2 id="go-torch">go-torch</h2>
-
-<p>在没有使用go-torch之前，我们要分析一分profile文件的时候，遇到结构简单的还好，但遇到一些调用关系复杂的，我相信大部分程序员都觉得无从下手，如下图：</p>
-
-<p><img src="/media/2018/hard_profile.png" alt="hard-to-read-profile" /></p>
-
-<p>这样的结构，带给我们的是晦涩难懂的感觉，我们需要寻求更直观，更简单的分析工具。</p>
-
-<p>go-torch是<code>Uber</code>公司开源的一款针对Go语言程序的火焰图生成工具，能收集 stack traces,并把它们整理成火焰图，直观地程序给开发人员。</p>
-
-<p>go-torch是基于使用BrendanGregg创建的火焰图工具生成直观的图像，很方便地分析Go的各个方法所占用的CPU的时间，
-火焰图是一个新的方法来可视化CPU的使用情况，本文中我会展示如何使用它辅助我们排查问题。</p>
-
-<p><a href="https://github.com/uber/go-torch">go-torch项目首页</a></p>
-
-<p>下图是火焰图的一个事例展示：</p>
-
-<p><img src="/media/2018/go-torch.png" alt="df" /></p>
-
-<p>这样的展示方式相比之前的树状的，有了更直观的表现，</p>
-
-<p>好，我们了解应该差不多了，可以开始安装并使用go-torch了</p>
-
-<h2 id="安装">安装</h2>
-
-<p>1.首先，我们要配置<code>FlameGraph</code>的脚本</p>
-
-<blockquote>
-<p>FlameGraph 是profile数据的可视化层工具，已被广泛用于Python和Node</p>
-</blockquote>
-<pre><code>git clone https://github.com/brendangregg/FlameGraph.git
-</code></pre>
-
-<p>2.检出完成后，把<code>flamegraph.pl</code>拷到我们机器环境变量$PATH的路径中去，例如：</p>
-<pre><code>cp flamegraph.pl /usr/local/bin
-</code></pre>
-
-<p>3.在终端输入 <code>flamegraph.pl -h</code> 是否安装FlameGraph成功</p>
-<pre><code>$ flamegraph.pl -h
-Option h is ambiguous (hash, height, help)
-USAGE: /usr/local/bin/flamegraph.pl [options] infile &gt; outfile.svg
-
-    --title       # change title text
-    --width       # width of image (default 1200)
-    --height      # height of each frame (default 16)
-    --minwidth    # omit smaller functions (default 0.1 pixels)
-    --fonttype    # font type (default &quot;Verdana&quot;)
-    --fontsize    # font size (default 12)
-    --countname   # count type label (default &quot;samples&quot;)
-    --nametype    # name type label (default &quot;Function:&quot;)
-    --colors      # set color palette. choices are: hot (default), mem, io,
-                  # wakeup, chain, java, js, perl, red, green, blue, aqua,
-                  # yellow, purple, orange
-    --hash        # colors are keyed by function name hash
-    --cp          # use consistent palette (palette.map)
-    --reverse     # generate stack-reversed flame graph
-    --inverted    # icicle graph
-    --negate      # switch differential hues (blue&lt;-&gt;red)
-    --help        # this message
-
-    eg,
-    /usr/local/bin/flamegraph.pl --title=&quot;Flame Graph: malloc()&quot; trace.txt &gt; graph.svg
-</code></pre>
-
-<p>4.安装go-torch</p>
-
-<p>有了flamegraph的支持，我们接下来要使用go-torch展示profile的输出，而安装go-torch很简单，我们使用下面的命令即可完成安装</p>
-<pre><code>go get -v github.com/uber/go-torch
-</code></pre>
-
-<p>5.使用go-torch命令</p>
-<pre><code>$ go-torch -h
-Usage:
-  go-torch [options] [binary] &lt;profile source&gt;
-
-pprof Options:
-  -u, --url=         Base URL of your Go program (default: http://localhost:8080)
-  -s, --suffix=      URL path of pprof profile (default: /debug/pprof/profile)
-  -b, --binaryinput= File path of previously saved binary profile. (binary profile is anything accepted by https://golang.org/cmd/pprof)
-      --binaryname=  File path of the binary that the binaryinput is for, used for pprof inputs
-  -t, --seconds=     Number of seconds to profile for (default: 30)
-      --pprofArgs=   Extra arguments for pprof
-
-Output Options:
-  -f, --file=        Output file name (must be .svg) (default: torch.svg)
-  -p, --print        Print the generated svg to stdout instead of writing to file
-  -r, --raw          Print the raw call graph output to stdout instead of creating a flame graph; use with Brendan Gregg's flame graph perl
-                     script (see https://github.com/brendangregg/FlameGraph)
-      --title=       Graph title to display in the output file (default: Flame Graph)
-      --width=       Generated graph width (default: 1200)
-      --hash         Colors are keyed by function name hash
-      --colors=      set color palette. choices are: hot (default), mem, io, wakeup, chain, java, js, perl, red, green, blue, aqua, yellow,
-                     purple, orange
-      --cp           Use consistent palette (palette.map)
-      --reverse      Generate stack-reversed flame graph
-      --inverted     icicle graph
-
-Help Options:
-  -h, --help         Show this help message
-</code></pre>
-
-<p>按照上面的几个步骤，我们基本可以具备生成我们的火焰图的前提条件了，但生成火焰图并不是这篇文章所要表达的目的，记住，我们的目的是： 找出问题，分析问题，解决问题！</p>
-
-<p>下面我们就结合案例，介绍如何使用火焰图辅助性能调优吧</p>
-
-<h2 id="调优实例">调优实例</h2>
-
-<p><a href="https://github.com/domac/playflame/tree/slow">demo代码</a></p>
-
-<p>demo是一个web的服务端程序，对外提供了两个用于我们演示的HTTP接口</p>
-
-<p>我们先阅读 main.go</p>
-<pre><code>func main() {
-    flag.Parse()
-
-    //高级接口
-    http.HandleFunc(&quot;/advance&quot;, handler.WithAdvanced(handler.Simple))
-
-    //简单接口
-    http.HandleFunc(&quot;/simple&quot;, handler.Simple)
-    http.HandleFunc(&quot;/&quot;, index)
-
-    fmt.Println(&quot;Starting Server on&quot;, hostPort)
-    if err := http.ListenAndServe(hostPort, nil); err != nil {
-        log.Fatalf(&quot;HTTP Server Failed: %v&quot;, err)
-    }
-}
-</code></pre>
-
-<p>启动服务后, 浏览器访问 <a href="http://localhost:9090/simple">http://localhost:9090/simple</a> 和 <a href="http://localhost:9090/advance">http://localhost:9090/advance</a></p>
-
-<p>正常都会输出</p>
-<pre><code>Hello VIP!
-</code></pre>
-
-<p>虽然输出的内容是一样的，但 /advance 接口附加了一些统计功能，我们可以在终端上启动web服务时，多增加printStats参数：</p>
-<pre><code>$ go run main.go -printStats
-</code></pre>
-
-<p>当我们刷新接口地址的时候，终端都会把访问信息打印出来，如下：</p>
-<pre><code>IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
-RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 418.07µs
-IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
-RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 71.084µs
-IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
-RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 93.233µs
-IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
-RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 88.246µs
-IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
-RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 99.305µs
-IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
-RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 82.383µs
-IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
-RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 86.55µs
-IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
-RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 109.914µs
-</code></pre>
-
-<p>OK, 例子很简单而且表面上看起来web服务都很正常，但背后真的是风平浪静吗？毕竟我们的并发量还没真正上去，cpu和内存都还没经受考验呢！</p>
-
-<p>我们继续保持web服务处于工作状态，然后输入以下命令：</p>
-<pre><code>kapok -d=35 -c=1000  http://localhost:9090/advance
-</code></pre>
-
-<blockquote>
-<p>kapok 是我自己开发用于压测的工具，除此之外，可使用go-wrk 或者 vegeta等http压测工具代替</p>
-</blockquote>
-
-<p>在上面的压测过程中，我们再新建一个终端窗口输入以下命令，生成我们的profile文件：</p>
-<pre><code>$ go tool pprof --seconds 25 http://localhost:9090/debug/pprof/profile
-</code></pre>
-
-<p>命令中，我们设置了25秒的采样时间，当看到(pprof)的时候，我们输入 <code>web</code>, 表示从浏览器打开</p>
-<pre><code>Fetching profile from http://localhost:9090/debug/pprof/profile?seconds=25
-Please wait... (25s)
-Saved profile in /Users/lihaoquan/pprof/pprof.localhost:9090.samples.cpu.014.pb.gz
-Entering interactive mode (type &quot;help&quot; for commands)
-(pprof) web
-</code></pre>
-
-<p>这样我们可以得到一个完整的程序调用性能采样profile的输出,如下图：</p>
-
-<p><img src="/media/2018/profile_simple1.png" alt="web-pprof" /></p>
-
-<p>就像评分报告一样，模块间的调用耗时都能从图中得到展现，但是, 这种图有个缺点，就是层次很深的话，这周发散性的层级关系有点不友好，我们可能需要换一种展示方式来告诉我们应用是否有问题</p>
-
-<p>好，我们回调终端上，依旧调用压力测试工具：</p>
-<pre><code>kapok -d=35 -c=1000  http://localhost:9090/advance
-</code></pre>
-
-<p>不过，我们决定使用go-torch来生成采样报告:</p>
-<pre><code>go-torch -u http://localhost:9090 -t 30
-</code></pre>
-
-<p>大概等三十秒后，go-torch完成采用后，会输出以下信息：</p>
-<pre><code>Writing svg to torch.svg
-</code></pre>
-
-<p><code>torch.svg</code> 是go-torch采样结束后自动生成的profile文件，我们也照旧用浏览器进行打开：</p>
-
-<p><img src="/media/2018/flame1.png" alt="f1" /></p>
-
-<p>嗯，这样体验好多了，接下来我们可以基于这个火焰图诊断一下我们的web服务是否是“健康”的！</p>
-
-<blockquote>
-<p>火焰图的y轴表示cpu调用方法的先后，x轴表示在每个采样调用时间内，方法所占的时间百分比，越宽代表占据cpu时间越多</p>
-</blockquote>
-
-<p>我们发现</p>
-<pre><code>os.Hostname
-</code></pre>
-
-<p>这个地方很明显有可疑，因为按正常理解一个回去hostname的方法，不应该占据这么多的资源啊，我们先去代码里看下：</p>
-<pre><code>func getStatsTags(r *http.Request) map[string]string {
-    userBrowser, userOS := parseUserAgent(r.UserAgent())
-    stats := map[string]string{
-        &quot;browser&quot;:  userBrowser,
-        &quot;os&quot;:       userOS,
-        &quot;endpoint&quot;: filepath.Base(r.URL.Path),
-    }
-    host, err := os.Hostname()
-    if err == nil {
-        if idx := strings.IndexByte(host, '.'); idx &gt; 0 {
-            host = host[:idx]
-        }
-        stats[&quot;host&quot;] = host
-    }
-    return stats
-}
-</code></pre>
-
-<p><code>getStatsTags</code> 这个方法会在每次访问 /advance接口的时候都会被调用，而代码里也很明显的使用了 <code>os.Hostname()</code>。 一般情况下我们的机器的hostname不应该是频繁变化的，所以
-我们应该把这个获取hostname的代码单独拿出来，作为一个全局性的处理，这样每次接口调用就不用再新调用它一次了：</p>
-
-<p>改进后的代码：</p>
-<pre><code>var _hostName = getHost()
-
-func getHost() string {
-    host, err := os.Hostname()
-    if err != nil {
-        return &quot;&quot;
-    }
-
-    if idx := strings.IndexByte(host, '.'); idx &gt; 0 {
-        host = host[:idx]
-    }
-    return host
-}
-
-func getStatsTags(r *http.Request) map[string]string {
-    userBrowser, userOS := parseUserAgent(r.UserAgent())
-    stats := map[string]string{
-        &quot;browser&quot;:  userBrowser,
-        &quot;os&quot;:       userOS,
-        &quot;endpoint&quot;: filepath.Base(r.URL.Path),
-    }
-    if _hostName != &quot;&quot; {
-        stats[&quot;host&quot;] = _hostName
-    }
-    return stats
-}
-
-</code></pre>
-
-<p>为了检验我们的诊断是否正确，我们重启我们的web服务再来调试一下,继续同时运行以下命令</p>
-<pre><code>$ kapok -d=35 -c=1000  http://localhost:9090/advance
-</code></pre>
-
-<p>依旧在压测的同时，我们并行采样：</p>
-<pre><code>$ go-torch -u http://localhost:9090 -t 30
-</code></pre>
-
-<p>生成新的profile后，浏览器打开</p>
-
-<p><img src="/media/2018/flame2.png" alt="f2" /></p>
-
-<p>可以看到，之前的os.Hostname在火焰图上没有了，我们解决了一个bug~</p>
-
-<p>想必这里我们一定认为安枕无忧了，但是俗语说祸不单行，bug一般不会轻易显露出来的，我们最好还是
-深入挖掘它。</p>
-
-<p>我们发现下图的一个地方（绿色框中的地方）：</p>
-
-<p><img src="/media/2018/f3.png" alt="f3" /></p>
-
-<p>从统计数据看到，绿色框标识的地方，采用数只有140，而这个函数应该也是每次调用/advance的时候都会被调用一次的，也就是说这里出现问题了。</p>
-
-<p>我们在火焰图上再点进去，发现了可疑的地方了：</p>
-
-<p><img src="/media/2018/f4.png" alt="f4" /></p>
-
-<p>绿色标识的地方所示，addTagsToName这个方法调用，为什么会出现两次呢？</p>
-
-<p>知道可能出现问题的地方，但百思不得其解！要怎么样才能具体定位问题所在呢？</p>
-
-<p>我们这个时候应该针对addTagsToName，尝试对症下药。</p>
-
-<p>我们矛头指向addTagsToName，做一次基准测试</p>
-
-<p>测试文件如下：</p>
-
-<p>reporter_test.go</p>
-<pre><code>package stats
-
-import &quot;testing&quot;
-
-func BenchmarkAddTagsToName(b *testing.B) {
-    tags := map[string]string{
-        &quot;host&quot;:     &quot;myhost&quot;,
-        &quot;endpoint&quot;: &quot;hello&quot;,
-        &quot;os&quot;:       &quot;OS X&quot;,
-        &quot;browser&quot;:  &quot;Chrome&quot;,
-    }
-    for i := 0; i &lt; b.N; i++ {
-        addTagsToName(&quot;recv.calls&quot;, tags)
-    }
-}
-
-func TestAddTagsToName(t *testing.T) {
-    tests := []struct {
-        name     string
-        tags     map[string]string
-        expected string
-    }{
-        {
-            name:     &quot;recvd&quot;,
-            tags:     nil,
-            expected: &quot;recvd.no-endpoint.no-os.no-browser&quot;,
-        },
-        {
-            name: &quot;recvd&quot;,
-            tags: map[string]string{
-                &quot;endpoint&quot;: &quot;hello&quot;,
-                &quot;os&quot;:       &quot;OS X&quot;,
-                &quot;browser&quot;:  &quot;Chrome&quot;,
-            },
-            expected: &quot;recvd.hello.OS-X.Chrome&quot;,
-        },
-        {
-            name: &quot;r.call&quot;,
-            tags: map[string]string{
-                &quot;host&quot;:     &quot;my-host-name&quot;,
-                &quot;endpoint&quot;: &quot;hello&quot;,
-                &quot;os&quot;:       &quot;OS{}/\tX&quot;,
-                &quot;browser&quot;:  &quot;Chro\\:me&quot;,
-            },
-            expected: &quot;r.call.my-host-name.hello.OS----X.Chro--me&quot;,
-        },
-    }
-
-    for _, tt := range tests {
-        got := addTagsToName(tt.name, tt.tags)
-        if got != tt.expected {
-            t.Errorf(&quot;addTagsToName(%v, %v) got %v, expected %v&quot;,
-                tt.name, tt.tags, got, tt.expected)
-        }
-    }
-}
-
-</code></pre>
-
-<p>我们执行一下benchmark测试</p>
-
-<p><strong>先是cpu的性能分析</strong></p>
-<pre><code>$ go test -bench . -benchmem -cpuprofile prof.cpu
-BenchmarkAddTagsToName-4         500000          3172 ns/op         480 B/op          16 allocs/op
-PASS
-ok      github.com/domac/playflame/stats    1.633s
-</code></pre>
-
-<p>使用go tool分析一下：</p>
-<pre><code>$ go tool pprof stats.test  prof.cpu
-Entering interactive mode (type &quot;help&quot; for commands)
-(pprof) top10
-930ms of 1420ms total (65.49%)
-Showing top 10 nodes out of 85 (cum &gt;= 60ms)
-      flat  flat%   sum%        cum   cum%
-     130ms  9.15%  9.15%      420ms 29.58%  regexp.(*machine).tryBacktrack
-     120ms  8.45% 17.61%      120ms  8.45%  regexp/syntax.(*Inst).MatchRunePos
-     120ms  8.45% 26.06%      300ms 21.13%  runtime.mallocgc
-     100ms  7.04% 33.10%      100ms  7.04%  regexp.(*bitState).push
-      90ms  6.34% 39.44%      300ms 21.13%  runtime.growslice
-      90ms  6.34% 45.77%       90ms  6.34%  runtime.memmove
-      80ms  5.63% 51.41%      530ms 37.32%  regexp.(*machine).backtrack
-      80ms  5.63% 57.04%       80ms  5.63%  runtime.heapBitsSetType
-      60ms  4.23% 61.27%      850ms 59.86%  regexp.(*Regexp).replaceAll
-      60ms  4.23% 65.49%       60ms  4.23%  sync/atomic.CompareAndSwapUint32
-(pprof)
-</code></pre>
-
-<p>从排行榜看到，大概regexp很大关系，但这不好看出真正问题，需要再用别的招数</p>
-
-<p>我们在(pprof)后，输入<code>list addTagsToName</code>， 分析基准测试文件中具体的方法</p>
-<pre><code>(pprof) list addTagsToName
-Total: 1.42s
-ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
-      20ms      1.37s (flat, cum) 96.48% of Total
-         .          .     31:    }
-         .          .     32:}
-         .          .     33:
-         .          .     34:func addTagsToName(name string, tags map[string]string) string {
-         .          .     35:    var keyOrder []string
-         .       10ms     36:    if _, ok := tags[&quot;host&quot;]; ok {
-         .       20ms     37:        keyOrder = append(keyOrder, &quot;host&quot;)
-         .          .     38:    }
-         .       30ms     39:    keyOrder = append(keyOrder, &quot;endpoint&quot;, &quot;os&quot;, &quot;browser&quot;)
-         .          .     40:
-         .          .     41:    parts := []string{name}
-         .          .     42:    for _, k := range keyOrder {
-      20ms       40ms     43:        v, ok := tags[k]
-         .          .     44:        if !ok || v == &quot;&quot; {
-         .          .     45:            parts = append(parts, &quot;no-&quot;+k)
-         .          .     46:            continue
-         .          .     47:        }
-         .      1.12s     48:        parts = append(parts, clean(v))
-         .          .     49:    }
-         .          .     50:
-         .      150ms     51:    return strings.Join(parts, &quot;.&quot;)
-         .          .     52:}
-         .          .     53:
-         .          .     54:var specialChars = regexp.MustCompile(`[{}/\\:\s.]`)
-         .          .     55:
-         .          .     56:func clean(value string) string {
-(pprof)
-</code></pre>
-
-<p>OK, 我们找到一个耗时比较多的功能调用了</p>
-<pre><code>1.12s     48:        parts = append(parts, clean(v))
-</code></pre>
-
-<p>这个地方就是耗时最多的地方了，也就是接下来我们应该去调优的代码区域了。我们先别急，因为这个代码段内嵌了一次clean方法的调用。</p>
-
-<p>继续在(pprof) 后输入 <code>list clean</code>,看是不是在clean出问题</p>
-<pre><code>(pprof) list clean
-Total: 1.42s
-ROUTINE ======================== github.com/domac/playflame/stats.clean in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
-         0      950ms (flat, cum) 66.90% of Total
-         .          .     52:}
-         .          .     53:
-         .          .     54:var specialChars = regexp.MustCompile(`[{}/\\:\s.]`)
-         .          .     55:
-         .          .     56:func clean(value string) string {
-         .      950ms     57:    return specialChars.ReplaceAllString(value, &quot;-&quot;)
-         .          .     58:}
-</code></pre>
-
-<p>没出意外的话，应该是 clean 方法使用不正确导致的，而且不正确的地方应该是下面的代码段：</p>
-<pre><code>specialChars.ReplaceAllString(value, &quot;-&quot;)
-</code></pre>
-
-<p>这段代码引起了性能问题！我们着手调优吧。</p>
-
-<p>代码修复前</p>
-<pre><code>var specialChars = regexp.MustCompile(`[{}/\\:\s.]`)
-
-func clean(value string) string {
-    return specialChars.ReplaceAllString(value, &quot;-&quot;)
-}
-</code></pre>
-
-<p>这段代码是把指定的特殊字符替换成‘-’，正则模块虽然灵活正则表达式比纯粹的文本匹配效率低，只是做简单文本替换的话，干脆自己写一个替换方法算了</p>
-
-<p>改进后</p>
-<pre><code>func clean(value string) string {
-    newStr := make([]byte, len(value))
-    for i := 0; i &lt; len(value); i++ {
-        switch c := value[i]; c {
-        case '{', '}', '/', '\\', ':', ' ', '\t', '.':
-            newStr[i] = '-'
-        default:
-            newStr[i] = c
-        }
-    }
-    return string(newStr)
-}
-</code></pre>
-
-<p>我们再观察基准测试报告的cpu调用分析：</p>
-<pre><code>$ go test -bench . -benchmem -cpuprofile prof.cpu
-BenchmarkAddTagsToName-4        1000000          1063 ns/op         448 B/op          15 allocs/op
-PASS
-ok      github.com/domac/playflame/stats    1.087s
-</code></pre>
-
-<p>对比上一次的测试，性能有了很大的提升：</p>
-<pre><code>(pprof) list clean
-Total: 1.02s
-ROUTINE ======================== github.com/domac/playflame/stats.clean in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
-      10ms      110ms (flat, cum) 10.78% of Total
-         .          .     48:    }
-         .          .     49:
-         .          .     50:    return strings.Join(parts, &quot;.&quot;)
-         .          .     51:}
-         .          .     52:
-      10ms       10ms     53:func clean(value string) string {
-         .       60ms     54:    newStr := make([]byte, len(value))
-         .          .     55:    for i := 0; i &lt; len(value); i++ {
-         .          .     56:        switch c := value[i]; c {
-         .          .     57:        case '{', '}', '/', '\\', ':', ' ', '\t', '.':
-         .          .     58:            newStr[i] = '-'
-         .          .     59:        default:
-         .          .     60:            newStr[i] = c
-         .          .     61:        }
-         .          .     62:    }
-         .       40ms     63:    return string(newStr)
-         .          .     64:}
-(pprof)
-</code></pre>
-
-<p>但我们还不能放松，我们看到其中一项指标: <code>15 allocs/op</code></p>
-
-<p>我们功能调用的速度上去了，但对象内存分配好像也没得到改善啊，这怎么办？</p>
-
-<p>我们继续深入下去, 既然源码分析不行，试试汇编代码：</p>
-<pre><code>(pprof)disasm
-
-...
-...
-...
-
-   .          .      a4cfb: MOVQ $0x0, 0(SP)
-         .          .      a4d03: MOVQ 0x70(SP), AX
-         .          .      a4d08: MOVQ AX, 0x8(SP)
-         .          .      a4d0d: MOVQ 0x40(SP), AX
-         .          .      a4d12: MOVQ AX, 0x10(SP)
-         .          .      a4d17: MOVQ 0x48(SP), AX
-         .          .      a4d1c: MOVQ AX, 0x18(SP)
-         .       60ms      a4d21: CALL runtime.slicebytetostring(SB)
-         .          .      a4d26: MOVQ 0x20(SP), AX
-         .          .      a4d2b: MOVQ 0x28(SP), CX
-         .          .      a4d30: MOVQ AX, 0xb8(SP)
-         .          .      a4d38: MOVQ CX, 0xc0(SP)
-         .          .      a4d40: MOVQ 0x80(SP), BP
-         .          .      a4d48: ADDQ $0x88, SP
-         .          .      a4d4f: RET
-
-...
-...
-...
-
-</code></pre>
-
-<p>我们在这里定位到 runtime.slicebytetostring(SB) 这里可能是引起内存分配问题的所在</p>
-
-<p>runtime.slicebytetostring函数正是被函数bytes.(*Buffer).String函数调用的。它实现的功能是把元素类型为byte的切片转换为字符串</p>
-
-<p>我们再详细看下代码究竟哪里涉及到字符串的转换行为</p>
-<pre><code>(pprof) list addTagsToName
-Total: 1.02s
-ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
-      40ms      770ms (flat, cum) 75.49% of Total
-         .          .     30:    }
-         .          .     31:}
-         .          .     32:
-         .          .     33:func addTagsToName(name string, tags map[string]string) string {
-         .          .     34:    var keyOrder []string
-         .       10ms     35:    if _, ok := tags[&quot;host&quot;]; ok {
-         .       10ms     36:        keyOrder = append(keyOrder, &quot;host&quot;)
-         .          .     37:    }
-         .       30ms     38:    keyOrder = append(keyOrder, &quot;endpoint&quot;, &quot;os&quot;, &quot;browser&quot;)
-         .          .     39:
-         .          .     40:    parts := []string{name}
-      10ms       10ms     41:    for _, k := range keyOrder {
-      10ms       40ms     42:        v, ok := tags[k]
-         .          .     43:        if !ok || v == &quot;&quot; {
-         .          .     44:            parts = append(parts, &quot;no-&quot;+k)
-         .          .     45:            continue
-         .          .     46:        }
-      10ms      520ms     47:        parts = append(parts, clean(v))
-         .          .     48:    }
-         .          .     49:
-      10ms      150ms     50:    return strings.Join(parts, &quot;.&quot;)
-         .          .     51:}
-         .          .     52:
-         .          .     53:func clean(value string) string {
-         .          .     54:    newStr := make([]byte, len(value))
-         .          .     55:    for i := 0; i &lt; len(value); i++ {
-(pprof)
-</code></pre>
-
-<p>留意上面的代码，为了拼接字符串，我们原方案是采用slice存放字符串元素，最后通过string.join()来拼接，
-我们多次调用了append方法，而在go里面slice其实如果容量不够的话，就会触发分配，所以
-针对这个思路，我们需要对代码的slice预分配容量，减少动态分配：</p>
-<pre><code>func addTagsToName(name string, tags map[string]string) string {
-    keyOrder := make([]string, 0, 4)
-    if _, ok := tags[&quot;host&quot;]; ok {
-        keyOrder = append(keyOrder, &quot;host&quot;)
-    }
-    keyOrder = append(keyOrder, &quot;endpoint&quot;, &quot;os&quot;, &quot;browser&quot;)
-
-    parts := make([]string, 1, 5)
-    parts[0] = name
-    for _, k := range keyOrder {
-        v, ok := tags[k]
-        if !ok || v == &quot;&quot; {
-            parts = append(parts, &quot;no-&quot;+k)
-            continue
-        }
-        parts = append(parts, clean(v))
-    }
-
-    return strings.Join(parts, &quot;.&quot;)
-}
-</code></pre>
-
-<p>我们执行又一次的基准测试</p>
-<pre><code>$ go test -bench . -benchmem -cpuprofile prof.cpu
-BenchmarkAddTagsToName-4        3000000           527 ns/op         144 B/op          10 allocs/op
-PASS
-ok      github.com/domac/playflame/stats    2.142s
-</code></pre>
-
-<p>可以看到对象分配的性能上去了，但不明显，而且，耗时好像比上一次还多了。唉~~ 问题还没彻底解决。</p>
-
-<p>再分析profile:</p>
-<pre><code>$ go tool pprof stats.test  prof.cpu
-Entering interactive mode (type &quot;help&quot; for commands)
-(pprof) list addTagsToName
-Total: 1.86s
-ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
-     140ms      1.76s (flat, cum) 94.62% of Total
-         .          .     34:}
-         .          .     35:
-         .          .     36:func addTagsToName(name string, tags map[string]string) string {
-         .          .     37:    // The format we want is: host.endpoint.os.browser
-         .          .     38:    // if there's no host tag, then we don't use it.
-         .       30ms     39:    keyOrder := make([]string, 0, 4)
-      10ms       30ms     40:    if _, ok := tags[&quot;host&quot;]; ok {
-         .          .     41:        keyOrder = append(keyOrder, &quot;host&quot;)
-         .          .     42:    }
-      10ms       10ms     43:    keyOrder = append(keyOrder, &quot;endpoint&quot;, &quot;os&quot;, &quot;browser&quot;)
-         .          .     44:
-         .          .     45:    parts := make([]string, 1, 5)
-         .          .     46:    parts[0] = name
-         .          .     47:    for _, k := range keyOrder {
-      40ms      240ms     48:        v, ok := tags[k]
-         .          .     49:        if !ok || v == &quot;&quot; {
-         .          .     50:            parts = append(parts, &quot;no-&quot;+k)
-         .          .     51:            continue
-         .          .     52:        }
-      50ms      820ms     53:        parts = append(parts, clean(v))
-         .          .     54:    }
-         .          .     55:
-      30ms      630ms     56:    return strings.Join(parts, &quot;.&quot;)
-         .          .     57:}
-         .          .     58:
-         .          .     59:// clean takes a string that may contain special characters, and replaces these
-         .          .     60:// characters with a '-'.
-         .          .     61:func clean(value string) string {
-(pprof)
-</code></pre>
-
-<p>可以看到 return strings.Join(parts, &ldquo;.&rdquo;) 这里的时间比之前的还长！！这就是问题之一</p>
-
-<p>parts = append(parts, clean(v)) 这里也是耗时比较多的，也是问题之一</p>
-
-<p>我们一个一个来：</p>
-
-<p>既然知道拼接字符串，除了把字符串装在数组里，再使用join的确很方便把字符串元素拼接，但调用次数很大的时候，可能会导致对象分配低效的问题。
-这里我们决定采用缓存buffer来优化字符串拼接：</p>
-<pre><code>func addTagsToName(name string, tags map[string]string) string {
-    keyOrder := make([]string, 0, 4)
-    if _, ok := tags[&quot;host&quot;]; ok {
-        keyOrder = append(keyOrder, &quot;host&quot;)
-    }
-    keyOrder = append(keyOrder, &quot;endpoint&quot;, &quot;os&quot;, &quot;browser&quot;)
-
-    buf := &amp;bytes.Buffer{}
-    buf.WriteString(name)
-    for _, k := range keyOrder {
-        buf.WriteByte('.')
-
-        v, ok := tags[k]
-        if !ok || v == &quot;&quot; {
-            buf.WriteString(&quot;no-&quot;)
-            buf.WriteString(k)
-            continue
-        }
-
-        writeClean(buf, v)
-    }
-
-    return buf.String()
-}
-
-func writeClean(buf *bytes.Buffer, value string) {
-    for i := 0; i &lt; len(value); i++ {
-        switch c := value[i]; c {
-        case '{', '}', '/', '\\', ':', ' ', '\t', '.':
-            buf.WriteByte('-')
-        default:
-            buf.WriteByte(c)
-        }
-    }
-}
-</code></pre>
-
-<p>我们引入buff缓冲的支持，看下优化的效果</p>
-<pre><code>$ go test -bench . -benchmem -cpuprofile prof.cpu
-BenchmarkAddTagsToName-4        3000000           488 ns/op         160 B/op           2 allocs/op
-PASS
-ok      github.com/domac/playflame/stats    1.981s
-</code></pre>
-
-<p>不错。性能指标继续上去了，而且执行耗时下降了，CPU的问题算是解决了</p>
-
-<p>我们多一个心眼，上面我们关注都是CPU调用性能，很有必要看看内存情况：</p>
-<pre><code>$ go test -bench . -benchmem -memprofile prof.mem
-BenchmarkAddTagsToName-4        3000000           479 ns/op         160 B/op           2 allocs/op
-PASS
-ok      github.com/domac/playflame/stats    1.939s
-</code></pre>
-
-<p>生成prof.mem后，分析查看top10内存消耗排行榜：</p>
-<pre><code>$ go tool pprof --alloc_objects  stats.test prof.mem
-Entering interactive mode (type &quot;help&quot; for commands)
-(pprof) top10
-7594956 of 7594956 total (  100%)
-      flat  flat%   sum%        cum   cum%
-   7594956   100%   100%    7594956   100%  github.com/domac/playflame/stats.addTagsToName
-         0     0%   100%    7594956   100%  github.com/domac/playflame/stats.BenchmarkAddTagsToName
-         0     0%   100%    7594956   100%  runtime.goexit
-         0     0%   100%    7594956   100%  testing.(*B).launch
-         0     0%   100%    7594956   100%  testing.(*B).runN
-(pprof)
-</code></pre>
-
-<p>又是addTagsToName引起内存分配问题，只好列出那里消耗多：</p>
-<pre><code>(pprof) list addTagsToName
-Total: 7594956
-ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
-   7594956    7594956 (flat, cum)   100% of Total
-         .          .     40:    if _, ok := tags[&quot;host&quot;]; ok {
-         .          .     41:        keyOrder = append(keyOrder, &quot;host&quot;)
-         .          .     42:    }
-         .          .     43:    keyOrder = append(keyOrder, &quot;endpoint&quot;, &quot;os&quot;, &quot;browser&quot;)
-         .          .     44:
-   3848310    3848310     45:    buf := &amp;bytes.Buffer{}
-         .          .     46:    buf.WriteString(name)
-         .          .     47:    for _, k := range keyOrder {
-         .          .     48:        buf.WriteByte('.')
-         .          .     49:
-         .          .     50:        v, ok := tags[k]
-         .          .     51:        if !ok || v == &quot;&quot; {
-         .          .     52:            buf.WriteString(&quot;no-&quot;)
-         .          .     53:            buf.WriteString(k)
-         .          .     54:            continue
-         .          .     55:        }
-         .          .     56:
-         .          .     57:        writeClean(buf, v)
-         .          .     58:    }
-         .          .     59:
-   3746646    3746646     60:    return buf.String()
-         .          .     61:}
-         .          .     62:
-         .          .     63:// writeClean cleans value (e.g. replaces special characters with '-') and
-         .          .     64:// writes out the cleaned value to buf.
-         .          .     65:func writeClean(buf *bytes.Buffer, value string) {
-(pprof)
-</code></pre>
-
-<p>问题定为在<code>buf := &amp;bytes.Buffer{}</code> ，我们之前用它优化了我们的字符串拼接，cpu是优化了，但每次调用都新建一个buf的话，内存其实没改善，还有什么其它的解决手段呢？</p>
-
-<p>我们尝试使用对象池，把buffer对象池话</p>
-<pre><code>var bufPool = sync.Pool{
-    New: func() interface{} {
-        return &amp;bytes.Buffer{}
-    },
-}
-
-func addTagsToName(name string, tags map[string]string) string {
-    keyOrder := make([]string, 0, 4)
-    if _, ok := tags[&quot;host&quot;]; ok {
-        keyOrder = append(keyOrder, &quot;host&quot;)
-    }
-    keyOrder = append(keyOrder, &quot;endpoint&quot;, &quot;os&quot;, &quot;browser&quot;)
-
-    buf := bufPool.Get().(*bytes.Buffer)
-    defer bufPool.Put(buf)
-    buf.Reset()
-    buf.WriteString(name)
-    for _, k := range keyOrder {
-        buf.WriteByte('.')
-
-        v, ok := tags[k]
-        if !ok || v == &quot;&quot; {
-            buf.WriteString(&quot;no-&quot;)
-            buf.WriteString(k)
-            continue
-        }
-
-        writeClean(buf, v)
-    }
-
-    return buf.String()
-}
-</code></pre>
-
-<p>调试一下：</p>
-<pre><code>$ go test -bench . -benchmem -memprofile prof.mem
-BenchmarkAddTagsToName-4        3000000           564 ns/op          48 B/op           1 allocs/op
-PASS
-ok      github.com/domac/playflame/stats    2.272s
-</code></pre>
-
-<p>调用也在正常了</p>
-<pre><code>(pprof) list addTagsToName
-Total: 4008802
-ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
-   4008802    4008802 (flat, cum)   100% of Total
-         .          .     67:        }
-         .          .     68:
-         .          .     69:        writeClean(buf, v)
-         .          .     70:    }
-         .          .     71:
-   4008802    4008802     72:    return buf.String()
-         .          .     73:}
-         .          .     74:
-         .          .     75:// writeClean cleans value (e.g. replaces special characters with '-') and
-         .          .     76:// writes out the cleaned value to buf.
-         .          .     77:func writeClean(buf *bytes.Buffer, value string) {
-(pprof)
-</code></pre>
-
-<p>我们再生产新的火焰图：</p>
-
-<p><img src="/media/2018/f5.png" alt="f5" /></p>
-
-<p>从火焰图看到，我们的性能采用报告也在合理正常的范围！</p>
-
-<h2 id="总结">总结</h2>
-
-<p>经过上面的一系列分析，我们日常开发应用程序后，一定要做好测试：<code>千里之堤毁于蚁穴</code></p>
-
-<p>代码中一个看起来很普通的地方，可能就是我们性能的瓶颈了。</p>
-
-<h3 id="日常开发原则">日常开发原则</h3>
-
-<ul>
-<li><p><strong>避免过早优化</strong></p>
-
-<p>尽量用快速迭代的方式进行开发，毕竟Go让我们在基准测试还是生产上对代码进行profile分析变得容易。加上go-torch极大帮助
-我们快速定位有问题的代码。过早优化相对片面，建议先有功能，再不断完善。</p></li>
-
-<li><p><strong>避免在热点区域进行大量对象分配</strong></p></li>
-</ul>
-
-<p>对热点区域编写基准测试用例，可以使用 -benchmem 和 memory profile来观察是否我们频繁进行内存分配，因为分配的潜台词是会发生
-    GC，GC会很大程度上会有服务延迟的风险。</p>
-
-<ul>
-<li><strong>切忌对汇编代码谈虎色变</strong></li>
-</ul>
-
-<p>一般情况下，对象分配或者调用耗时的细节会体现在汇编出来的代码上，我们也不需要对汇编太惧怕，掌握基本的指令和操作符知识，我们很大程度
-    能把一些隐藏的问题揪出来。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/1/1/Profiling-and-Optimizing-Go-using-go-torch.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

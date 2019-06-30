@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Kubernetes集群搭建 - domac的菜园子</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="kubernetes-install"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac的菜园子 <sup>coder at work</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">6</span>
+                            <span class="day">30</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/6/30/kubernetes-install.html">Kubernetes集群搭建</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/kubernetes.html">kubernetes</a>
+                            <a class="tag label label-info" href="/tags/docker.html">docker</a>
+                        </aside>
+                        <section class="brief"><p>本文主要纪录Ubuntu环境下搭建Kubernetes集群的相关步骤，包括网络环境、docker配置、k8s安装。这里把安装过程中遇到的问题以及解决方法也纪录下来，然后分享出来</p>
+
+<p>本文操作环境的默认用户为 root</p>
+
+<h2 id="一-环境准备">一、环境准备</h2>
+
+<p>为了快速搭建，我选用了三台ubuntu的虚拟机，初步规划如下：</p>
+
+<table>
+<thead>
+<tr>
+<th align="center">操作系统</th>
+<th align="center">服务器IP</th>
+<th align="center">节点名称</th>
+<th align="right">角色</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td align="center">Ubuntu 8.04</td>
+<td align="center">192.168.159.101</td>
+<td align="center">kmaster</td>
+<td align="right">master节点</td>
+</tr>
+
+<tr>
+<td align="center">Ubuntu 8.04</td>
+<td align="center">192.168.159.102</td>
+<td align="center">knode-1</td>
+<td align="right">worker节点</td>
+</tr>
+
+<tr>
+<td align="center">Ubuntu 8.04</td>
+<td align="center">192.168.159.103</td>
+<td align="center">knode-2</td>
+<td align="right">worker节点</td>
+</tr>
+
+<tr>
+<td align="center">Ubuntu 8.04</td>
+<td align="center">192.168.159.104</td>
+<td align="center">knode-3</td>
+<td align="right">worker节点</td>
+</tr>
+</tbody>
+</table>
+
+<!--more-->
+
+<h3 id="1-1-安装-ss">1.1 安装 SS</h3>
+
+<p>由于安装kubernetes在国内的网络环境下，如果没有条件，可能需要采用一些科学上网的工具进行一些网络环境设置，下面我简单列一下：</p>
+
+<p>在我的 4台 Ubuntu 下各执行下面的命令:</p>
+<pre><code class="language-bash">sudo apt install python3-pip
+pip3 install https://github.com/shadowsocks/shadowsocks/archive/master.zip
+</code></pre>
+
+<h3 id="1-2-创建-shadowsocks-配置文件">1.2 创建 Shadowsocks 配置文件</h3>
+
+<p>创建一个 <code>/etc/shadowsocks.json</code> 文件，格式如下</p>
+
+<blockquote>
+<p>需要事先设置 socks5 服务，相关方法自行google</p>
+</blockquote>
+
+<p>下面是我的demo配置信息，供参考</p>
+<pre><code class="language-bash">{
+    &quot;server&quot;: &quot;我的socks服务地址&quot;,
+    &quot;server_port&quot;: 我的socks服务端口,
+    &quot;local_address&quot;: &quot;127.0.0.1&quot;,
+    &quot;local_port&quot;: 1080,
+    &quot;password&quot;: &quot;我的密码&quot;,
+    &quot;timeout&quot;: 300,
+    &quot;method&quot;: &quot;RC4-MD5&quot;,
+    &quot;fast_open&quot;: false
+}
+</code></pre>
+
+<h3 id="1-3-启动-shadowsocks">1.3 启动 Shadowsocks</h3>
+
+<p>Python 版客户端命令是 sslocal ， Shadowsocks-libev 客户端命令为 ss-local</p>
+<pre><code class="language-bash">/usr/local/bin/sslocal -c /etc/shadowsocks.json -d start
+</code></pre>
+
+<h3 id="1-4-终端内使用-需安裝-proxychains-或-privoxy">1.4 终端内使用，需安裝 proxychains 或 privoxy</h3>
+
+<p>为了在终端中使用代理，还需要安装配置 privoxy (也可以选择 proxychains)</p>
+<pre><code class="language-bash">apt-get install privoxy -y
+</code></pre>
+
+<p>安装完成后编辑 /etc/privoxy/config，搜索关键字 forward-socks5t，取消下面这一行的注释:</p>
+<pre><code class="language-bash">forward-socks5t   /               127.0.0.1:1080 .
+</code></pre>
+
+<blockquote>
+<p>这里 1080 对应着上面 Shadowsocks 配置文件中的“端口号”。</p>
+</blockquote>
+
+<p>启动 privoxy</p>
+<pre><code class="language-bash">systemctl start privoxy
+</code></pre>
+
+<h3 id="1-5-设置环境变量">1.5 设置环境变量</h3>
+
+<p>4台服务器，分别编辑 ~/.profile，并在文件末尾添加如下内容：</p>
+<pre><code class="language-bash">export http_proxy=http://127.0.0.1:8118
+export https_proxy=http://127.0.0.1:8118
+export ftp_proxy=http://127.0.0.1:8118
+export no_proxy=localhost,127.0.0.0,127.0.1.1,127.0.1.1,192.168.159.101,192.168.159.102,192.168.159.103,192.168.159.104,10.0.0.0/8,192.168.0.0/16,mirrors.aliyun.com
+
+export HTTP_PROXY=http://127.0.0.1:8118
+export HTTPS_PROXY=http://127.0.0.1:8118
+export FTP_PROXY=http://127.0.0.1:8118
+export NO_PROXY=localhost,127.0.0.0,127.0.1.1,127.0.1.1,10.0.0.0/8,192.168.159.101,192.168.159.102,192.168.159.103,192.168.159.10,192.168.0.0/16,mirrors.aliyun.com
+</code></pre>
+
+<h3 id="1-6-关闭swap">1.6 关闭swap</h3>
+
+<p>编辑/etc/fstab文件，注释掉引用swap的行，保存并重启后输入sudo swapoff -a即可</p>
+
+<h3 id="1-7-开机后台自动运行ss">1.7 开机后台自动运行ss</h3>
+
+<p>由于我们想服务器重启后我们的ss服务能自动拉起，所以我们需要借助第三方软件进行后台进程管理，这里我选用了supervisor</p>
+<pre><code class="language-bash">sudo apt-get install supervisor
+</code></pre>
+
+<p>安装好后我们可以在/etc/supervisor/目录下找到supervisor.conf配置文件，我们可以用以下命令来编辑</p>
+<pre><code class="language-bash">sudo vim /etc/supervisor/conf.d/shadowsocks.conf
+</code></pre>
+
+<p>在这个文件的最后加上以下内容</p>
+<pre><code class="language-bash">[program:shadowsocks]
+command=sslocal -c /etc/shadowsocks.json
+autostart=true
+autorestart=true
+user=root
+log_stderr=true
+logfile=/var/log/shadowsocks.log
+</code></pre>
+
+<p>重启suervisor</p>
+<pre><code class="language-bash">sudo service supervisor restart
+</code></pre>
+
+<h3 id="1-8-关闭-ubuntu-防火墙">1.8 关闭 ubuntu 防火墙</h3>
+
+<p>sudo ufw disable</p>
+
+<h2 id="二-docker-安装">二、Docker 安装</h2>
+
+<p>网络环境配置完后，我们把重心放回kubernetes的核心部件安装，容器运行时是执行容器并在节点上管理容器镜像的软件，目前，最广为人知的容器运行时是Docker，但在生态系统中还有其他容器运行时软件，比如Rkt、Containerd和Lxd。Docker是现在于Kubernetes环境中使用的最常见的容器运行时，所以我这里就默认选用Docker</p>
+
+<h3 id="2-1-安装必要的一些系统工具">2.1 安装必要的一些系统工具</h3>
+<pre><code class="language-bash">sudo apt-get update
+sudo apt-get -y install apt-transport-https ca-certificates curl software-properties-common
+</code></pre>
+
+<h3 id="2-2-安装gpg证书">2.2 安装GPG证书</h3>
+<pre><code class="language-bash">curl -fsSL http://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | sudo apt-key add -
+</code></pre>
+
+<h3 id="2-3-写入软件源信息">2.3 写入软件源信息</h3>
+<pre><code class="language-bash">sudo add-apt-repository \
+   &quot;deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+   $(lsb_release -cs) \
+   stable&quot;
+</code></pre>
+
+<h3 id="2-4-更新并指定版本安装docker-ce">2.4 更新并指定版本安装Docker-CE</h3>
+<pre><code class="language-bash">sudo apt-get update
+
+sudo apt-get install docker-ce docker-ce-cli containerd.io
+</code></pre>
+
+<h3 id="2-5-设置阿里源">2.5 设置阿里源</h3>
+<pre><code class="language-bash">sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json &lt;&lt;-'EOF'
+ {
+   &quot;registry-mirrors&quot;: [&quot;https://xxxxxxx.mirror.aliyuncs.com&quot;]
+ }
+ EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+</code></pre>
+
+<h2 id="三-使用minikube安装kubernetes集群">三、使用minikube安装kubernetes集群</h2>
+
+<p>安装kubernetes集群，目前主流的有三种方式：minikube、kubeadm、二进制文件安装；</p>
+
+<p>由于二进制安装略有冗长，所以这里我主要介绍前面两种。</p>
+
+<h3 id="3-1-安装minikube">3.1 安装Minikube</h3>
+
+<p>MiniKube 是使用 Go 语言开发的，所以安装其实很方便，一是通过下载基于不同平台早已编译好的二级制文件安装，二是可以编译源文件安装。</p>
+
+<h4 id="mac安装">Mac安装</h4>
+<pre><code class="language-bash">brew cask install minikube
+
+minikube -h
+</code></pre>
+
+<h4 id="linux-安装">Linux 安装</h4>
+<pre><code class="language-bash">curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 &amp;&amp; chmod +x minikube &amp;&amp; sudo mv minikube /usr/local/bin/
+
+minikube -h
+</code></pre>
+
+<h3 id="3-2-安装kubectl">3.2 安装Kubectl</h3>
+
+<p>kubernetes通过kube-apiserver作为整个集群管理的入口。Apiserver是整个集群的主管理节点，用户通过Apiserver配置和组织集群，同时集群中各个节点同etcd存储的交互也是通过Apiserver进行交互。Apiserver实现了一套RESTfull的接口，用户可以直接使用API同Apiserver交互。但是官方提供了一个客户端kubectl随工具集打包，用于可直接通过kubectl以命令行的方式同集群交互。</p>
+<pre><code class="language-bash">curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl &amp;&amp; chmod +x kubectl &amp;&amp; sudo mv kubectl /usr/local/bin/
+
+kubectl -h
+</code></pre>
+
+<h3 id="3-3-启动minikube">3.3 启动minikube</h3>
+
+<p>由于minikube默认情况下运行需要虚拟机驱动，所以建议我们事先安装好virtualBox软件先，然后可以执行启动：</p>
+<pre><code class="language-bash">sudo minikube start
+</code></pre>
+
+<h3 id="3-4-启动容器服务">3.4 启动容器服务</h3>
+<pre><code class="language-bash">sudo kubectl run kube-nginx --image=nginx:latest --port=80
+
+deployment &quot;kube-nginx&quot; created
+</code></pre>
+
+<h3 id="3-5-发布服务">3.5 发布服务</h3>
+<pre><code class="language-bash">sudo kubectl expose deployment kube-nginx --type=NodePort
+service &quot;kube-nginx&quot; exposed
+</code></pre>
+
+<h3 id="3-6-服务地址">3.6 服务地址</h3>
+<pre><code class="language-bash">sudo minikube service kube-nginx --url
+
+http://127.0.0.1:31511
+</code></pre>
+
+<p>这里展示的地址即启动的nginx容器服务地址，访问<a href="http://127.0.0.1:31511">http://127.0.0.1:31511</a> 于是便出现nginx首页，服务成功启动.</p>
+
+<h3 id="3-7-启动dashboard管理后台">3.7 启动dashboard管理后台</h3>
+
+<p>dashboard是kubernetes提供的容器服务管理后台，可视化界面，用来进行机器负载，集群管理，镜像扩容，配置数据等相关操作</p>
+
+<p>启动dashboard</p>
+<pre><code class="language-bash">sudo minikube dashboard --url
+</code></pre>
+
+<h2 id="四-使用-kubeadm-安装-kubernetes">四 使用 Kubeadm 安装 Kubernetes</h2>
+
+<h3 id="4-1-配置-docker-的-proxy">4.1 配置 Docker 的 proxy</h3>
+
+<p>Kubernetes 的一些 docker 镜像是需要借助梯子才能拉取到的，为此需要为 Docker 配置 Proxy。</p>
+
+<p>参考 <a href="https://docs.docker.com/config/daemon/systemd/#httphttps-proxy">https://docs.docker.com/config/daemon/systemd/#httphttps-proxy</a></p>
+
+<p>配置文件 /etc/systemd/system/docker.service.d/http-proxy.conf 内容如下：</p>
+<pre><code class="language-bash">[Service]
+Environment=&quot;HTTP_PROXY=http://127.0.0.1:8118/&quot;
+Environment=&quot;NO_PROXY=localhost,127.0.0.0/8,10.0.0.0/8,192.168.0.0/16,xxxxxxx.mirror.aliyuncs.com&quot;
+</code></pre>
+
+<p>重启 docker</p>
+<pre><code class="language-bash">sudo systemctl daemon-reload
+sudo systemctl restart docker
+</code></pre>
+
+<h3 id="4-2-安装kubernetes-所有虚拟机">4.2 安装Kubernetes(所有虚拟机)</h3>
+
+<p>如果你已经使用Minikube安装了k8s,那么kubectl命令会有一份配置文件存在 $HOME/.kube目录下，需要删除才可以使用kubeadm安装</p>
+
+<p>添加软件源</p>
+<pre><code class="language-bash">curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+
+cat &lt;&lt;EOF &gt;/etc/apt/sources.list.d/kubernetes.list
+deb https://apt.kubernetes.io/ kubernetes-xenial main
+EOF
+</code></pre>
+
+<p>更新软件包缓存并安装</p>
+<pre><code class="language-bash">apt-get update
+apt-get install -y kubelet kubeadm kubectl kubernetes-cni
+apt-mark hold kubelet kubeadm kubectl
+</code></pre>
+
+<p>启用kubelet</p>
+<pre><code class="language-bash">systemctl enable kubelet &amp;&amp; systemctl start kubelet
+</code></pre>
+
+<p>(可选) 添加到变量到 /etc/systemd/system/kubelet.service.d/10-kubeadm.conf</p>
+<pre><code class="language-bash">Environment=&quot;cgroup-driver=systemd/cgroup-driver=cgroups&quot; 
+</code></pre>
+
+<h3 id="4-3-使用kubeadm-init初始化master节点">4.3 使用kubeadm init初始化master节点</h3>
+
+<blockquote>
+<p>kubeadm init 前最好删除 $HOME/.kube目录</p>
+</blockquote>
+
+<p>下面提供两种网络插件安装方式，选其中一种即可</p>
+
+<p>calico 网络</p>
+<pre><code class="language-bash">kubeadm init --apiserver-advertise-address 192.168.159.101 --pod-network-cidr=192.168.0.0/16
+</code></pre>
+
+<p>Flannel网络</p>
+<pre><code class="language-bash">kubeadm init --apiserver-advertise-address 192.168.159.101 --pod-network-cidr=10.244.0.0/16
+</code></pre>
+
+<p>配置文件方式（可选）</p>
+
+<p>执行 kubeadm config print init-defaults 可以取得默认的初始化参数文件</p>
+<pre><code class="language-bash">kubeadm config print init-defaults &gt; init.default.yml
+</code></pre>
+
+<p>对生成的文件进行编辑，可以按需生成合适的配置，例如，若需要定制镜像仓库地址、以及Pod的地址范围，则可以使用如下配置</p>
+<pre><code class="language-bash">apiVersion: kubeadm.k8s.io/v1beta2
+kind: ClusterConfiguration
+imageRepository: docker.io/dustine
+kubernetesVersion: v1.14.0
+networking:
+    podSubnet:&quot;192.168.0.0/16&quot;
+</code></pre>
+
+<p>将上面的内容保存为init-config.yaml 备用</p>
+
+<h3 id="4-4-init-常用主要参数">4.4 init 常用主要参数：</h3>
+
+<ul>
+<li><p>kubernetes-version: 指定Kubenetes版本，如果不指定该参数，会从google网站下载最新的版本信息。</p></li>
+
+<li><p>pod-network-cidr: 指定pod网络的IP地址范围，它的值取决于你在下一步选择的哪个网络网络插件，比如我在本文中使用的是 flannel 网络，需要指定为10.244.0.0/16。</p></li>
+
+<li><p>apiserver-advertise-address: 指定master服务发布的Ip地址，如果不指定，则会自动检测网络接口，通常是内网IP。
+kubeadm init 输出的token用于master和加入节点间的身份认证，token是机密的，需要保证它的安全，因为拥有此标记的人都可以随意向集群中添加节点。</p></li>
+</ul>
+
+<p>安装过程中，可能会出现下面的错误</p>
+<pre><code class="language-bash">[init] Using Kubernetes version: v1.15.0
+[preflight] Running pre-flight checks
+    [WARNING IsDockerSystemdCheck]: detected &quot;cgroupfs&quot; as the Docker cgroup driver. The recommended driver is &quot;systemd&quot;. Please follow the guide at https://kubernetes.io/docs/setup/cri/
+[preflight] Pulling images required for setting up a Kubernetes cluster
+[preflight] This might take a minute or two, depending on the speed of your internet connection
+[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'
+error execution phase preflight: [preflight] Some fatal errors occurred:
+    [ERROR ImagePull]: failed to pull image k8s.gcr.io/kube-apiserver:v1.15.0: output: Error response from daemon: Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+, error: exit status 1
+    [ERROR ImagePull]: failed to pull image k8s.gcr.io/kube-controller-manager:v1.15.0: output: Error response from daemon: Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+, error: exit status 1
+    [ERROR ImagePull]: failed to pull image k8s.gcr.io/kube-scheduler:v1.15.0: output: Error response from daemon: Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+, error: exit status 1
+    [ERROR ImagePull]: failed to pull image k8s.gcr.io/kube-proxy:v1.15.0: output: Error response from daemon: Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+, error: exit status 1
+    [ERROR ImagePull]: failed to pull image k8s.gcr.io/pause:3.1: output: Error response from daemon: Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+, error: exit status 1
+    [ERROR ImagePull]: failed to pull image k8s.gcr.io/etcd:3.3.10: output: Error response from daemon: Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+, error: exit status 1
+    [ERROR ImagePull]: failed to pull image k8s.gcr.io/coredns:1.3.1: output: Error response from daemon: Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)
+, error: exit status 1
+[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`
+</code></pre>
+
+<p>新版本的Kubernetes在安装部署中，需要从k8s.grc.io仓库中拉取所需镜像文件，但由于国内网络防火墙问题导致无法正常拉取</p>
+
+<p>docker.io仓库对google的容器做了镜像，可以通过下列命令下拉取相关镜像：</p>
+
+<p><strong>建议 master 和 node 节点也安装下面的镜像</strong></p>
+
+<p>否则node节点可能由于墙的原因，在加入集群的时候可能会报下面的错误</p>
+<pre><code class="language-bash">Container runtime network not ready: NetworkReady=false reason:NetworkPluginNotReady message:docker: network plugin is not ready: cni config uninitialized
+</code></pre>
+
+<p>因为每个node节点，需要 <code>k8s.gcr.io/pause</code>、<code>kube-proxy</code>、<code>calico/fannel等插件</code> 等相关启动容器的支持才能正常工作</p>
+
+<p>下面是镜像安装脚本</p>
+
+<p>vim imagespull.sh</p>
+<pre><code class="language-bash">docker pull mirrorgooglecontainers/kube-apiserver:v1.15.0
+docker pull mirrorgooglecontainers/kube-controller-manager:v1.15.0
+docker pull mirrorgooglecontainers/kube-scheduler:v1.15.0
+docker pull mirrorgooglecontainers/kube-proxy:v1.15.0
+docker pull mirrorgooglecontainers/pause:3.1
+docker pull mirrorgooglecontainers/etcd:3.3.10
+docker pull coredns/coredns:1.3.1
+
+docker tag docker.io/mirrorgooglecontainers/kube-proxy:v1.15.0 k8s.gcr.io/kube-proxy:v1.15.0
+docker tag docker.io/mirrorgooglecontainers/kube-scheduler:v1.15.0 k8s.gcr.io/kube-scheduler:v1.15.0
+docker tag docker.io/mirrorgooglecontainers/kube-apiserver:v1.15.0 k8s.gcr.io/kube-apiserver:v1.15.0
+docker tag docker.io/mirrorgooglecontainers/kube-controller-manager:v1.15.0 k8s.gcr.io/kube-controller-manager:v1.15.0
+docker tag docker.io/mirrorgooglecontainers/etcd:3.3.10  k8s.gcr.io/etcd:3.3.10
+docker tag docker.io/mirrorgooglecontainers/pause:3.1  k8s.gcr.io/pause:3.1
+docker tag docker.io/coredns/coredns:1.3.1  k8s.gcr.io/coredns:1.3.1
+</code></pre>
+<pre><code class="language-bash">sh imagespull.sh
+</code></pre>
+
+<p>最后，kubeadm init 执行后，如出现下面的信息，表示安装成功</p>
+<pre><code class="language-bash">Your Kubernetes control-plane has initialized successfully!
+
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+You should now deploy a pod network to the cluster.
+Run &quot;kubectl apply -f [podnetwork].yaml&quot; with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 192.168.159.101:6443 --token 82e1nv.rtjfhtg2yufmvxfe \
+    --discovery-token-ca-cert-hash sha256:5caf354a1ec5dc2ba220b38f71b2a8b11d767be1ffcd12cc0c04336986599d8c
+</code></pre>
+
+<p>按照提示执行下面的命令，复制配置文件到普通用户的home目录下</p>
+<pre><code class="language-bash">mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+</code></pre>
+
+<h3 id="4-5-安装网络插件">4.5 安装网络插件</h3>
+
+<p>安装一个网络插件是必须的，因为你的pods之间需要彼此通信。</p>
+
+<p>网络部署必须是优先于任何应用的部署，详细的网络列表可参考插件页面。</p>
+
+<p>上面在 <code>kubeadm init</code> 的时候根据选择的网络模型方式，选择下面其中对应的安装</p>
+
+<p>下面的插件二选一进行安装：</p>
+
+<h4 id="calico">Calico</h4>
+
+<p>如果使用的是 <a href="https://github.com/projectcalico/calico">calico</a> 网络，安装如下：</p>
+<pre><code class="language-bash">kubectl apply -f https://docs.projectcalico.org/v3.7/manifests/calico.yaml
+</code></pre>
+
+<h4 id="flannel">Flannel</h4>
+
+<p>如果使用的是 <a href="https://github.com/coreos/flannel">flannel</a> 网络，安装如下：</p>
+<pre><code class="language-bash">kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+</code></pre>
+
+<p>观察是否配置成功</p>
+<pre><code class="language-bash">kubectl get pods -o wide --all-namespaces
+
+NAMESPACE     NAME                                       READY   STATUS    RESTARTS   AGE   IP                NODE      NOMINATED NODE   READINESS GATES
+kube-system   calico-kube-controllers-6fb584dd97-dpll4   1/1     Running   0          43s   192.168.189.3     kmaster   &lt;none&gt;           &lt;none&gt;
+kube-system   calico-node-t4xxf                          1/1     Running   0          43s   192.168.159.101   kmaster   &lt;none&gt;           &lt;none&gt;
+kube-system   coredns-5c98db65d4-fcdx9                   1/1     Running   0          86s   192.168.189.2     kmaster   &lt;none&gt;           &lt;none&gt;
+kube-system   coredns-5c98db65d4-pcsmk                   1/1     Running   0          86s   192.168.189.1     kmaster   &lt;none&gt;           &lt;none&gt;
+kube-system   etcd-kmaster                               1/1     Running   0          18s   192.168.159.101   kmaster   &lt;none&gt;           &lt;none&gt;
+kube-system   kube-apiserver-kmaster                     1/1     Running   0          25s   192.168.159.101   kmaster   &lt;none&gt;           &lt;none&gt;
+kube-system   kube-controller-manager-kmaster            1/1     Running   0          38s   192.168.159.101   kmaster   &lt;none&gt;           &lt;none&gt;
+kube-system   kube-proxy-dd4kk                           1/1     Running   0          85s   192.168.159.101   kmaster   &lt;none&gt;           &lt;none&gt;
+kube-system   kube-scheduler-kmaster                     1/1     Running   0          28s   192.168.159.101   kmaster   &lt;none&gt;           &lt;none&gt;
+</code></pre>
+<pre><code class="language-bash">kubectl get nodes
+NAME      STATUS   ROLES    AGE     VERSION
+kmaster   Ready    master   2m11s   v1.15.0
+</code></pre>
+
+<h3 id="4-6-添加从节点">4.6 添加从节点</h3>
+
+<p>在从节点上按照前面的步骤按照好docker和kubeadm后，就可以添加从节点到主节点上了</p>
+<pre><code class="language-bash">kubeadm join 192.168.159.101:6443 --token 82e1nv.rtjfhtg2yufmvxfe --discovery-token-ca-cert-hash sha256:5caf354a1ec5dc2ba220b38f71b2a8b11d767be1ffcd12cc0c04336986599d8c
+</code></pre>
+
+<p>回到master节点查看集群状态</p>
+<pre><code class="language-bash">kubectl get nodes
+NAME      STATUS   ROLES    AGE   VERSION
+kmaster   Ready    master   35m   v1.15.0
+knode-1   Ready    &lt;none&gt;   69s   v1.15.0
+</code></pre>
+
+<p>这样一个节点添加成功，我们同时把其它节点添加进来就可以了</p>
+
+<p>我们可以手动给任意 node 设置 ROLES</p>
+
+<p>原理就是给 node 打标签, 只不过是特殊的标签</p>
+<pre><code class="language-bash">kubectl label node knode-1 node-role.kubernetes.io/worker=worker
+kubectl label node knode-2 node-role.kubernetes.io/worker=worker
+kubectl label node knode-3 node-role.kubernetes.io/worker=worker
+</code></pre>
+<pre><code class="language-bash">kubectl get nodes
+NAME      STATUS   ROLES    AGE     VERSION
+kmaster   Ready    master   34m     v1.15.0
+knode-1   Ready    worker   29m     v1.15.0
+knode-2   Ready    worker   28m     v1.15.0
+knode-3   Ready    worker   28s     v1.15.0
+</code></pre>
+
+<h3 id="4-7-安装-dashboard-插件">4.7 安装 Dashboard 插件</h3>
+<pre><code class="language-bash">kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml
+</code></pre>
+
+<p>修改service通过NodePort方式访问k8s dashboard</p>
+
+<p>小技巧，由于后面的操作都是在 kube-system 名称空间中进行，可以设置个别名 ksys=kubectl -n kube-system 这样就可以使用ksys操作该名称空间了</p>
+<pre><code class="language-bash">alias ksys='kubectl -n kube-system'
+
+ksys get svc
+NAME                   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                  AGE
+kube-dns               ClusterIP   10.96.0.10      &lt;none&gt;        53/UDP,53/TCP,9153/TCP   3h43m
+kubernetes-dashboard   NodePort    10.102.227.67   &lt;none&gt;        443/TCP            3h39m
+
+</code></pre>
+
+<p>可以看到 kubernetes-dashboard  service 在集群内部，无法再外部访问，为了方便访问，我们暴露kubernetes-dashboard 443端口给NodePort
+ksys edit svc kubernetes-dashboard 通过ksys edit svc 直接编辑service</p>
+<pre><code class="language-bash">ksys edit svc kubernetes-dashboard
+</code></pre>
+
+<p>把 type: ClusterIp 改为 type: NodePort。 参考如下</p>
+<pre><code class="language-bash">
+... ...
+
+spec:
+  clusterIP: 10.102.227.67
+  externalTrafficPolicy: Cluster
+  ports:
+  - nodePort: 31537
+    port: 443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    k8s-app: kubernetes-dashboard
+  sessionAffinity: None
+  type: NodePort
+
+... ...  
+</code></pre>
+
+<p>这时，我们再重新查看Service</p>
+<pre><code class="language-bash">ksys get svc
+NAME                   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                  AGE
+kube-dns               ClusterIP   10.96.0.10      &lt;none&gt;        53/UDP,53/TCP,9153/TCP   3h45m
+kubernetes-dashboard   NodePort    10.102.227.67   &lt;none&gt;        443:31537/TCP            3h41m
+</code></pre>
+
+<p>可以看到当前NodePort 端口是随机的31537，通过ifconfig 查看节点ip地址，该节点ip为：192.168.159.101</p>
+
+<p>通过谷歌浏览器访问 <a href="https://192.168.159.101:31537">https://192.168.159.101:31537</a></p>
+
+<p><img src="/media/2019/d1.jpg" alt="d1" /></p>
+
+<p>创建kubernetes-dashboard管理员角色</p>
+<pre><code class="language-bash">kubectl create serviceaccount dashboard -n default
+</code></pre>
+
+<p>然后</p>
+<pre><code class="language-bash">kubectl create clusterrolebinding dashboard-admin -n default --clusterrole=cluster-admin --serviceaccount=default:dashboard
+</code></pre>
+
+<p>最后生成token</p>
+<pre><code class="language-bash">kubectl get secret $(kubectl get serviceaccount dashboard -o jsonpath=&quot;{.secrets[0].name}&quot;) -o jsonpath=&quot;{.data.token}&quot; | base64 --decode
+</code></pre>
+
+<p>生成的token如下：</p>
+<pre><code class="language-bash">eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImRhc2hib2FyZC10b2tlbi01d2s3NiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJkYXNoYm9hcmQiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJkOWM5ZGZiNS0yOTgyLTQzMzMtYjE0ZC1jYjY1ODAwYzVmZjciLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6ZGVmYXVsdDpkYXNoYm9hcmQifQ.krpa4umk2aPO8OAIvVJvwmGcO-CKrpEwiGxriSu7iYmoM8qiBqtic8YbQpVtoW4I6orCvflOH1xzO4fJp2h7r-ElFUqCBLO6trm3ZsrbdfiewOPMlk6BN4wKH1E6DbkTycR_BbalxJqpSrBM19LZgjTAsLoUqMIaNr51vQGNhQCRS8lUfJRAbWA7GRspUz_rbFSNbtIKzFZWbyP1r_yY253e7lof8K7sf0WEUpSkf2pTyQXfe57bY_QyGl3J-k_a5mv4zqzu_9kDoD3jmHxBDq292lK1FzY17fMpwuR4lMCzoanx68gFvexNpZ_1oPbIs2eEPOTQ12Ew923zMYzBTw
+</code></pre>
+
+<p>把这个toke贴到上面的登录页的令牌框中，点击确认页面成功调整到管理页面</p>
+
+<p><img src="/media/2019/d2.jpg" alt="d2" /></p>
+
+<p>以后，我们直接通过浏览器访问 <a href="https://192.168.159.101:31537/#!/cluster?namespace=default">https://192.168.159.101:31537/#!/cluster?namespace=default</a> 就能进入管理后台</p>
+
+<h3 id="4-8-查看日志">4.8 查看日志</h3>
+
+<p>journalctl -f -u kubelet</p>
+
+<h3 id="4-9-备注">4.9 备注</h3>
+
+<p>如果安装失败，可以使用 <code>kubeadm reset</code> 命令将主机恢复原状，重新执行 <code>kubeadmin init</code> 命令进行安装</p>
+
+<p>如果需要node节点重装可以使用下面的命令（个人偏好，不代表规范操作）</p>
+<pre><code class="language-bash">rm -rf /var/lib/kubelet/* &amp;&amp; rm -rf  /etc/kubernetes/* &amp;&amp; systemctl stop kubelet
+
+apt-get purge kubelet kubeadm kubectl &amp;&amp; apt-get install kubelet kubeadm kubectl
+
+systemctl enable kubelet &amp;&amp; systemctl start kubelet
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<p>根据上面的安装指引，基本能搭建起一个四节点的kubernetes集群，接下来我们可以从集群环境出发根据kubernetes的相关知识点不断学习不断演练，加深对这个优秀开源软件的学习</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2019 domac的菜园子.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by
+            <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+
+</html>

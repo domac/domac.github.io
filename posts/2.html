@@ -50,6 +50,39 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">1</span>
+                            <span class="day">27</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/1/27/linux-mem-manage.html">Linux内核学习：内存管理</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>理解Linux内存管理能够更好地理解进程的虚拟空间排布（当一个进程需要某块内存时，它会把自己的一个内存地址交由OS处理）。</p>
+
+<p>虽然进程只关心如何使用自己的线性排列的虚拟地址，而不需要关心物理内存的实际容量，以及如何使用真实的物理内存，但内存管理是内核最复杂的同时也是最重要的一部分；它是协作处理器与内核的关键流程，所以本文我们主要介绍Linux内存管理的相关知识点。</p>
+
+<p>典型的进程内存排布如下：</p>
+
+<p><img src="/media/2019/pm.png" alt="process mem" /></p>
+
+<blockquote>
+<p>操作系统有保护措施，阻止堆和栈的越界行为发生</p>
+</blockquote>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2019/1/27/linux-mem-manage.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">1</span>
                             <span class="day">20</span>
                         </span>
                             </div>
@@ -140,37 +173,6 @@ int getbits(unsigned x, int p, int n) { return x &gt;&gt; (p - n + 1) &amp; ~(~0
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/11/9/c-bits-examples.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">11</span>
-                            <span class="day">4</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/11/4/tail-example-in-c.html">tail的c语言简单实现</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>下面的实现是来自K&amp;R-C的习题实现:</p>
-<pre><code>编写程序tail，将输入中的n行打印出来。默认情况下，n的值为10，但可通过一个可选参数改变n的值，因此命令 tail -n 将打印其输入的最后n行。无论输入或n的值是否合理，该程序都应该能正常运行,编写的程序要充分利用存储空间
-</code></pre>
-
-<blockquote>
-<p>下面的例子只简单实现一次输入输出，并不实现系统 tail -f 一样的监控文件的实时输出</p>
-</blockquote>
-
-<h3 id="tail-c">tail.c</h3>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/11/4/tail-example-in-c.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
