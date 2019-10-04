@@ -50,6 +50,50 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">11</span>
+                            <span class="day">9</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2018/11/9/c-bits-examples.html">C语言的位操作常见例子</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>我们每一种计算机语言最终都会通过编译器转换成机器语言来执行，所以在编程中，位操作是常见且高效的数据处理手段之一，下面列出一些基于C语言的场景实例，便于日常开发中学习和使用</p>
+
+<h3 id="例一-编写函数-getbits-x-p-n-从数值x的第p位开始返回n位数值">例一，编写函数 getbits(x,p,n) 从数值x的第p位开始返回n位数值</h3>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+int getbits(unsigned x, int p, int n);
+
+int main() {
+  unsigned x = 0xF994;
+  int p = 4;
+  int n = 3;
+  int z = getbits(x, p, n);
+
+  printf(&quot;getbits(%u (%x), %d, %d) = %u (%X)\n&quot;, x, x, p, n, z, z);
+}
+
+// ff94             11111111100.101.00  # original number
+// &gt;&gt; p+1-n     [2] 0011111111100.101.  # shift desired bits to right
+// &amp; ~(~0 &lt;&lt; n) [7] 0000000000000.101.  # clear all the other (left) bits
+
+int getbits(unsigned x, int p, int n) { return x &gt;&gt; (p - n + 1) &amp; ~(~0 &lt;&lt; n); }
+</code></pre>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2018/11/9/c-bits-examples.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">11</span>
                             <span class="day">4</span>
                         </span>
                             </div>
@@ -129,41 +173,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2018/9/29/postgresql-master-slave-ha.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">7</span>
-                            <span class="day">22</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2018/7/22/go-sync-cond.html">go同步之条件变量</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>Go的标准库中有一个类型叫条件变量：sync.Cond。这种类型与互斥锁和读写锁不同，它不是开箱即用的，它需要与互斥锁组合使用：</p>
-<pre><code class="language-go">
-// NewCond returns a new Cond with Locker l.
-func NewCond(l Locker) *Cond {
-    return &amp;Cond{L: l}
-}
-
-// A Locker represents an object that can be locked and unlocked.
-type Locker interface {
-    Lock()
-    Unlock()
-}
-</code></pre>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2018/7/22/go-sync-cond.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
