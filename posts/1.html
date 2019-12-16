@@ -49,6 +49,35 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">12</span>
+                            <span class="day">16</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/12/16/kubernetes-postgresql-pvc.html">部署Kubernetes PostgreSQL实例</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>本文主要演示如何通过Kubernetes提供的持久化卷（PV）和Statefulset来部署Pg数据库容器。所以本文假设您已经搭建了<a href="https://lihaoquan.me/2019/6/30/kubernetes-install.html">K8S的运行环境</a>，你也可以使用minikube来安装搭建k8s环境。</p>
+
+<h2 id="镜像准备">镜像准备</h2>
+
+<p>我们打算使用官方提供的Postgresql 12.1：<a href="https://hub.docker.com/_/postgres">https://hub.docker.com/_/postgres</a> 版本的镜像作为我们的部署镜像，这个版本的镜像提供了齐全的功能，并且支持我们使用编排文件配置环境变量，如用户名、密码、默认数据库、pgdata路径等。</p>
+
+<p>下面我们可以正式开始实例的演示了&hellip; &hellip;</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2019/12/16/kubernetes-postgresql-pvc.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">10</span>
                             <span class="day">4</span>
                         </span>
@@ -274,39 +303,6 @@ server {
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2019/3/22/nginx-limit-conn-by-network-segments.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">2</span>
-                            <span class="day">17</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2019/2/17/2pc.html">分布式系统学习：二阶段提交</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h3 id="cap理论">CAP理论</h3>
-
-<p>在学习分布式的相关知识点前，一定要先掌握CAP定理：</p>
-
-<ul>
-<li><p>C(onsistency) 一致性：分布式环境中，CAP关注的粒度是数据，而不是系统，而数据往往存在于多个副本之中，一致性是指多个副本之间，在同一时刻能否有同样的值（内容和组织上的数据）</p></li>
-
-<li><p>A(vailability) 可用性：系统提供的服务必须一直处于可用的状态。即使集群中一部分节点故障。换句话说就是用户在容忍的时间范围内返回用户期望的结果</p></li>
-
-<li><p>P(artition-resiliene) 分区容错性：系统在遇到节点故障，或者网络分区时（断网），依然能对外提供一致性和可用性的服务，在分布式系统架构中，通常由多个节点组成，由于节点通讯往往依赖网络，网络在现实中不是100%可靠的，所以分区容错是分布式的一个 <code>“最基本要求”</code> ，所以一般我们常见的CAP架构只有 AP和CP。</p></li>
-</ul>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2019/2/17/2pc.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

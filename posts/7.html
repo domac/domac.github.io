@@ -50,6 +50,43 @@
                             <div class="meta">
                         <span class="date">
                             <span class="month">10</span>
+                            <span class="day">8</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/10/8/an-programmer-prepares-1.html">《程序员的自我修养》读书笔记</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>本文是《程序员的自我修养》的读书笔记之一，主要把相关知识点进行了梳理。</p>
+
+<p>链接、装载等是操作系统中很基础也是很重要的一部分。我们需要掌握的东西很多，书中向我们灌输了理解linux里面的文件的ELF格式的重要性，我们从阅读《程序员的自我修养》前面的章节从学习ELF文件格式开始有助于更加了解日常编程看不到的东西：</p>
+
+<ul>
+<li>理解操作系统是如何让一段代码工作起来</li>
+<li>如何让不同的二进制模块协同工作</li>
+<li>理解整个系统的一个起点</li>
+</ul>
+
+<blockquote>
+<p>本书最好是配合 <a href="https://book.douban.com/subject/1436811/">《Linkers and Loaders》</a> 一起深入阅读。</p>
+</blockquote>
+
+<p>链接、装载、库是本书的三大核心点，看书的时候根据这三点的笔记整理如下：</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/10/8/an-programmer-prepares-1.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">10</span>
                             <span class="day">2</span>
                         </span>
                             </div>
@@ -123,53 +160,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/9/20/setup-squid.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">9</span>
-                            <span class="day">11</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/9/11/distributed-cache.html">最近工作点滴</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>在目前这家电商公司刚好满两年，我觉得是时候简单总结一下最近的一些工作吧：</p>
-
-<p>最近公司内部人员调整算是比较大的, 按照leader的想法, 我这边下半年开始往基础架构的建设上下更大的功夫。 而且临近双十一，相关挑战也接踵而来：目前一个&rdquo;水深火热&rdquo;的问题是我们内部某个基础底层的服务需要增加更可靠的分布式缓存支持日益递增的业务请求压力；</p>
-
-<p>虽然说目前市面上的分布式缓存手段繁多,外面每个大厂分享的&rdquo;PPT&rdquo;描述得好像都很有道理，但能结合目前我们的问题的方案可就显得力不从心了，更何况当今的后端研发人员，一说到分布式缓存，不把memcache/redis挂在嘴上，都不好意思说自己懂后端开发了，但被问到如何解决实际的问题与策略，很多人就吞吞吐吐了。所以我们内部也开始研究乃至自己编写相关分布式缓存技术的组件, 希望能抗住目前项目所带来的巨大请求压力.</p>
-
-<p>典型的分布式缓存思路无非就是使用类似KV形式存储和访问数据，在内存中维护一张巨大的HashTable，然后根据相关的路由算法将key进行Hash，使得在读数据是首先读缓存(内存)。如果缓存中没有数据，那么再去读存储(磁盘)，并且把数据写入缓存。最终对数据查询的时间复杂度降低到O(1)，保证了对数据的高性能访问。</p>
-
-<p>这种手段放之四海而皆准。但往深入想一下，会发现这都是很表面的套路，一个健壮的分布式缓存应该需要同时解决以下的问题：</p>
-
-<ul>
-<li><p>扩容问题</p></li>
-
-<li><p>故障恢复</p></li>
-
-<li><p>存储一致性</p></li>
-
-<li><p>高效的读写</p></li>
-
-<li><p>过载保护</p></li>
-
-<li><p>预热功能</p></li>
-</ul>
-
-<p>上述的问题，我先抛出来，主要做一个记录，先不详细说明，这段时间我会结合不断的实践，到时如果有所收获的话，再提炼相关经验分享出来吧。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/9/11/distributed-cache.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
