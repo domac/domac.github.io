@@ -85,6 +85,7 @@ body {
 .article .header .title {
     padding-right: 78px;
     line-height: 1.5;
+    font-size: 3em;
 }
 
 .article .header a {
