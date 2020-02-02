@@ -244,15 +244,15 @@ go tool pprof [binary] prof.cpu 来进行分析。</p></li>
 <blockquote>
 <p>FlameGraph 是profile数据的可视化层工具，已被广泛用于Python和Node</p>
 </blockquote>
-<pre><code>git clone https://github.com/brendangregg/FlameGraph.git
+<pre><code class="language-bash">git clone https://github.com/brendangregg/FlameGraph.git
 </code></pre>
 
 <p>2.检出完成后，把<code>flamegraph.pl</code>拷到我们机器环境变量$PATH的路径中去，例如：</p>
-<pre><code>cp flamegraph.pl /usr/local/bin
+<pre><code class="language-bash">cp flamegraph.pl /usr/local/bin
 </code></pre>
 
 <p>3.在终端输入 <code>flamegraph.pl -h</code> 是否安装FlameGraph成功</p>
-<pre><code>$ flamegraph.pl -h
+<pre><code class="language-bash">$ flamegraph.pl -h
 Option h is ambiguous (hash, height, help)
 USAGE: /usr/local/bin/flamegraph.pl [options] infile &gt; outfile.svg
 
@@ -281,11 +281,11 @@ USAGE: /usr/local/bin/flamegraph.pl [options] infile &gt; outfile.svg
 <p>4.安装go-torch</p>
 
 <p>有了flamegraph的支持，我们接下来要使用go-torch展示profile的输出，而安装go-torch很简单，我们使用下面的命令即可完成安装</p>
-<pre><code>go get -v github.com/uber/go-torch
+<pre><code class="language-bash">go get -v github.com/uber/go-torch
 </code></pre>
 
 <p>5.使用go-torch命令</p>
-<pre><code>$ go-torch -h
+<pre><code class="language-bash">$ go-torch -h
 Usage:
   go-torch [options] [binary] &lt;profile source&gt;
 
@@ -326,7 +326,7 @@ Help Options:
 <p>demo是一个web的服务端程序，对外提供了两个用于我们演示的HTTP接口</p>
 
 <p>我们先阅读 main.go</p>
-<pre><code>func main() {
+<pre><code class="language-go">func main() {
     flag.Parse()
 
     //高级接口
@@ -346,15 +346,15 @@ Help Options:
 <p>启动服务后, 浏览器访问 <a href="http://localhost:9090/simple">http://localhost:9090/simple</a> 和 <a href="http://localhost:9090/advance">http://localhost:9090/advance</a></p>
 
 <p>正常都会输出</p>
-<pre><code>Hello VIP!
+<pre><code class="language-bash">Hello VIP!
 </code></pre>
 
 <p>虽然输出的内容是一样的，但 /advance 接口附加了一些统计功能，我们可以在终端上启动web服务时，多增加printStats参数：</p>
-<pre><code>$ go run main.go -printStats
+<pre><code class="language-bash">$ go run main.go -printStats
 </code></pre>
 
 <p>当我们刷新接口地址的时候，终端都会把访问信息打印出来，如下：</p>
-<pre><code>IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
+<pre><code class="language-bash">IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
 RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 418.07µs
 IncCounter: handler.received.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 1
 RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 71.084µs
@@ -375,7 +375,7 @@ RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 10
 <p>OK, 例子很简单而且表面上看起来web服务都很正常，但背后真的是风平浪静吗？毕竟我们的并发量还没真正上去，cpu和内存都还没经受考验呢！</p>
 
 <p>我们继续保持web服务处于工作状态，然后输入以下命令：</p>
-<pre><code>kapok -d=35 -c=1000  http://localhost:9090/advance
+<pre><code class="language-bash">kapok -d=35 -c=1000  http://localhost:9090/advance
 </code></pre>
 
 <blockquote>
@@ -383,11 +383,11 @@ RecordTimer: handler.latency.lihaoquantekiMacBook-Pro.advance.Mac-OS.Chrome = 10
 </blockquote>
 
 <p>在上面的压测过程中，我们再新建一个终端窗口输入以下命令，生成我们的profile文件：</p>
-<pre><code>$ go tool pprof --seconds 25 http://localhost:9090/debug/pprof/profile
+<pre><code class="language-bash">$ go tool pprof --seconds 25 http://localhost:9090/debug/pprof/profile
 </code></pre>
 
 <p>命令中，我们设置了25秒的采样时间，当看到(pprof)的时候，我们输入 <code>web</code>, 表示从浏览器打开</p>
-<pre><code>Fetching profile from http://localhost:9090/debug/pprof/profile?seconds=25
+<pre><code class="language-bash">Fetching profile from http://localhost:9090/debug/pprof/profile?seconds=25
 Please wait... (25s)
 Saved profile in /Users/lihaoquan/pprof/pprof.localhost:9090.samples.cpu.014.pb.gz
 Entering interactive mode (type &quot;help&quot; for commands)
@@ -401,15 +401,15 @@ Entering interactive mode (type &quot;help&quot; for commands)
 <p>就像评分报告一样，模块间的调用耗时都能从图中得到展现，但是, 这种图有个缺点，就是层次很深的话，这周发散性的层级关系有点不友好，我们可能需要换一种展示方式来告诉我们应用是否有问题</p>
 
 <p>好，我们回调终端上，依旧调用压力测试工具：</p>
-<pre><code>kapok -d=35 -c=1000  http://localhost:9090/advance
+<pre><code class="language-bash">kapok -d=35 -c=1000  http://localhost:9090/advance
 </code></pre>
 
 <p>不过，我们决定使用go-torch来生成采样报告:</p>
-<pre><code>go-torch -u http://localhost:9090 -t 30
+<pre><code class="language-bash">go-torch -u http://localhost:9090 -t 30
 </code></pre>
 
 <p>大概等三十秒后，go-torch完成采用后，会输出以下信息：</p>
-<pre><code>Writing svg to torch.svg
+<pre><code class="language-bash">Writing svg to torch.svg
 </code></pre>
 
 <p><code>torch.svg</code> 是go-torch采样结束后自动生成的profile文件，我们也照旧用浏览器进行打开：</p>
@@ -423,11 +423,11 @@ Entering interactive mode (type &quot;help&quot; for commands)
 </blockquote>
 
 <p>我们发现</p>
-<pre><code>os.Hostname
+<pre><code class="language-bash">os.Hostname
 </code></pre>
 
 <p>这个地方很明显有可疑，因为按正常理解一个回去hostname的方法，不应该占据这么多的资源啊，我们先去代码里看下：</p>
-<pre><code>func getStatsTags(r *http.Request) map[string]string {
+<pre><code class="language-go">func getStatsTags(r *http.Request) map[string]string {
     userBrowser, userOS := parseUserAgent(r.UserAgent())
     stats := map[string]string{
         &quot;browser&quot;:  userBrowser,
@@ -449,7 +449,7 @@ Entering interactive mode (type &quot;help&quot; for commands)
 我们应该把这个获取hostname的代码单独拿出来，作为一个全局性的处理，这样每次接口调用就不用再新调用它一次了：</p>
 
 <p>改进后的代码：</p>
-<pre><code>var _hostName = getHost()
+<pre><code class="language-go">var _hostName = getHost()
 
 func getHost() string {
     host, err := os.Hostname()
@@ -479,11 +479,11 @@ func getStatsTags(r *http.Request) map[string]string {
 </code></pre>
 
 <p>为了检验我们的诊断是否正确，我们重启我们的web服务再来调试一下,继续同时运行以下命令</p>
-<pre><code>$ kapok -d=35 -c=1000  http://localhost:9090/advance
+<pre><code class="language-bash">$ kapok -d=35 -c=1000  http://localhost:9090/advance
 </code></pre>
 
 <p>依旧在压测的同时，我们并行采样：</p>
-<pre><code>$ go-torch -u http://localhost:9090 -t 30
+<pre><code class="language-bash">$ go-torch -u http://localhost:9090 -t 30
 </code></pre>
 
 <p>生成新的profile后，浏览器打开</p>
@@ -516,7 +516,7 @@ func getStatsTags(r *http.Request) map[string]string {
 <p>测试文件如下：</p>
 
 <p>reporter_test.go</p>
-<pre><code>package stats
+<pre><code class="language-go">package stats
 
 import &quot;testing&quot;
 
@@ -578,14 +578,14 @@ func TestAddTagsToName(t *testing.T) {
 <p>我们执行一下benchmark测试</p>
 
 <p><strong>先是cpu的性能分析</strong></p>
-<pre><code>$ go test -bench . -benchmem -cpuprofile prof.cpu
+<pre><code class="language-bash">$ go test -bench . -benchmem -cpuprofile prof.cpu
 BenchmarkAddTagsToName-4         500000          3172 ns/op         480 B/op          16 allocs/op
 PASS
 ok      github.com/domac/playflame/stats    1.633s
 </code></pre>
 
 <p>使用go tool分析一下：</p>
-<pre><code>$ go tool pprof stats.test  prof.cpu
+<pre><code class="language-bash">$ go tool pprof stats.test  prof.cpu
 Entering interactive mode (type &quot;help&quot; for commands)
 (pprof) top10
 930ms of 1420ms total (65.49%)
@@ -607,7 +607,7 @@ Showing top 10 nodes out of 85 (cum &gt;= 60ms)
 <p>从排行榜看到，大概regexp很大关系，但这不好看出真正问题，需要再用别的招数</p>
 
 <p>我们在(pprof)后，输入<code>list addTagsToName</code>， 分析基准测试文件中具体的方法</p>
-<pre><code>(pprof) list addTagsToName
+<pre><code class="language-bash">(pprof) list addTagsToName
 Total: 1.42s
 ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
       20ms      1.37s (flat, cum) 96.48% of Total
@@ -641,13 +641,13 @@ ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName 
 </code></pre>
 
 <p>OK, 我们找到一个耗时比较多的功能调用了</p>
-<pre><code>1.12s     48:        parts = append(parts, clean(v))
+<pre><code class="language-bash">1.12s     48:        parts = append(parts, clean(v))
 </code></pre>
 
 <p>这个地方就是耗时最多的地方了，也就是接下来我们应该去调优的代码区域了。我们先别急，因为这个代码段内嵌了一次clean方法的调用。</p>
 
 <p>继续在(pprof) 后输入 <code>list clean</code>,看是不是在clean出问题</p>
-<pre><code>(pprof) list clean
+<pre><code class="language-bash">(pprof) list clean
 Total: 1.42s
 ROUTINE ======================== github.com/domac/playflame/stats.clean in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
          0      950ms (flat, cum) 66.90% of Total
@@ -667,7 +667,7 @@ ROUTINE ======================== github.com/domac/playflame/stats.clean in /User
 <p>这段代码引起了性能问题！我们着手调优吧。</p>
 
 <p>代码修复前</p>
-<pre><code>var specialChars = regexp.MustCompile(`[{}/\\:\s.]`)
+<pre><code class="language-go">var specialChars = regexp.MustCompile(`[{}/\\:\s.]`)
 
 func clean(value string) string {
     return specialChars.ReplaceAllString(value, &quot;-&quot;)
@@ -677,7 +677,7 @@ func clean(value string) string {
 <p>这段代码是把指定的特殊字符替换成‘-’，正则模块虽然灵活正则表达式比纯粹的文本匹配效率低，只是做简单文本替换的话，干脆自己写一个替换方法算了</p>
 
 <p>改进后</p>
-<pre><code>func clean(value string) string {
+<pre><code class="language-go">func clean(value string) string {
     newStr := make([]byte, len(value))
     for i := 0; i &lt; len(value); i++ {
         switch c := value[i]; c {
@@ -692,14 +692,14 @@ func clean(value string) string {
 </code></pre>
 
 <p>我们再观察基准测试报告的cpu调用分析：</p>
-<pre><code>$ go test -bench . -benchmem -cpuprofile prof.cpu
+<pre><code class="language-bash">$ go test -bench . -benchmem -cpuprofile prof.cpu
 BenchmarkAddTagsToName-4        1000000          1063 ns/op         448 B/op          15 allocs/op
 PASS
 ok      github.com/domac/playflame/stats    1.087s
 </code></pre>
 
 <p>对比上一次的测试，性能有了很大的提升：</p>
-<pre><code>(pprof) list clean
+<pre><code class="language-bash">(pprof) list clean
 Total: 1.02s
 ROUTINE ======================== github.com/domac/playflame/stats.clean in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
       10ms      110ms (flat, cum) 10.78% of Total
@@ -728,7 +728,7 @@ ROUTINE ======================== github.com/domac/playflame/stats.clean in /User
 <p>我们功能调用的速度上去了，但对象内存分配好像也没得到改善啊，这怎么办？</p>
 
 <p>我们继续深入下去, 既然源码分析不行，试试汇编代码：</p>
-<pre><code>(pprof)disasm
+<pre><code class="language-bash">(pprof)disasm
 
 ...
 ...
@@ -761,7 +761,7 @@ ROUTINE ======================== github.com/domac/playflame/stats.clean in /User
 <p>runtime.slicebytetostring函数正是被函数bytes.(*Buffer).String函数调用的。它实现的功能是把元素类型为byte的切片转换为字符串</p>
 
 <p>我们再详细看下代码究竟哪里涉及到字符串的转换行为</p>
-<pre><code>(pprof) list addTagsToName
+<pre><code class="language-bash">(pprof) list addTagsToName
 Total: 1.02s
 ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
       40ms      770ms (flat, cum) 75.49% of Total
@@ -797,7 +797,7 @@ ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName 
 <p>留意上面的代码，为了拼接字符串，我们原方案是采用slice存放字符串元素，最后通过string.join()来拼接，
 我们多次调用了append方法，而在go里面slice其实如果容量不够的话，就会触发分配，所以
 针对这个思路，我们需要对代码的slice预分配容量，减少动态分配：</p>
-<pre><code>func addTagsToName(name string, tags map[string]string) string {
+<pre><code class="language-go">func addTagsToName(name string, tags map[string]string) string {
     keyOrder := make([]string, 0, 4)
     if _, ok := tags[&quot;host&quot;]; ok {
         keyOrder = append(keyOrder, &quot;host&quot;)
@@ -820,7 +820,7 @@ ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName 
 </code></pre>
 
 <p>我们执行又一次的基准测试</p>
-<pre><code>$ go test -bench . -benchmem -cpuprofile prof.cpu
+<pre><code class="language-bash">$ go test -bench . -benchmem -cpuprofile prof.cpu
 BenchmarkAddTagsToName-4        3000000           527 ns/op         144 B/op          10 allocs/op
 PASS
 ok      github.com/domac/playflame/stats    2.142s
@@ -829,7 +829,7 @@ ok      github.com/domac/playflame/stats    2.142s
 <p>可以看到对象分配的性能上去了，但不明显，而且，耗时好像比上一次还多了。唉~~ 问题还没彻底解决。</p>
 
 <p>再分析profile:</p>
-<pre><code>$ go tool pprof stats.test  prof.cpu
+<pre><code class="language-bash">$ go tool pprof stats.test  prof.cpu
 Entering interactive mode (type &quot;help&quot; for commands)
 (pprof) list addTagsToName
 Total: 1.86s
@@ -874,7 +874,7 @@ ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName 
 
 <p>既然知道拼接字符串，除了把字符串装在数组里，再使用join的确很方便把字符串元素拼接，但调用次数很大的时候，可能会导致对象分配低效的问题。
 这里我们决定采用缓存buffer来优化字符串拼接：</p>
-<pre><code>func addTagsToName(name string, tags map[string]string) string {
+<pre><code class="language-go">func addTagsToName(name string, tags map[string]string) string {
     keyOrder := make([]string, 0, 4)
     if _, ok := tags[&quot;host&quot;]; ok {
         keyOrder = append(keyOrder, &quot;host&quot;)
@@ -912,7 +912,7 @@ func writeClean(buf *bytes.Buffer, value string) {
 </code></pre>
 
 <p>我们引入buff缓冲的支持，看下优化的效果</p>
-<pre><code>$ go test -bench . -benchmem -cpuprofile prof.cpu
+<pre><code class="language-bash">$ go test -bench . -benchmem -cpuprofile prof.cpu
 BenchmarkAddTagsToName-4        3000000           488 ns/op         160 B/op           2 allocs/op
 PASS
 ok      github.com/domac/playflame/stats    1.981s
@@ -921,14 +921,14 @@ ok      github.com/domac/playflame/stats    1.981s
 <p>不错。性能指标继续上去了，而且执行耗时下降了，CPU的问题算是解决了</p>
 
 <p>我们多一个心眼，上面我们关注都是CPU调用性能，很有必要看看内存情况：</p>
-<pre><code>$ go test -bench . -benchmem -memprofile prof.mem
+<pre><code class="language-bash">$ go test -bench . -benchmem -memprofile prof.mem
 BenchmarkAddTagsToName-4        3000000           479 ns/op         160 B/op           2 allocs/op
 PASS
 ok      github.com/domac/playflame/stats    1.939s
 </code></pre>
 
 <p>生成prof.mem后，分析查看top10内存消耗排行榜：</p>
-<pre><code>$ go tool pprof --alloc_objects  stats.test prof.mem
+<pre><code class="language-bash">$ go tool pprof --alloc_objects  stats.test prof.mem
 Entering interactive mode (type &quot;help&quot; for commands)
 (pprof) top10
 7594956 of 7594956 total (  100%)
@@ -942,7 +942,7 @@ Entering interactive mode (type &quot;help&quot; for commands)
 </code></pre>
 
 <p>又是addTagsToName引起内存分配问题，只好列出那里消耗多：</p>
-<pre><code>(pprof) list addTagsToName
+<pre><code class="language-bash">(pprof) list addTagsToName
 Total: 7594956
 ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
    7594956    7594956 (flat, cum)   100% of Total
@@ -978,7 +978,7 @@ ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName 
 <p>问题定为在<code>buf := &amp;bytes.Buffer{}</code> ，我们之前用它优化了我们的字符串拼接，cpu是优化了，但每次调用都新建一个buf的话，内存其实没改善，还有什么其它的解决手段呢？</p>
 
 <p>我们尝试使用对象池，把buffer对象池话</p>
-<pre><code>var bufPool = sync.Pool{
+<pre><code class="language-go">var bufPool = sync.Pool{
     New: func() interface{} {
         return &amp;bytes.Buffer{}
     },
@@ -1013,14 +1013,14 @@ func addTagsToName(name string, tags map[string]string) string {
 </code></pre>
 
 <p>调试一下：</p>
-<pre><code>$ go test -bench . -benchmem -memprofile prof.mem
+<pre><code class="language-bash">$ go test -bench . -benchmem -memprofile prof.mem
 BenchmarkAddTagsToName-4        3000000           564 ns/op          48 B/op           1 allocs/op
 PASS
 ok      github.com/domac/playflame/stats    2.272s
 </code></pre>
 
 <p>调用也在正常了</p>
-<pre><code>(pprof) list addTagsToName
+<pre><code class="language-bash">(pprof) list addTagsToName
 Total: 4008802
 ROUTINE ======================== github.com/domac/playflame/stats.addTagsToName in /Users/lihaoquan/GoProjects/Playground/src/github.com/domac/playflame/stats/reporter.go
    4008802    4008802 (flat, cum)   100% of Total
