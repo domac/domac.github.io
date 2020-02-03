@@ -1,16 +1,16 @@
 html, body {
-    font-family: Helvetica, Tahoma, Arial, STXihei, "华文细黑", "Microsoft YaHei", "微软雅黑", SimSun, "宋体", Heiti, "黑体", sans-serif;
+    font-family: "微软雅黑",Helvetica, Tahoma, Arial, STXihei, "华文细黑", "Microsoft YaHei", "微软雅黑", SimSun, "宋体", Heiti, "黑体", sans-serif;
 }
 
 pre code {
-    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei", Helvetica, Arial, sans-serif;
+    font-family: Monaco, Consolas, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei", Helvetica, Arial, sans-serif;
 }
 
 body {
     padding-top: 15px;
     /*background: url("../img/bg.jpg") no-repeat top center;*/
     /*font-family: Helvetica, Arial, sans-serif,Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', "Microsoft Yahei";*/
-    font-family: Helvetica, Tahoma, Arial, STXihei, "华文细黑", "Microsoft YaHei", "微软雅黑", SimSun, "宋体", Heiti, "黑体", sans-serif;
+    font-family: "微软雅黑", Helvetica, Tahoma, Arial, STXihei, "华文细黑", "Microsoft YaHei", "微软雅黑", SimSun, "宋体", Heiti, "黑体", sans-serif;
     font-size: 12px;
     color: #1D1C1C;
 }
