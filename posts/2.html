@@ -49,6 +49,77 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">3</span>
+                            <span class="day">22</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/3/22/nginx-limit-conn-by-network-segments.html">Nginx对网段内ip的连接数限流配置</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>Nginx中的所谓连接数限制，其实是tcp连接，也就是请求方通过三次握手后成功建立的连接状态。Nginx一般为我们提供了 <code>ngx_http_limit_conn_module</code> 模块来提供限制连接功能。该模块可以根据定义的键来限制每个键值的连接数，如同一个IP来源的连接数。</p>
+
+<h2 id="ngx-http-limit-conn-module指令解释">ngx_http_limit_conn_module指令解释</h2>
+<pre><code>Syntax:    limit_conn zone number;
+Default:    —
+Context:    http, server, location
+</code></pre>
+
+<p>该指令描述会话状态存储区域。键的状态中保存了当前连接数，键的值可以是特定变量的任何非空值（空值将不会被考虑）。$variable定义键，zone=name定义区域名称。
+常见使用例子：</p>
+<pre><code>limit_conn_zone $binary_remote_addr zone=addr:10m;
+
+server {
+    location /download/ {
+        limit_conn addr 1;
+    }
+</code></pre>
+
+<p>上面例子表示当请求访问 /download/ 时， 同一时刻只能一个请求连接会成功进行资源下载。</p>
+
+<h3 id="网段限制">网段限制</h3>
+
+<p>常见的limit_conn_zone 配置一般设置 $binary_remote_addr 或 $server_name，进行单一ip或主机级的连接数限制。</p>
+
+<p>但有时候我们希望能对某ip网段进行连接数限制，那我们可以这么做：</p>
+<pre><code>http {
+
+... ...
+
+    limit_conn_zone $ip_segment zone=network_segment:10m;
+
+    server {
+            ... ...
+            set $ip_segment $remote_addr;
+
+            if ( $ip_segment ~ ^(\d+)\.(\d+)\.(\d+)\.(\d+) ) {
+                set $ip_segment $1.$2.$3;
+            }
+
+            location /download/ {
+                limit_conn network_segment 10; 
+                #limit_rate  200k;
+            }
+
+    }
+}
+</code></pre>
+
+<p>这样基本能满足Nginx对网段内所有ip的连接数做统一的连接数限制了。</p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2019/3/22/nginx-limit-conn-by-network-segments.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">2</span>
                             <span class="day">17</span>
                         </span>
@@ -133,39 +204,6 @@
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2019/1/27/linux-mem-manage.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">1</span>
-                            <span class="day">20</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2019/1/20/linux-kernel-learning-process.html">Linux内核学习：进程</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><h2 id="进程基本概念">进程基本概念</h2>
-
-<p>进程是Unix及其衍生操作系统的根本，通常我们把一个程序的执行称为一个进程，换句话说，进程用于描述程序的执行过程。进程不能笼统地作为程序+执行的结果，从内核的观点看，进程的目的就是担当分配系统资源的实体，也是操作系统进行资源分配的一个基本单位。</p>
-
-<blockquote>
-<p>进程所涉及的资源一般指：内存地址空间、文件描述符、线程栈和寄存器等。</p>
-</blockquote>
-
-<p>进程并不仅仅局限于一段可执行的代码段，通常进程还包含各种资源（打开的文件、挂起的信号、内存管理信息、处理器状态、一个或多个内存映射的内存地址空间以及一个或多个线程，当然还包含用来存放全局变量的数据段等）。</p>
-
-<p>总结一句就是：程序本身并不是进程，进程（内核也叫任务）是处于执行期间的程序以及相关的资源的总称。</p>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2019/1/20/linux-kernel-learning-process.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

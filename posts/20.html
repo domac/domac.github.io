@@ -49,6 +49,174 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">5</span>
+                            <span class="day">3</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2015/5/3/set-my-ss.html">Shadowsocks安装与环境设置</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>Shadowsocks安装与环境设置</p>
+
+<blockquote>
+<p>Shadowsocks是我们常用的代理工具，它使用socks5协议，而终端很多工具目前只支持http和https等协议, 正因为如此,我们在
+使用shadowsocks的时候,最为开发人员的我们,需要让我们的终端也支持翻墙功能.</p>
+</blockquote>
+
+<p>对于shadowsocks的服务,可以自己搭建shadowsocks server 或者 购买网上的服务, 服务正常启动后,我们先配置我们的开发环境.</p>
+
+<h3 id="mac-端环境配置">Mac 端环境配置</h3>
+
+<p>我目前使用的是Mac OSX 10.11, 所以需要在Mac下安装 <code>polipo</code></p>
+<pre><code>$ brew install polipo
+</code></pre>
+
+<p>然后创建配置文件 <code>~/Library/LaunchAgents/homebrew.mxcl.polipo.plist</code> 如下</p>
+<pre><code class="language-html">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;
+&lt;plist version=&quot;1.0&quot;&gt;
+  &lt;dict&gt;
+    &lt;key&gt;Label&lt;/key&gt;
+    &lt;string&gt;homebrew.mxcl.polipo&lt;/string&gt;
+    &lt;key&gt;RunAtLoad&lt;/key&gt;
+    &lt;true/&gt;
+    &lt;key&gt;KeepAlive&lt;/key&gt;
+    &lt;true/&gt;
+    &lt;key&gt;ProgramArguments&lt;/key&gt;
+    &lt;array&gt;
+      &lt;string&gt;/usr/local/opt/polipo/bin/polipo&lt;/string&gt;
+      &lt;string&gt;socksParentProxy=localhost:1080&lt;/string&gt;
+    &lt;/array&gt;
+    &lt;!-- Set `ulimit -n 20480`. The default OS X limit is 256, that's
+        not enough for Polipo (displays 'too many files open' errors).
+        It seems like you have no reason to lower this limit
+        (and unlikely will want to raise it). --&gt;
+    &lt;key&gt;SoftResourceLimits&lt;/key&gt;
+    &lt;dict&gt;
+      &lt;key&gt;NumberOfFiles&lt;/key&gt;
+      &lt;integer&gt;20480&lt;/integer&gt;
+    &lt;/dict&gt;
+  &lt;/dict&gt;
+&lt;/plist&gt;
+</code></pre>
+
+<p>文件保存后, 我们需要载入它,以便服务能随着机器重启时自启动</p>
+<pre><code>launchctl load ~/Library/LaunchAgents/homebrew.mxcl.polipo.plist
+</code></pre>
+
+<p>好了, 这时,我们的终端还不能使用ss的, 我们需要再进行一些环境变量的配置</p>
+<pre><code>$ export https_proxy=http://localhost:8123
+
+$ export http_proxy=http://localhost:8123
+</code></pre>
+
+<p>ok, 我们在终端上运行命令</p>
+<pre><code class="language-sh">$ curl ip.gs
+
+当前 IP：xx.xx.xx.xx 来自：中国香港 xxx.net
+</code></pre>
+
+<p>或</p>
+<pre><code class="language-sh">curl -i --verbose https://www.facebook.com
+</code></pre>
+
+<p>如果能正常返回&rdquo;内容&rdquo;, 则证明我们终端的协议转换成功,能正常使用了</p>
+
+<h3 id="linux-端环境配置">Linux 端环境配置</h3>
+
+<p>由于大部分开发者会在自己的mac上运行虚拟机来部署Linux的操作系统, 所以我们也希望除了Mac终端能翻墙外,我们虚拟机上的Linux
+也能翻墙. 不过一般的方法都是更改网络策略,使用网桥的方式.</p>
+
+<p>我觉得这种方式不够好,甚至影响了虚拟机上的一个依赖网络的服务的功能.所以为了网虚拟机上的linux操作系统也支持shadowsock,我们要
+进行环境安装.</p>
+
+<p>下面我以我的ubuntu为例</p>
+<pre><code>$ apt-get install python-pip
+
+$ pip install shadowsocks
+</code></pre>
+
+<p>成功安装后, 编辑shadowsocks配置文件</p>
+<pre><code>vim /etc/shadowsocks.json
+</code></pre>
+
+<p>填写代理信息：</p>
+<pre><code class="language-json">{
+    &quot;server&quot;:&quot;xxx.xxx.xxx.net&quot;,
+    &quot;server_port&quot;:8388,
+    &quot;local_address&quot;: &quot;127.0.0.1&quot;,
+    &quot;local_port&quot;:1080,
+    &quot;password&quot;:&quot;12345678987654321&quot;,
+    &quot;timeout&quot;:300,
+    &quot;method&quot;:&quot;rc4-md5&quot;,
+    &quot;fast_open&quot;: false
+}
+</code></pre>
+
+<p>设置后,重启shadowsocks</p>
+<pre><code class="language-sh">$ sslocal -c /etc/shadowsocks.json -d stop
+
+$ sslocal -c /etc/shadowsocks.json -d start
+</code></pre>
+
+<p>接下来跟mac一样,安装polipo</p>
+<pre><code class="language-sh">$ sudo apt-get install polipo
+</code></pre>
+
+<p>如下打开配置文件：</p>
+<pre><code class="language-sh">$ sudo vim /etc/polipo/config
+</code></pre>
+
+<p>加入以下内容</p>
+<pre><code>proxy:socksParentProxy = &quot;localhost:1080&quot;
+socksProxyType = socks5
+logFile=/var/log/polipologLevel=4
+</code></pre>
+
+<p>保存后,重启polipo服务  :)</p>
+<pre><code class="language-sh">$ sudo service polipo stop
+
+$ sudo service polipo start
+</code></pre>
+
+<p>然后跟我们的mac一样设置http proxy的环境配置</p>
+<pre><code>$ export https_proxy=http://localhost:8123
+
+$ export http_proxy=http://localhost:8123
+</code></pre>
+
+<p>好了,这是我们可以使用命令验证服务是否正常</p>
+<pre><code class="language-sh">$ curl ip.gs
+
+当前 IP：xx.xx.xx.xx 来自：中国香港 xxx.net
+</code></pre>
+
+<p>或</p>
+<pre><code class="language-sh">curl -i --verbose https://www.facebook.com
+</code></pre>
+
+<h3 id="最后">最后</h3>
+
+<p>如果我们想暂停我们终端的代理服务, 可以重新情况我们的代理环境配置, 如下:</p>
+<pre><code>$ export https_proxy=
+
+$ export http_proxy=
+</code></pre>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2015/5/3/set-my-ss.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">4</span>
                             <span class="day">26</span>
                         </span>

@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Kubernetes CRD 开发实践 - domac的菜园子</title>
+    <meta name="keywords" content="go,golang,go语言"/>
+    <meta name="description" content="k8s crd develop"/>
+    <link rel="stylesheet" href="/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="/css/prism.css"/>
+    <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<header id="header">
+    <div class="container">
+        <div class="header clearfix">
+            <nav id="site-nav">
+                <ul class="nav nav-inverse nav-pills pull-right">
+                    <li role="presentation" class="">
+                        <a href="/" >首页
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/archive" >归档
+                        </a>
+                    </li>
+                    <li role="presentation" class="">
+                        <a href="/about" >关于我
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <h3 id="site-title">
+                <a href="/">domac的菜园子 <sup>coder at work</sup></a>
+            </h3>
+        </div>
+    </div>
+</header>
+
+<section id="main">
+    <div class="container">
+        <div id="article-single">
+            <article class="article">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
+                            <span class="month">3</span>
+                            <span class="day">8</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2020/3/8/k8s-crd-develop.html">Kubernetes CRD 开发实践</a>
+                            </h5>
+                        </header>
+                        <aside class="aside clearfix">
+                            <a class="tag label label-info" href="/tags/go.html">go</a>
+                            <a class="tag label label-info" href="/tags/kubernetes.html">kubernetes</a>
+                        </aside>
+                        <section class="brief"><h2 id="背景">背景</h2>
+
+<p>Kubernetes的最大亮点之一必定是它的声明式API设计，所谓的声明式就是告诉kubernetes你要什么，而不是告诉它怎么做命令。我们日常使用kubernetes做编排工作的时候，经常会接触 <code>Deployment</code>、<code>Service</code>、<code>Pod</code> 等资源对象，我们可以很灵活地创建其定义配置，然后执行 kubectl apply 命令，kubernetes总能为我们创建相关资源对象并完成资源的注册，进而执行资源所负责的功能。</p>
+
+<p>但是我们有没想过，日常业务开发过程中，虽然常规的资源基本满足需求，但是这些常规的资源大多仅仅是代表相对底层、通用的概念的对象， 某些情况下我们总是想根据业务定制我们的资源类型，并且利用kubernetes的声明式API，对资源的<code>增删改查</code>进行监听并作出具体的业务功能。随着Kubernetes生态系统的持续发展，越来越多高层次的对象将会不断涌现，比起目前使用的对象，新对象将更加专业化。</p>
+
+<p>有了自定义资源定义API，开发者将不需要逐一进行 Deployment、Service、ConfigMap 等步骤，而是创建并关联一些用于表述整个应用程序或者软件服务的对象。除此，我们能使用自定义的高阶对象，并在这些高阶对象的基础上创建底层对象。例如：我们想要一个Backup资源，我们创建它的对象时，就希望通过spec的定义进行日常的备份操作声明，当提交给k8s集群的时候，相关的Deployment、Service资源会被自动创建，很大程度让业务扩展性加大。</p>
+
+<!--more-->
+
+<p>在 <code>Kubernetes1.7</code> 之前，要实现类似的自定义资源，需要通过 <code>TPR（ThirdPartyResource ）</code> 对象方式定义自定义资源，但因为这种方式十分复杂，一度并不被人重视。到了 <code>Kubernetes1.8</code> 版本，TPR开始被停用，被官方推荐的 <code>CRD（CustomResourceDefinitions）所取代</code>。</p>
+
+<p><code>CRD</code>，称之为自定义资源定义，本质上，它的表现形式是一段声明，用于定义用户定义的资源对象罢了。单单通过它还不能产生任何收益，因为开发者还要针对CRD定义提供关联的CRD对象CRD控制器（CRD Controller）。CRD控制器通常可以通过Golang进行开发，只需要遵循Kubernetes的控制器开发规范，并基于client-go进行调用，并实现 Informer、ResourceEventHandler、Workqueue等组件逻辑即可。听起来感觉很复杂的样子，不过其实真正开发的时候，并不困难，因为大部分繁琐的代码逻辑都能通过k8s的code generator代码生成出来。关于如何进行CRD控制器的开发，下面我们会通过一个例子慢慢地深入，希望通过实践来理解CRD的原理。</p>
+
+<h3 id="crd定义范例">CRD定义范例</h3>
+
+<p>与其他资源对象一样，对CRD的定义也使用YAML配置进行声明。下面先来看下本文的Demo例子的CRD定义</p>
+
+<p>本文的 crddemo 源码为：<a href="https://github.com/domac/crddemo">https://github.com/domac/crddemo</a></p>
+
+<p><em>mydemo.yaml</em></p>
+<pre><code class="language-yaml">apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: mydemos.crddemo.k8s.io
+spec:
+  group: crddemo.k8s.io
+  version: v1
+  names:
+    kind: Mydemo
+    plural: mydemos
+  scope: Namespaced
+</code></pre>
+
+<p>CRD定义中的关键字段如下：</p>
+
+<p><img src="/media/2020/202003081.png" alt="api url" /></p>
+
+<ul>
+<li><p>group：设置API所属的组，将其映射为API URL中的 “/apis/” 下一级目录。它是逻辑上相关的Kinds集合</p></li>
+
+<li><p>scope：该API的生效范围，可选项为Namespaced和Cluster。</p></li>
+
+<li><p>version：每个 Group 可以存在多个版本。例如，v1alpha1，然后升为 v1beta1，最后稳定为 v1 版本。</p></li>
+
+<li><p>names：CRD的名称，包括单数、复数、kind、所属组等名称定义</p></li>
+</ul>
+
+<p>在这个 CRD 中，我指定了 <code>group: crddemo.k8s.io</code> , <code>version: v1</code> 这样的 API 信息，也指定了这个 CR 的资源类型叫作 Mydemo，复数（plural）是 mydemos。</p>
+
+<p>我们先别着急使用kubectl create创建资源定义，我们接下来要做的是再基于这个CRD的定义创建相应的具体自定义对象</p>
+
+<p><em>example-mydemo.yaml</em></p>
+<pre><code class="language-yaml">apiVersion: crddemo.k8s.io/v1
+kind: Mydemo
+metadata:
+  name: example-mydemo
+spec:
+  ip: &quot;127.0.0.1&quot;
+  port: 8080
+</code></pre>
+
+<p>这个资源对象跟定义pod差不多，它的主要信息都是来源上面的定义，Kind是<code>Mydemo</code>，版本是<code>v1</code>，资源组是<code>crddemo.k8s.io</code></p>
+
+<p>除了这些设置，还需要在spec端设置相应的参数，一般是开发者自定义定制的，在这里，我定制了两个属性：<code>ip</code>和<code>port</code>。所以整个对象我要告诉k8s，我期待监听处理一个叫example-mydemo的程序，它的地址是127.0.0.1，端口是8080。
+当然，这里只是一个demo，没有什么严格的属性约束，开发者还是根据自己的业务需要自行定义吧。为了不影响本文的介绍，姑且认为这两个属性是非常重要的。</p>
+
+<p>到这里为止，相对轻松的工作已经完成，我们已经完成CRD的“设计图”工作，下面我们开始动手构建这个CRD控制器的编码工作了。</p>
+
+<h3 id="crd-控制器原理">CRD 控制器原理</h3>
+
+<p>在正式编码之前，我们先理解一下自定义控制器的工作原理，如下图</p>
+
+<p><img src="/media/2020/202003083.png" alt="crd arch" /></p>
+
+<p>CRD控制器的工作流，可分为监听、同步、触发三个步骤：</p>
+
+<p>一、Controller 首先会通过Informer （所谓的 Informer，就是一个自带缓存和索引机制），从K8ss的API Server中获取它所关心的对象，举个例子，也就是我编写的Controller获取的应该是Mydemo对象。值得注意的是Informer在构建之前，会使用我们生成的client（下面编码阶段会提到）,再透过Reflector的ListAndWatch机制跟API Server建立连接，不断地监听 Mydemo对象实例的变化。在 ListAndWatch 机制下，一旦 APIServer 端有新的 Mydemo 实例被创建、删除或者更新，Reflector 都会收到“事件通知”。该事件及它对应的 API 对象会被放进一个 Delta FIFO Queue中。</p>
+
+<p>二、Local Store 此时完成同步缓存操作</p>
+
+<p>三、Informer 根据这些事件的类型，触发我们编写并注册号的ResourceEventHandler，完成业务动作的触发。</p>
+
+<p>上面图中的 Control Loop 实际上可以通过code-generator生成,下面也会提到。总之Control Loop中我们只关心如何拿到“实际状态”，并与“期待状态”对比，从而具体的差异处理逻辑，只需要开发者自行编写即可。</p>
+
+<h3 id="crd-开发过程">CRD 开发过程</h3>
+
+<p>下面会通过一个简单的例子，开始我们的CRD代码的编写， <a href="https://github.com/domac/crddemo">完整代码: https://github.com/domac/crddemo</a></p>
+
+<p>自定义资源代码编写</p>
+
+<p>首先，kubernetes涉及的代码生成对项目目录结构是有要求的，所以我们先创建一个结构如下的项目</p>
+<pre><code class="language-bash">├── controller.go
+├── crd
+│   └── mydemo.yaml
+├── example
+│   └── example-mydemo.yaml
+├── main.go
+└── pkg
+    └── apis
+        └── crddemo
+            ├── register.go
+            └── v1
+                ├── doc.go
+                ├── register.go
+                ├── types.go
+</code></pre>
+
+<p>可见关键部分的pkg目录就是API组的URL结构, 如下图</p>
+
+<p><img src="/media/2020/202003082.png" alt="path2" /></p>
+
+<p>v1 下面的 types.go 文件里，则定义了 Mydemo 对象的完整描述。</p>
+
+<p>1、我们首先开看 *pkg/apis/crddemo/register.go*，这个文件主要用来存放全局变量，如下：</p>
+<pre><code class="language-go">package crddemo
+
+const (
+    GroupName = &quot;crddemo.k8s.io&quot;
+    Version   = &quot;v1&quot;
+)
+</code></pre>
+
+<p>2、<em>pkg/apis/crddemo/v1下的doc.go</em> 也是比较简单的：</p>
+<pre><code class="language-go">// +k8s:deepcopy-gen=package
+// +groupName=crddemo.k8s.io
+package v1
+</code></pre>
+
+<p>在这个文件中，你会看到 +k8s:deepcopy-gen=package 和  +groupName=crddemo.k8s.io，这就是 Kubernetes 进行代码生成要用的 Annotation 风格的注释。</p>
+
+<ul>
+<li><code>+k8s:deepcopy-gen=package</code> 意思是，请为整个 v1 包里的所有类型定义自动生成 DeepCopy 方法；</li>
+<li><code>+groupName=crddemo.k8s.io</code>，则定义了这个包对应的crddemo  API 组的名字。</li>
+</ul>
+
+<p>可以看到，这些定义在 doc.go 文件的注释，起到的是全局的代码生成控制的作用，所以也被称为 Global Tags。</p>
+
+<p>3、<em>pkg/apis/crddemo/types.go</em> 的作用就是定义一个 Mydemo 类型到底有哪些字段（比如，spec 字段里的内容）。这个文件的主要内容如下所示：</p>
+<pre><code class="language-go">package v1
+
+
+import (
+    metav1 &quot;k8s.io/apimachinery/pkg/apis/meta/v1&quot;
+)
+
+
+// +genclient
+// +genclient:noStatus
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+
+// Mydemo 描述一个 Mydemo的资源字段
+type Mydemo struct {
+    metav1.TypeMeta `json:&quot;,inline&quot;`
+
+    metav1.ObjectMeta `json:&quot;metadata,omitempty&quot;`
+
+    Spec MydemoSpec `json:&quot;spec&quot;`
+}
+
+//MydemoSpec 为 Mydemo的资源的spec属性的字段
+type MydemoSpec struct {
+    Ip   string `json:&quot;ip&quot;`
+    Port int    `json:&quot;port&quot;`
+}
+
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+//复数形式
+type MydemoList struct {
+    metav1.TypeMeta `json:&quot;,inline&quot;`
+    metav1.ListMeta `json:&quot;metadata&quot;`
+
+    Items []Mydemo `json:&quot;items&quot;`
+}
+</code></pre>
+
+<p>上面的代码，可以开的我们的Mydemo可续定义方法跟k8s对象一样，都包含了TypeMeta和ObjectMeta字段，而其中比较重要的是 Spec 字段，就是需要我们自己定义的部分：定义了 Ip 和 Port 两个字段。</p>
+
+<p>此外，除了定义 Mydemo  类型，你还需要定义一个 MydemoList 类型，用来描述一组 Mydemo 对象应该包括哪些字段。之所以需要这样一个类型，是因为在 Kubernetes 中，获取所有某对象的 List() 方法，返回值都是List 类型，而不是某类型的数组。所以代码上一定要做区分</p>
+
+<p>关于上面代码的几个重要注解，下面说明一下：</p>
+
+<ul>
+<li><p><code>+genclient</code> 这段注解的意思是：请为下面资源类型生成对应的 Client 代码。</p></li>
+
+<li><p><code>+genclient:noStatus</code> 的意思是：这个 API 资源类型定义里，没有 Status 字段，因为Mydemo才是主类型，所以 +genclient 要写在Mydemo之上，不用写在MydemoList之上，这时要细心注意的。</p></li>
+
+<li><p><code>+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object</code> 的意思是，请在生成 DeepCopy 的时候，实现 Kubernetes 提供的 runtime.Object 接口。否则，在某些版本的 Kubernetes 里，你的这个类型定义会出现编译错误。</p></li>
+</ul>
+
+<p>4、<em>pkg/apis/crddemo/register.go</em> 作用就是注册一个类型（Type）给 APIServer。</p>
+<pre><code class="language-go">package v1
+
+
+import (
+    &quot;github.com/domac/crddemo/pkg/apis/crddemo&quot;
+
+
+    metav1 &quot;k8s.io/apimachinery/pkg/apis/meta/v1&quot;
+    &quot;k8s.io/apimachinery/pkg/runtime&quot;
+    &quot;k8s.io/apimachinery/pkg/runtime/schema&quot;
+)
+
+
+var SchemeGroupVersion = schema.GroupVersion{
+    Group:   crddemo.GroupName,
+    Version: crddemo.Version,
+}
+
+
+var (
+    SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+    AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+
+func Resource(resource string) schema.GroupResource {
+    return SchemeGroupVersion.WithResource(resource).GroupResource()
+}
+
+
+func Kind(kind string) schema.GroupKind {
+    return SchemeGroupVersion.WithKind(kind).GroupKind()
+}
+
+
+//Mydemo 资源类型在服务器端的注册的工作，APIServer 会自动帮我们完成
+//但与之对应的，我们还需要让客户端也能知道 Mydemo 资源类型的定义
+func addKnownTypes(scheme *runtime.Scheme) error {
+    scheme.AddKnownTypes(
+        SchemeGroupVersion,
+        &amp;Mydemo{},
+        &amp;MydemoList{},
+    )
+
+    // register the type in the scheme
+    metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+    return nil
+}
+</code></pre>
+
+<p>有了 <code>addKnownTypes</code> 这个方法，Kubernetes 就能够在后面生成客户端的时候，知道Mydemo 以及MydemoList 类型的定义了。</p>
+
+<p>好了，到这里为止，我们有关定义的代码已经写好了，正如controller原理图所示，接下来我们需要通过kubernetes提供的代码生成工具，为上面的Mydemo资源类型生成clientset、informer 和 lister。</p>
+
+<p>关于如何使用代码生成，这里我已经编写了一个脚步，只需只需本脚步即可</p>
+
+<h3 id="代码生成">代码生成</h3>
+
+<p>具体可以调用我提供的shll脚本：<code>code-gen.sh</code></p>
+<pre><code class="language-bash">#!/bin/bash
+
+set -x
+
+ROOT_PACKAGE=&quot;github.com/domac/crddemo&quot;
+CUSTOM_RESOURCE_NAME=&quot;crddemo&quot;
+CUSTOM_RESOURCE_VERSION=&quot;v1&quot;
+GO111MODULE=off
+
+# 安装k8s.io/code-generator
+[[ -d $GOPATH/src/k8s.io/code-generator ]] || go get -u k8s.io/code-generator/...
+
+# 执行代码自动生成，其中pkg/client是生成目标目录，pkg/apis是类型定义目录
+cd $GOPATH/src/k8s.io/code-generator &amp;&amp; ./generate-groups.sh all &quot;$ROOT_PACKAGE/pkg/client&quot; &quot;$ROOT_PACKAGE/pkg/apis&quot; &quot;$CUSTOM_RESOURCE_NAME:$CUSTOM_RESOURCE_VERSION&quot;
+</code></pre>
+
+<p>当只需代码生成脚步后，可以发现我们的代码工作目录也发送了变化，多出了一个<code>client目录</code></p>
+<pre><code class="language-bash">client
+├── clientset
+│   └── versioned
+│       ├── clientset.go
+│       ├── doc.go
+│       ├── fake
+│       │   ├── clientset_generated.go
+│       │   ├── doc.go
+│       │   └── register.go
+│       ├── scheme
+│       │   ├── doc.go
+│       │   └── register.go
+│       └── typed
+│           └── crddemo
+│               └── v1
+│                   ├── crddemo_client.go
+│                   ├── doc.go
+│                   ├── fake
+│                   │   ├── doc.go
+│                   │   ├── fake_crddemo_client.go
+│                   │   └── fake_mydemo.go
+│                   ├── generated_expansion.go
+│                   └── mydemo.go
+├── informers
+│   └── externalversions
+│       ├── crddemo
+│       │   ├── interface.go
+│       │   └── v1
+│       │       ├── interface.go
+│       │       └── mydemo.go
+│       ├── factory.go
+│       ├── generic.go
+│       └── internalinterfaces
+│           └── factory_interfaces.go
+└── listers
+    └── crddemo
+        └── v1
+            ├── expansion_generated.go
+            └── mydemo.go
+</code></pre>
+
+<p>其中，<em>pkg/apis/crddemo/v1</em> 下面的 <em>zz_generated.deepcopy.go</em> 文件，就是自动生成的 DeepCopy 代码文件。下面的三个包（clientset、informers、 listers），都是 Kubernetes 为 Mydemo 类型生成的client库，这些库会在后面编写自定义控制器的时候用到。</p>
+
+<p>自定义控制器代码编写</p>
+
+<p>k8s的声明式 API并不像“命令式 API”那样有着明显的执行逻辑。这就使得基于声明式 API 的业务功能实现，往往需要通过控制器模式来“监视”API 对象的变化，然后以此来决定实际要执行的具体工作。</p>
+
+<p><em>main.go</em></p>
+<pre><code class="language-go">package main
+
+
+import (
+    &quot;flag&quot;
+    &quot;os&quot;
+    &quot;os/signal&quot;
+    &quot;syscall&quot;
+    &quot;time&quot;
+
+
+    &quot;github.com/golang/glog&quot;
+    &quot;k8s.io/client-go/kubernetes&quot;
+    &quot;k8s.io/client-go/tools/clientcmd&quot;
+
+
+    clientset &quot;github.com/domac/crddemo/pkg/client/clientset/versioned&quot;
+    informers &quot;github.com/domac/crddemo/pkg/client/informers/externalversions&quot;
+)
+
+
+//程序启动参数
+var (
+    flagSet              = flag.NewFlagSet(&quot;crddemo&quot;, flag.ExitOnError)
+    master               = flag.String(&quot;master&quot;, &quot;&quot;, &quot;The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.&quot;)
+    kubeconfig           = flag.String(&quot;kubeconfig&quot;, &quot;&quot;, &quot;Path to a kubeconfig. Only required if out-of-cluster.&quot;)
+    onlyOneSignalHandler = make(chan struct{})
+    shutdownSignals      = []os.Signal{os.Interrupt, syscall.SIGTERM}
+)
+
+
+//设置信号处理
+func setupSignalHandler() (stopCh &lt;-chan struct{}) {
+    close(onlyOneSignalHandler)
+
+
+    stop := make(chan struct{})
+    c := make(chan os.Signal, 2)
+    signal.Notify(c, shutdownSignals...)
+    go func() {
+        &lt;-c
+        close(stop)
+        &lt;-c
+        os.Exit(1)
+    }()
+
+
+    return stop
+}
+
+
+func main() {
+    flag.Parse()
+
+    //设置一个信号处理，应用于优雅关闭
+    stopCh := setupSignalHandler()
+
+
+    cfg, err := clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
+    if err != nil {
+        glog.Fatalf(&quot;Error building kubeconfig: %s&quot;, err.Error())
+    }
+
+
+    kubeClient, err := kubernetes.NewForConfig(cfg)
+    if err != nil {
+        glog.Fatalf(&quot;Error building kubernetes clientset: %s&quot;, err.Error())
+    }
+
+
+    mydemoClient, err := clientset.NewForConfig(cfg)
+    if err != nil {
+        glog.Fatalf(&quot;Error building example clientset: %s&quot;, err.Error())
+    }
+
+
+    //informerFactory工厂类， 这里注入我们通过代码生成的client
+    //clent主要用于和API Server 进行通信，实现ListAndWatch
+    mydemoInformerFactory := informers.NewSharedInformerFactory(mydemoClient, time.Second*30)
+
+    //生成一个crddemo组的Mydemo对象传递给自定义控制器
+    controller := NewController(kubeClient, mydemoClient,
+        mydemoInformerFactory().V1().Mydemos())
+
+
+    go mydemoInformerFactory(stopCh)
+
+
+    if err = controller.Run(2, stopCh); err != nil {
+        glog.Fatalf(&quot;Error running controller: %s&quot;, err.Error())
+    }
+}
+</code></pre>
+
+<p>接下来，我们来看跟业务最紧密的控制器Controller的编写</p>
+
+<p><em>controller.go</em> 部分重要代码：</p>
+<pre><code class="language-go">… … 
+
+func NewController(
+    kubeclientset kubernetes.Interface,
+    mydemoslientset clientset.Interface,
+    mydemoInformer informers.MydemoInformer) *Controller {
+
+
+    // Create event broadcaster
+    // Add sample-controller types to the default Kubernetes Scheme so Events can be
+    // logged for sample-controller types.
+    utilruntime.Must(mydemoscheme.AddToScheme(scheme.Scheme))
+    glog.V(4).Info(&quot;Creating event broadcaster&quot;)
+    eventBroadcaster := record.NewBroadcaster()
+    eventBroadcaster.StartLogging(glog.Infof)
+    eventBroadcaster.StartRecordingToSink(&amp;typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events(&quot;&quot;)})
+    recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
+
+
+    //使用client 和前面创建的 Informer，初始化了自定义控制器
+    controller := &amp;Controller{
+        kubeclientset:   kubeclientset,
+        mydemoslientset: mydemoslientset,
+        demoInformer:    mydemoInformer.Lister(),
+        mydemosSynced:   mydemoInformer.Informer().HasSynced,
+        workqueue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), &quot;Mydemos”), //WorkQueue的实现，负责同步 Informer 和控制循环之间的数据
+        recorder:        recorder,
+    }
+
+
+    glog.Info(&quot;Setting up mydemo event handlers”)
+
+    //mydemoInformer 注册了三个 Handler（AddFunc、UpdateFunc 和 DeleteFunc）
+    // 分别对应 API 对象的“添加”“更新”和“删除”事件。而具体的处理操作，都是将该事件对应的 API 对象加入到工作队列中
+    mydemoInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+        AddFunc: controller.enqueueMydemo,
+        UpdateFunc: func(old, new interface{}) {
+            oldMydemo := old.(*samplecrdv1.Mydemo)
+            newMydemo := new.(*samplecrdv1.Mydemo)
+            if oldMydemo.ResourceVersion == newMydemo.ResourceVersion {
+                return
+            }
+            controller.enqueueMydemo(new)
+        },
+        DeleteFunc: controller.enqueueMydemoForDelete,
+    })
+
+
+    return controller
+}
+
+… … 
+</code></pre>
+
+<p>通过上面Controller的代码实现，我们基本实现了控制器ListAndWatch的事件注册逻辑：通过 APIServer 的 LIST API获取所有最新版本的 API 对象；然后，再通过 WATCH-API 来监听所有这些API对象的变化。通过监听到的事件变化，Informer 就可以实时地更新本地缓存，并且调用这些事件对应的 EventHandler了</p>
+
+<p>下面，我们再来看原理图中的Control Loop的部分</p>
+<pre><code class="language-go">
+func (c *Controller) Run(threadiness int, stopCh &lt;-chan struct{}) error {
+    defer runtime.HandleCrash()
+    defer c.workqueue.ShutDown()
+
+
+    // 记录开始日志
+    glog.Info(&quot;Starting Mydemo control loop&quot;)
+
+
+  
+    glog.Info(&quot;Waiting for informer caches to sync&quot;)
+
+    if ok := cache.WaitForCacheSync(stopCh, c.mydemosSynced); !ok {
+        return fmt.Errorf(&quot;failed to wait for caches to sync&quot;)
+    }
+
+
+    glog.Info(&quot;Starting workers&quot;)
+    for i := 0; i &lt; threadiness; i++ {
+        go wait.Until(c.runWorker, time.Second, stopCh)
+    }
+
+
+    glog.Info(&quot;Started workers&quot;)
+    &lt;-stopCh
+    glog.Info(&quot;Shutting down workers&quot;)
+
+
+    return nil
+}
+</code></pre>
+
+<p>可以看到，启动控制循环的逻辑非常简单，就是同步+循环监听任务。而这个循环监听任务就是我们真正的业务实现部分了</p>
+<pre><code class="language-go">
+//runWorker是一个不断运行的方法，并且一直会调用 c.processNextWorkItem 从workqueue读取和读取消息
+func (c *Controller) runWorker() {
+    for c.processNextWorkItem() {
+    }
+}
+
+
+//从workqueue读取和读取消息
+func (c *Controller) processNextWorkItem() bool {
+    obj, shutdown := c.workqueue.Get()
+    if shutdown {
+        return false
+    }
+    err := func(obj interface{}) error {
+        defer c.workqueue.Done(obj)
+        var key string
+        var ok bool
+        if key, ok = obj.(string); !ok {
+            c.workqueue.Forget(obj)
+            runtime.HandleError(fmt.Errorf(&quot;expected string in workqueue but got %#v&quot;, obj))
+            return nil
+        }
+        if err := c.syncHandler(key); err != nil {
+            return fmt.Errorf(&quot;error syncing '%s': %s&quot;, key, err.Error())
+        }
+        c.workqueue.Forget(obj)
+        glog.Infof(&quot;Successfully synced '%s'&quot;, key)
+        return nil
+    }(obj)
+
+    if err != nil {
+        runtime.HandleError(err)
+        return true
+    }
+    return true
+}
+
+//尝试从 Informer 维护的缓存中拿到了它所对应的 Mydemo 对象
+func (c *Controller) syncHandler(key string) error {
+    namespace, name, err := cache.SplitMetaNamespaceKey(key)
+    if err != nil {
+        runtime.HandleError(fmt.Errorf(&quot;invalid resource key: %s&quot;, key))
+        return nil
+    }
+
+    mydemo, err := c.demoInformer.Mydemos(namespace).Get(name)
+ 
+    //从缓存中拿不到这个对象,那就意味着这个 Mydemo 对象的 Key 是通过前面的“删除”事件添加进工作队列的。
+    if err != nil {
+        if errors.IsNotFound(err) {
+            //对应的 Mydemo 对象已经被删除了
+            glog.Warningf(&quot;DemoCRD: %s/%s does not exist in local cache, will delete it from Mydemo ...&quot;,
+                namespace, name)
+            glog.Infof(&quot;[DemoCRD] Deleting mydemo: %s/%s ...&quot;, namespace, name)
+            return nil
+        }
+        runtime.HandleError(fmt.Errorf(&quot;failed to list mydemo by: %s/%s&quot;, namespace, name))
+        return err
+    }
+    glog.Infof(&quot;[DemoCRD] Try to process mydemo: %#v ...&quot;, mydemo)
+    c.recorder.Event(mydemo, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
+    return nil
+}
+</code></pre>
+
+<p>代码中的 <code>demoInformer</code>，从namespace中通过key获取Mydemo对象这个操作，其实就是在访问本地缓存的索引，实际上，在 Kubernetes 的源码中，你会经常看到控制器从各种 Lister 里获取对象，比如：podLister、nodeLister 等等，它们使用的都是 Informer 和缓存机制。</p>
+
+<p>而如果控制循环从缓存中拿不到这个对象（demoInformer 返回了 IsNotFound 错误），那就意味着这个 Mydemo 对象的 Key 是通过前面的“删除”事件添加进工作队列的。所以，尽管队列里有这个 Key，但是对应的 Mydemo 对象已经被删除了。而如果能够获取到对应的 Mydemo 对象，就可以执行控制器模式里的对比“期望状态（用户通过 YAML 文件提交到 APIServer 里的信息）”和“实际状态（我们的控制循环需要通过查询实际的Mydemo资源情况” 的功能逻辑了。不过在本例子中，就不做过多的业务假设了。</p>
+
+<p>至此，一个完整的自定义 API 对象和它所对应的自定义控制器，就编写完毕了。</p>
+
+<h3 id="部署测试">部署测试</h3>
+
+<p>代码编码后，我们准备开始代码的发布，可以使用提供 <em>Makefile</em> 进行编译</p>
+<pre><code class="language-bash">$ make
+
+... …
+
+gofmt -w .
+go test -v . 
+?       github.com/domac/crddemo        [no test files]
+mkdir -p releases
+GOOS=linux GOARCH=amd64 go build -mod=vendor -ldflags &quot;-s -w&quot; -v -o releases/crddemo *.go
+github.com/golang/groupcache/lru
+k8s.io/apimachinery/third_party/forked/golang/json
+k8s.io/apimachinery/pkg/util/mergepatch
+k8s.io/kube-openapi/pkg/util/proto
+k8s.io/client-go/tools/record/util
+k8s.io/apimachinery/pkg/util/strategicpatch
+k8s.io/client-go/tools/record
+command-line-arguments
+go clean -i
+
+... ...
+</code></pre>
+
+<p>编译完成后，会生成 <em>crddemo</em> 的二进制文件，我们要做把crddemo放到kubernetes集群中，或者本地也行，只要能访问到 <code>apiserver</code> 和具备<code>kubeconfig</code></p>
+<pre><code class="language-bash">$  ./crddemo --kubeconfig=/data/svr/projects/kubernetes/config/kubectl.kubeconfig --master=http://127.0.0.1:8080  -alsologtostderr=true 
+
+I0308 12:23:18.494507   27426 controller.go:79] Setting up mydemo event handlers
+I0308 12:23:18.494829   27426 controller.go:105] Starting Mydemo control loop
+I0308 12:23:18.494840   27426 controller.go:108] Waiting for informer caches to sync
+E0308 12:23:18.496902   27426 reflector.go:178] github.com/domac/crddemo/pkg/client/informers/externalversions/factory.go:117: Failed to list *v1.Mydemo: the server could not find the requested resource (get mydemos.crddemo.k8s.io)
+E0308 12:23:18.497477   27426 reflector.go:178] github.com/domac/crddemo/pkg/client/informers/externalversions/factory.go:117: Failed to list *v1.Mydemo: the server could not find the requested resource (get mydemos.crddemo.k8s.io)
+E0308 12:23:21.604508   27426 reflector.go:178] github.com/domac/crddemo/pkg/client/informers/externalversions/factory.go:117: Failed to list *v1.Mydemo: the server could not find the requested resource (get mydemos.crddemo.k8s.io)
+E0308 12:23:26.932293   27426 reflector.go:178] github.com/domac/crddemo/pkg/client/informers/externalversions/factory.go:117: Failed to list *v1.Mydemo: the server could not find the requested resource (get mydemos.crddemo.k8s.io)
+
+
+... ...
+</code></pre>
+
+<p>可以看到，程序运行的时候，一开始会报错。这是因为，此时 Mydemo 对象的 CRD 还没有被创建出来，所以 Informer 去 APIServer 里获取 Mydemos 对象时，并不能找到 Mydemo 这个 API 资源类型的定义</p>
+
+<p>接下来，我们执行我们自定义资源的定义文件：</p>
+<pre><code class="language-bash">$  kubectl apply -f crd/mydemo.yaml 
+customresourcedefinition.apiextensions.k8s.io/mydemos.crddemo.k8s.io created
+</code></pre>
+
+<p>此时，观察crddemo的日志输出，可以看到Controller的日志恢复了正常，控制循环启动成功</p>
+<pre><code class="language-bash">I0308 12:30:29.956263   28282 controller.go:113] Starting workers
+I0308 12:30:29.956307   28282 controller.go:118] Started workers
+</code></pre>
+
+<p>然后，我们可以对我们的Mydemo对象进行增删改查操作了。</p>
+
+<p>提交我们的自定义资源对象</p>
+<pre><code>$  kubectl apply -f example-mydemo.yaml 
+mydemo.crddemo.k8s.io/example-mydemo created
+</code></pre>
+
+<p>创建成功够，看k8s集群是否成功存储起来</p>
+<pre><code class="language-bash">$  kubectl get Mydemo                   
+NAME             AGE
+example-mydemo   2s
+</code></pre>
+
+<p>这时候，查看一下控制器的输出：</p>
+<pre><code class="language-bash">I0308 12:31:24.983663   28282 controller.go:216] [DemoCRD] Try to process mydemo: &amp;v1.Mydemo{TypeMeta:v1.TypeMeta{Kind:&quot;&quot;, APIVersion:&quot;&quot;}, ObjectMeta:v1.ObjectMeta{Name:&quot;example-mydemo&quot;, GenerateName:&quot;&quot;, Namespace:&quot;default&quot;, SelfLink:&quot;/apis/crddemo.k8s.io/v1/namespaces/default/mydemos/example-mydemo&quot;, UID:&quot;8a6d17f7-17f3-4a1d-8250-bb092678ae7e&quot;, ResourceVersion:&quot;10818363&quot;, Generation:1, CreationTimestamp:v1.Time{Time:time.Time{wall:0x0, ext:63719238684, loc:(*time.Location)(0x1e566c0)}}, DeletionTimestamp:(*v1.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string(nil), Annotations:map[string]string{&quot;kubectl.kubernetes.io/last-applied-configuration&quot;:&quot;{\&quot;apiVersion\&quot;:\&quot;crddemo.k8s.io/v1\&quot;,\&quot;kind\&quot;:\&quot;Mydemo\&quot;,\&quot;metadata\&quot;:{\&quot;annotations\&quot;:{},\&quot;name\&quot;:\&quot;example-mydemo\&quot;,\&quot;namespace\&quot;:\&quot;default\&quot;},\&quot;spec\&quot;:{\&quot;ip\&quot;:\&quot;127.0.0.1\&quot;,\&quot;port\&quot;:8080}}\n&quot;}, OwnerReferences:[]v1.OwnerReference(nil), Finalizers:[]string(nil), ClusterName:&quot;&quot;, ManagedFields:[]v1.ManagedFieldsEntry(nil)}, Spec:v1.MydemoSpec{Ip:&quot;127.0.0.1&quot;, Port:8080}} …
+
+I0308 12:31:24.983844   28282 controller.go:174] Successfully synced 'default/example-mydemo’
+
+I0308 12:31:24.983893   28282 event.go:278] Event(v1.ObjectReference{Kind:&quot;Mydemo&quot;, Namespace:&quot;default&quot;, Name:&quot;example-mydemo&quot;, UID:&quot;8a6d17f7-17f3-4a1d-8250-bb092678ae7e&quot;, APIVersion:&quot;crddemo.k8s.io/v1&quot;, ResourceVersion:&quot;10818363&quot;, FieldPath:&quot;&quot;}): type: 'Normal' reason: 'Synced' Mydemo synced successfully
+</code></pre>
+
+<p>可以看到，我们上面创建 example-mydemo.yaml 的操作，触发了 EventHandler 的添加事件，从而被放进了工作队列。紧接着，控制循环就从队列里拿到了这个对象，并且打印出了正在处理这个 Mydemo 对象的日志。</p>
+
+<p>我们这时候，尝试修改资源，对对应的port属性进行修改</p>
+<pre><code class="language-yaml">apiVersion: crddemo.k8s.io/v1
+kind: Mydemo
+metadata:
+  name: example-mydemo
+spec:
+  ip: &quot;127.0.0.1&quot;
+  port: 9090
+</code></pre>
+
+<p>手动执行修改:</p>
+<pre><code class="language-bash">$  kubectl apply -f example-mydemo.yaml
+</code></pre>
+
+<p>此时，crddemo新增出来的日志如下：</p>
+<pre><code class="language-bash">I0308 12:32:05.663044   28282 controller.go:216] [DemoCRD] Try to process mydemo: &amp;v1.Mydemo{TypeMeta:v1.TypeMeta{Kind:&quot;&quot;, APIVersion:&quot;&quot;}, ObjectMeta:v1.ObjectMeta{Name:&quot;example-mydemo&quot;, GenerateName:&quot;&quot;, Namespace:&quot;default&quot;, SelfLink:&quot;/apis/crddemo.k8s.io/v1/namespaces/default/mydemos/example-mydemo&quot;, UID:&quot;8a6d17f7-17f3-4a1d-8250-bb092678ae7e&quot;, ResourceVersion:&quot;10818457&quot;, Generation:2, CreationTimestamp:v1.Time{Time:time.Time{wall:0x0, ext:63719238684, loc:(*time.Location)(0x1e566c0)}}, DeletionTimestamp:(*v1.Time)(nil), DeletionGracePeriodSeconds:(*int64)(nil), Labels:map[string]string(nil), Annotations:map[string]string{&quot;kubectl.kubernetes.io/last-applied-configuration&quot;:&quot;{\&quot;apiVersion\&quot;:\&quot;crddemo.k8s.io/v1\&quot;,\&quot;kind\&quot;:\&quot;Mydemo\&quot;,\&quot;metadata\&quot;:{\&quot;annotations\&quot;:{},\&quot;name\&quot;:\&quot;example-mydemo\&quot;,\&quot;namespace\&quot;:\&quot;default\&quot;},\&quot;spec\&quot;:{\&quot;ip\&quot;:\&quot;127.0.0.1\&quot;,\&quot;port\&quot;:9080}}\n&quot;}, OwnerReferences:[]v1.OwnerReference(nil), Finalizers:[]string(nil), ClusterName:&quot;&quot;, ManagedFields:[]v1.ManagedFieldsEntry(nil)}, Spec:v1.MydemoSpec{Ip:&quot;127.0.0.1&quot;, Port:9080}} …
+
+I0308 12:32:05.663179   28282 controller.go:174] Successfully synced 'default/example-mydemo’
+
+I0308 12:32:05.663208   28282 event.go:278] Event(v1.ObjectReference{Kind:&quot;Mydemo&quot;, Namespace:&quot;default&quot;, Name:&quot;example-mydemo&quot;, UID:&quot;8a6d17f7-17f3-4a1d-8250-bb092678ae7e&quot;, APIVersion:&quot;crddemo.k8s.io/v1&quot;, ResourceVersion:&quot;10818457&quot;, FieldPath:&quot;&quot;}): type: 'Normal' reason: 'Synced' Mydemo synced successfully
+</code></pre>
+
+<p>可以看到，这一次，Informer 注册的更新事件被触发，更新后的Mydemo对象的 Key 被添加到了工作队列之中。</p>
+
+<p>所以，接下来控制循环从工作队列里拿到的Mydemo对象，与前一个对象是不同的：它的<code>ResourceVersion</code>的值从 <code>10818363</code> 变成了 <code>10818457</code> ；而 Spec 里的Port字段，则变成了 <code>9080</code>。最后，我再把这个对象删除掉：</p>
+<pre><code class="language-bash">$  kubectl delete -f example-mydemo.yaml 
+mydemo.crddemo.k8s.io &quot;example-mydemo&quot; deleted
+</code></pre>
+
+<p>这一次，在控制器的输出里，我们就可以看到，Informer 注册的“删除”事件被触发,输出如下：</p>
+<pre><code class="language-bash">
+0308 12:33:08.494755   28282 controller.go:203] DemoCRD: default/example-mydemo does not exist in local cache, will delete it from Mydemo …
+
+I0308 12:33:08.495793   28282 controller.go:206] [DemoCRD] Deleting mydemo: default/example-mydemo …
+
+I0308 12:33:08.495808   28282 controller.go:174] Successfully synced 'default/example-mydemo'
+</code></pre>
+
+<p>然后，k8s集群的资源也被清除了：</p>
+<pre><code class="language-bash">$  kubectl get Mydemo                    
+No resources found in default namespace.
+</code></pre>
+
+<p>以上就是使用自定义控制器的基本开发流程</p>
+</section>
+                    </div>
+                </div>
+            </article>
+        </div>
+        
+<section id="comment">
+    
+    
+</section>
+
+    </div>
+</section>
+<footer id="footer">
+    <div class="container text-center">
+        <p>© 2020 domac的菜园子.
+            <a href="http://creativecommons.org/licenses/by/3.0/">Some rights reserved </a> |
+            <a href="/feed.xml">Feed</a> |
+            <a href="/sitemap.xml">Sitemap</a>
+        </p>
+        <p>Powered by
+            <a href="https://github.com/go-xiaohei/pugo">PuGo 0.10.0 (beta)</a>. Theme by Default.
+        </p>
+        
+    
+    
+    <script>
+    window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+    ga('create', 'UA-90108536-1', 'auto');
+    ga('send', 'pageview');
+    </script>
+    <script async src='//www.google-analytics.com/analytics.js'></script>
+    
+    
+    
+
+    </div>
+</footer>
+<script src="/js/jquery-2.1.4.min.js"></script>
+<script src="/js/bootstrap.min.js"></script>
+<script src="/js/prism.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $("pre code").addClass("line-numbers")
+    });
+</script>
+</body>
+
+</html>
