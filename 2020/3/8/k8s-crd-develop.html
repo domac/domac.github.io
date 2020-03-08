@@ -172,7 +172,7 @@ spec:
 
 <p>v1 下面的 types.go 文件里，则定义了 Mydemo 对象的完整描述。</p>
 
-<p>1、我们首先开看 *pkg/apis/crddemo/register.go*，这个文件主要用来存放全局变量，如下：</p>
+<p>1、我们首先开看 <code>pkg/apis/crddemo/register.go</code>，这个文件主要用来存放全局变量，如下：</p>
 <pre><code class="language-go">package crddemo
 
 const (
@@ -691,7 +691,7 @@ I0308 12:30:29.956307   28282 controller.go:118] Started workers
 <p>然后，我们可以对我们的Mydemo对象进行增删改查操作了。</p>
 
 <p>提交我们的自定义资源对象</p>
-<pre><code>$  kubectl apply -f example-mydemo.yaml 
+<pre><code class="language-bash">$  kubectl apply -f example-mydemo.yaml 
 mydemo.crddemo.k8s.io/example-mydemo created
 </code></pre>
 
