@@ -272,13 +272,15 @@ data:
 </code></pre>
 
 <p>创建执行</p>
-<pre><code class="language-bash">secret/mysql-secret created
+<pre><code class="language-bash">kubectl apply -f 05-mysql-secret.yaml
+
+secret/mysql-secret created
 </code></pre>
 
 <h4 id="六-使用-service-为-mysql-提供读写分离">六、使用 Service 为 MySQL 提供读写分离</h4>
 
 <p>06-mysql-services.yaml</p>
-<pre><code class="language-yaml">piVersion: v1
+<pre><code class="language-yaml">apiVersion: v1
 kind: Service
 metadata:
   name: mysql
