@@ -49,6 +49,149 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">4</span>
+                            <span class="day">21</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2017/4/21/ring-buffer-in-go.html">RingBuffer的应用</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>最近团队在某些go开发的项目中, 都不同程度地出现内存暴涨, 计算量特别大的时候,内存一直不下降,且gc很频繁,但按理说GC后内存清理后,依旧不释放就有问题了, 经过pprof分析出的原因是: 写的缓冲层实现,不满足我们数据计算量非常大的场景, 毕竟并发的世界充满意想不到的事情</p>
+
+<p>当然某些中间计算的结果,我们可以加入redis作为缓冲来存放, 但作为一级缓存, 我认为也没必要去加重代码的对第三方服务的依赖, 如果用原生map的时候,效率和手动去lock又会带来上面的回收频繁问题, 所以就想有没有好的算法或者好的手段来简单快速解决问题</p>
+
+<p>然后看了很多技术文章, 跟我们目前情况差不多的团队,他们都用了很多基于RingBuffer的思路来解决问题.</p>
+
+<h2 id="概念">概念</h2>
+
+<p>Ring Buffer在维基百科的解析是:</p>
+<pre><code>圆形缓冲区（circular buffer），也称作圆形队列（circular queue），循环缓冲区（cyclic buffer），环形缓冲区（ring buffer），是一种用于表示一个固定尺寸、头尾相连的缓冲区的数据结构，适合缓存数据流。
+</code></pre>
+
+<p>简单概况, 它的基本特点:</p>
+
+<ul>
+<li>FIFO</li>
+<li>读指针</li>
+<li>写指针</li>
+<li>固定尺寸、头尾相连的结构</li>
+</ul>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/rb1.png" alt="rb1" /></p>
+
+<p>基本结构示意</p>
+
+<p><img src="http://og0usnhfv.bkt.clouddn.com/rb2.png" alt="rb2" /></p>
+
+<p>存储操作示意</p>
+
+<p>RingBUffer之所以ringbuffer采用这种数据结构，是因为它在可靠消息传递方面有很好的性能:</p>
+
+<p>首先，因为它是数组，所以插入要比链表快</p>
+
+<p>其次，你可以为数组预先分配内存，使得数组对象一直存在, 这就意味着不需要花大量的时间用于垃圾回收。此外，不像链表那样，需要为每一个添加到其上面的对象创造节点对象—对应的，当删除节点时，需要执行相应的内存清理操作。</p>
+
+<h2 id="实现">实现</h2>
+
+<p>了解RingBuffer的原理后,我们可以自己来写一个简单的RingBuffer的<code>Golang</code>实现</p>
+
+<p>我们先定义最基本的RingBuffer结构体</p>
+<pre><code class="language-go">type RingBuffer struct {
+    data         []byte
+    size         int64
+    writeCursor  int64
+    writtenCount int64
+}
+</code></pre>
+
+<p>提供初始化的方法: 由于rb的特定是大小需要预先固定,所以我们在初始化的时候,把尺寸都给预分配好</p>
+<pre><code class="language-go">//size 必须大于0
+func NewBuffer(size int64) (*RingBuffer, error) {
+    if size &lt;= 0 {
+        return nil, errors.New(&quot;Size must be positive&quot;)
+    }
+
+    b := &amp;RingBuffer{
+        size: size,
+        data: make([]byte, size)}
+
+    return b, nil
+}
+</code></pre>
+
+<p>RingBuffer最重要的功能就是要写数据, 由于ringbuffer的形态特殊, 我们必须写数据的时候,要移动我们的 <code>&quot;写指针&quot;</code>, 再根据fifo的特点来进行数据填充</p>
+<pre><code class="language-go">//写入buf到ringbuffer内部
+//如果需要会覆盖旧数据(fifo)
+func (b *RingBuffer) Write(buf []byte) (int, error) {
+
+    n := len(buf)
+    b.writtenCount += int64(n)
+
+    //如果buf的大小超过容量限制,根据fifo原则
+    //我们只关注最近最新的部分数据
+    if int64(n) &gt; b.size {
+        buf = buf[int64(n)-b.size:]
+    }
+
+    remain := b.size - b.writeCursor
+    copy(b.data[b.writeCursor:], buf)
+    if int64(len(buf)) &gt; remain {
+        copy(b.data, buf[remain:])
+    }
+
+    b.writeCursor = ((b.writeCursor + int64(len(buf))) % b.size)
+    return n, nil
+}
+</code></pre>
+
+<p>关于读的方法实现, 这里就简单实现一个输出所有数据的方法, 当然我们也可以根据具体位置读取的方法实现, 这个大家可以根据自己的需要去扩展.</p>
+<pre><code class="language-go">//读出buffer所有数据
+func (b *RingBuffer) ReadAll() []byte {
+
+    switch {
+    case b.writtenCount &gt;= b.size &amp;&amp; b.writeCursor == 0:
+        return b.data
+    case b.writtenCount &gt; b.size:
+        out := make([]byte, b.size)
+        copy(out, b.data[b.writeCursor:])
+        copy(out[b.size-b.writeCursor:], b.data[:b.writeCursor])
+        return out
+    default:
+        return b.data[:b.writeCursor]
+    }
+
+    return nil
+}
+</code></pre>
+
+<h2 id="总结">总结</h2>
+
+<ol>
+<li><p>ring buffer在网络编程各种语言很多场景下都有不同的应用和用法，一次性开块大内存是生产环境下的常用做法</p></li>
+
+<li><p>使用 ring buffer 的优势是内存使用率很高，不会造成内存碎片，几乎没有浪费（比如传统动态内存分配需要的 cookie）,业务处理的同一时间，访问的内存数据段集中。可以更好的适应不同系统，取得较高的性能。</p></li>
+
+<li><p>内存的物理布局简单单一，不太容易发生内存越界、悬空指针等 bug,出了问题也容易在内存级别分析调试。做出来的系统容易保持健壮。</p></li>
+</ol>
+
+<h3 id="参考资料">参考资料</h3>
+
+<p><a href="http://blog.codingnow.com/2012/02/ring_buffer.html">云风的blog : RingBuffer的应用</a></p>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2017/4/21/ring-buffer-in-go.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">3</span>
                             <span class="day">29</span>
                         </span>
@@ -842,341 +985,6 @@ NAME              STATUS    AGE
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2017/3/8/get-concepts-in-kubernetes.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">2</span>
-                            <span class="day">25</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2017/2/25/create-kubernetes-single-node-mode.html">深入学习Kubernetes(一):单节点k8s安装</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>Kubernetes 是Google的一种基于容器的开源服务编排解决方案，在我们进行Kubernetes的学习前,为了对Kubernetes的工作有一个大概的认识, 我们需要先安装一个单节点的实例服务,用于平常的开发与测试。在官网
-中，有各种各样的搭建方式，但这里我们想要有更贴近实际的例子，只有这样才能让docker和k8s体现出关系的紧密。</p>
-
-<p>我们先看k8s的架构图，以便对它的部署有个直观的了解</p>
-
-<p><img src="http://og0usnhfv.bkt.clouddn.com/an-introduction-to-kubernetes-21-638.jpg" alt="arch-k8s" /></p>
-
-<h2 id="环境准备">环境准备</h2>
-
-<p>本文的例子是基于Centos 7的Linux版本，大家也可以使用ubuntu或其他发行版，软件搭建的方式基本是差不多的，为了让例子更简单，
-本文省去了网络Fannel的安装与配置，只做基本通用的开发环境搭建，希望对大家有帮助。</p>
-
-<p>本例子用于测试的服务器ip为：192.168.139.149</p>
-
-<h3 id="yum源">yum源</h3>
-
-<p>为了让国内下载etcd和kubernetes更流畅，我们先切换阿里云的yum源</p>
-<pre><code>$ wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-7.repo
-
-$ yum makecache
-</code></pre>
-
-<h3 id="关闭防火墙服务">关闭防火墙服务</h3>
-
-<p>centos7 默认使用firewall为防火墙，而Kubernetes的Master与工作Node之间会有大量的网络通信，安全的做法是在防火墙上配置各种需要相互通讯的端口号，在一个安全的内部网络环境中可以关闭防火墙服务；</p>
-
-<p>这里我们将其更改为iptables，具体步骤如下：</p>
-<pre><code>$ systemctl disable firewalld.service
-$ systemctl stop firewalld.service
-</code></pre>
-
-<p>安装iptables，其操作为：</p>
-<pre><code>$ yum install -y iptables-services
-$ systemctl start iptables.service
-$ systemctl enable iptables.service
-</code></pre>
-
-<h3 id="安装etcd和kubernetes软件-docker会在安装kubernetes的过程中被安装">安装etcd和Kubernetes软件（docker会在安装kubernetes的过程中被安装）</h3>
-<pre><code>$ yum install -y etcd kubernetes
-</code></pre>
-
-<h3 id="配置修改">配置修改</h3>
-
-<p>安装完服务组件后，我们需要修改相关的配置</p>
-
-<p>Docker配置文件 /etc/sysconfig/docker，其中的OPTIONS的内容设置为：</p>
-<pre><code>$ vim /etc/sysconfig/docker
-
-OPTIONS='--selinux-enabled=false --insecure-registry gcr.io'
-</code></pre>
-
-<p>Kubernetes修改apiserver的配置文件，在/etc/kubernetes/apiserver中</p>
-<pre><code>$ vim /etc/kubernetes/apiserver
- KUBE_ADMISSION_CONTROL=&quot;--admission_control=NamespaceLifecycle,NamespaceExists,
- LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota&quot;
-</code></pre>
-
-<p>去掉 <code>ServiceAccount</code> 选项。否则会在往后的pod创建中，会出现类似以下的错误：</p>
-<pre><code> Error from server: error when creating &quot;mysql-rc.yaml&quot;: Pod &quot;mysql&quot; is forbidden:
- no API token found for service account default/default, 
- retry after the token is automatically created and added to the service account
-</code></pre>
-
-<h3 id="切换docker-hub-镜像源">切换docker hub 镜像源</h3>
-
-<p>在国内为了稳定pull镜像，我们最好使用Daocloud的镜像服务 :)</p>
-<pre><code>curl -sSL https://get.daocloud.io/daotools/set_mirror.sh | sh -s http://dbe35452.m.daocloud.io
-</code></pre>
-
-<h3 id="按顺序启动所有服务">按顺序启动所有服务</h3>
-<pre><code>systemctl start etcd
-systemctl start docker
-systemctl start kube-apiserver.service
-systemctl start kube-controller-manager.service
-systemctl start kube-scheduler.service
-systemctl start kubelet.service
-systemctl start kube-proxy.service
-</code></pre>
-
-<p>然后，我们检验下kubernetes的服务是否跑起来</p>
-<pre><code>ps -ef | grep kube
-</code></pre>
-
-<p>到目前为止，一个单机版的Kubernetes的环境就安装启动完成了。接下来，我就基于这个单机版，撸起袖子，认真干！！！</p>
-
-<h2 id="启动mysql容器服务">启动MySQL容器服务</h2>
-
-<p>我们先拉取mysql的服务镜像 ：</p>
-<pre><code>sudo docker pull mysql
-或
-docker pull hub.c.163.com/library/mysql:latest
-</code></pre>
-
-<h3 id="启动mysql服务">启动MySQL服务</h3>
-
-<p>首先为MySQL服务创建一个RC定义文件：mysql-rc.yaml，下面给出了该文件的完整内容</p>
-<pre><code class="language-yaml">apiVersion: v1
-kind: ReplicationController
-metadata:
-  name: mysql
-spec:
-  replicas: 1
-  selector:
-    app: mysql
-  template:
-    metadata:
-      labels:
-        app: mysql
-    spec:
-      containers:
-      - name: mysql
-        image: hub.c.163.com/library/mysql
-        ports: 
-        - containerPort: 3306
-        env:
-        - name: MYSQL_ROOT_PASSWORD
-          value: &quot;123456&quot;
-</code></pre>
-
-<p>yaml定义文件说明：</p>
-
-<ul>
-<li>kind：表明此资源对象的类型，例如上面表示的是一个RC</li>
-<li>spec: 对RC的相关属性定义，比如说spec.selector是RC的Pod标签（Label）选择器，既监控和管理拥有这些表情的Pod实例，确保当前集群上始终有且
-仅有replicas个Pod实例在运行。</li>
-<li>spec.template定义pod的模板，这些模板会在当集群中的pod数量小于replicas时，被作为依据去创建新的Pod</li>
-</ul>
-
-<p>创建好 mysql-rc.yaml后， 为了将它发布到Kubernetes中，我们在Master节点执行命令</p>
-<pre><code>$ kubectl create -f mysql-rc.yaml
-replicationcontroller &quot;mysql” created
-</code></pre>
-
-<p>接下来，我们用kuberctl命令查看刚刚创建的RC:</p>
-<pre><code>$ kubectl get rc
-
-NAME      DESIRED   CURRENT   READY     AGE
-mysql     1         1         0         14s
-</code></pre>
-
-<p>查看Pod的创建情况，可以运行下面的命令：</p>
-<pre><code>$ kubectl get pods
-
-NAME          READY     STATUS              RESTARTS   AGE
-mysql-b0gk0   0/1       ContainerCreating   0          3s
-</code></pre>
-
-<p>可见pod的状态处于ContainerCreating，我们需要耐心等待一下，直到状态为Running</p>
-<pre><code>NAME          READY     STATUS    RESTARTS   AGE
-mysql-b0gk0   1/1       Running   0          6m
-</code></pre>
-
-<p>最后，我们创建一个与之关联的Kubernetes Service - MySQL的定义文件：mysql-svc.yaml</p>
-<pre><code class="language-yaml">apiVersion: v1
-kind: Service
-metadata: 
-  name: mysql
-spec:
-  ports:
-    - port: 3306
-  selector:
-    app: mysql
-</code></pre>
-
-<p>其中 metadata.name是Service的服务名，port定义服务的端口，spec.selector确定了哪些Pod的副本对应本地的服务。</p>
-
-<p>运行kuberctl命令，创建service：</p>
-<pre><code>$ kubectl create -f mysql-svc.yaml
-
-service &quot;mysql&quot; created
-</code></pre>
-
-<p>然后我们查看service的状态</p>
-<pre><code>$ kubectl get svc
-
-NAME         CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
-kubernetes   10.254.0.1      &lt;none&gt;        443/TCP    18m
-mysql        10.254.185.20   &lt;none&gt;        3306/TCP   14s
-</code></pre>
-
-<p>注意到MySQL服务被分配了一个值为 <code>10.254.185.20</code>的CLUSTER-IP，这是一个虚地址，随后，Kubernetes集群中的其他新创建的Pod就可以通过Service
-的CLUSTER-IP+端口6379来连接和访问它了。</p>
-
-<h2 id="启动web容器服务">启动Web容器服务</h2>
-
-<p>先拉取一个测试镜像到本地</p>
-<pre><code>docker pull kubeguide/tomcat-app:v1
-</code></pre>
-
-<p>上面我们定义和启动了MySQL的服务，接下来我们用同样的步骤，完成Tomcat应用的服务启动过程，首先我们创建对应的RC文件
-myweb-rc.yaml，具体内容如下：</p>
-<pre><code class="language-yaml">apiVersion: v1
-kind: ReplicationController
-metadata:
-  name: myweb
-spec:
-  replicas: 5
-  selector:
-    app: myweb
-  template:
-    metadata:
-      labels:
-        app: myweb
-    spec:
-      containers:
-      - name: myweb
-        image: docker.io/kubeguide/tomcat-app:v1
-        ports: 
-        - containerPort: 8080
-        env:
-        - name: MYSQL_SERVICE_HOST
-          value: &quot;mysql&quot;
-        - name: MYSQL_SERVICE_PORT
-          value: &quot;3306&quot;
-</code></pre>
-
-<p>与mysql一样，我们创建rc服务：</p>
-<pre><code>$ kubectl create -f myweb-rc.yaml
-replicationcontroller &quot;myweb&quot; created
-
-$ kubectl get rc
-NAME      DESIRED   CURRENT   READY     AGE
-mysql     1         1         0         14m
-myweb     5         5         0         10s
-</code></pre>
-
-<p>接着，我们看下pods的状态：</p>
-<pre><code>$ kubectl get pods
-NAME          READY     STATUS    RESTARTS   AGE
-mysql-b0gk0   1/1       Running   0          15m
-myweb-1oyb7   1/1       Running   0          43s
-myweb-8ffs6   1/1       Running   0          43s
-myweb-xge1t   1/1       Running   0          43s
-myweb-xr214   1/1       Running   0          43s
-myweb-zia37   1/1       Running   0          43s
-</code></pre>
-
-<p>wow..从命理结果我们发现，我们yaml中声明的5个副本都被创建并运行起来了，我们隐约感受到k8s的威力咯</p>
-
-<p>我们创建对应的Service, 相关的myweb-svc文件如下：</p>
-<pre><code class="language-yaml">apiVersion: v1
-kind: Service
-metadata: 
-  name: myweb
-spec:
-  type: NodePort
-  ports:
-    - port: 8080
-      nodePort: 30001
-  selector:
-    app: myweb
-</code></pre>
-
-<p>运行kubectl create 命令进行创建</p>
-<pre><code>$ kubectl create  -f myweb-svc.yaml
-service &quot;myweb&quot; created
-</code></pre>
-
-<p>最后，我们使用kubectl查看前面创建的Service</p>
-<pre><code>[root@kdev tmp]# kubectl get services
-NAME         CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
-kubernetes   10.254.0.1      &lt;none&gt;        443/TCP    4h
-mysql        10.254.185.20   &lt;none&gt;        3306/TCP   4m
-myweb        10.254.18.53    &lt;nodes&gt;       8080/TCP   57s
-</code></pre>
-
-<h2 id="验证与总结">验证与总结</h2>
-
-<p>通过上面的几个步骤，我们可以成功实现了一个简单的K8s单机版例子，我们可以在浏览器输入 <a href="http://192.168.139.149:30001/demo/">http://192.168.139.149:30001/demo/</a> 来测试我们发布的web应用。</p>
-<pre><code>$ curl http://192.168.139.149:30001
-
-
-&lt;!DOCTYPE html&gt;
-&lt;html lang=&quot;en&quot;&gt;
-    &lt;head&gt;
-        &lt;meta charset=&quot;UTF-8&quot; /&gt;
-        &lt;title&gt;Apache Tomcat/8.0.35&lt;/title&gt;
-        &lt;link href=&quot;favicon.ico&quot; rel=&quot;icon&quot; type=&quot;image/x-icon&quot; /&gt;
-        &lt;link href=&quot;favicon.ico&quot; rel=&quot;shortcut icon&quot; type=&quot;image/x-icon&quot; /&gt;
-        &lt;link href=&quot;tomcat.css&quot; rel=&quot;stylesheet&quot; type=&quot;text/css&quot; /&gt;
-    &lt;/head&gt;
-
-    &lt;body&gt;
-        &lt;div id=&quot;wrapper&quot;&gt;
-            &lt;div id=&quot;navigation&quot; class=&quot;curved container&quot;&gt;
-                &lt;span id=&quot;nav-home&quot;&gt;&lt;a href=&quot;http://tomcat.apache.org/&quot;&gt;Home&lt;/a&gt;&lt;/span&gt;
-                &lt;span id=&quot;nav-hosts&quot;&gt;&lt;a href=&quot;/docs/&quot;&gt;Documentation&lt;/a&gt;&lt;/span&gt;
-                &lt;span id=&quot;nav-config&quot;&gt;&lt;a href=&quot;/docs/config/&quot;&gt;Configuration&lt;/a&gt;&lt;/span&gt;
-                &lt;span id=&quot;nav-examples&quot;&gt;&lt;a href=&quot;/examples/&quot;&gt;Examples&lt;/a&gt;&lt;/span&gt;
-                &lt;span id=&quot;nav-wiki&quot;&gt;&lt;a href=&quot;http://wiki.apache.org/tomcat/FrontPage&quot;&gt;Wiki&lt;/a&gt;&lt;/span&gt;
-                &lt;span id=&quot;nav-lists&quot;&gt;&lt;a href=&quot;http://tomcat.apache.org/lists.html&quot;&gt;Mailing Lists&lt;/a&gt;&lt;/span&gt;
-                &lt;span id=&quot;nav-help&quot;&gt;&lt;a href=&quot;http://tomcat.apache.org/findhelp.html&quot;&gt;Find Help&lt;/a&gt;&lt;/span&gt;
-                &lt;br class=&quot;separator&quot; /&gt;
-            &lt;/div&gt;
-            &lt;div id=&quot;asf-box&quot;&gt;
-                &lt;h1&gt;Apache Tomcat/8.0.35&lt;/h1&gt;
-            &lt;/div&gt;
-...
-...
-...
-</code></pre>
-
-<p>但我们不只是要搭建环境那么简单，我们希望更深入一下，比如说运用这里例子拓展一下深度：</p>
-
-<ul>
-<li><p>研究 RC、Service等文件格式</p></li>
-
-<li><p>熟悉 kuberctl 的命令</p></li>
-
-<li><p>手工停止某个Service对应的容器进程，然后观察有什么现象发生</p></li>
-
-<li><p>修改RC文件，改变副本数量，重新发布，观察结果</p></li>
-</ul>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2017/2/25/create-kubernetes-single-node-mode.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>

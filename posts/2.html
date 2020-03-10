@@ -49,6 +49,76 @@
                         <header class="header">
                             <div class="meta">
                         <span class="date">
+                            <span class="month">6</span>
+                            <span class="day">30</span>
+                        </span>
+                            </div>
+                            <h5 class="title">
+                                <a href="/2019/6/30/kubernetes-install.html">Kubernetes集群搭建</a>
+                            </h5>
+                        </header>
+                        <section class="brief"><p>本文主要纪录Ubuntu环境下搭建Kubernetes集群的相关步骤，包括网络环境、docker配置、k8s安装。这里把安装过程中遇到的问题以及解决方法也纪录下来，然后分享出来</p>
+
+<p>本文操作环境的默认用户为 root</p>
+
+<h2 id="一-环境准备">一、环境准备</h2>
+
+<p>为了快速搭建，我选用了三台ubuntu的虚拟机，初步规划如下：</p>
+
+<table>
+<thead>
+<tr>
+<th align="center">操作系统</th>
+<th align="center">服务器IP</th>
+<th align="center">节点名称</th>
+<th align="right">角色</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td align="center">Ubuntu 18.04</td>
+<td align="center">192.168.159.101</td>
+<td align="center">kmaster</td>
+<td align="right">master节点</td>
+</tr>
+
+<tr>
+<td align="center">Ubuntu 18.04</td>
+<td align="center">192.168.159.102</td>
+<td align="center">knode-1</td>
+<td align="right">worker节点</td>
+</tr>
+
+<tr>
+<td align="center">Ubuntu 18.04</td>
+<td align="center">192.168.159.103</td>
+<td align="center">knode-2</td>
+<td align="right">worker节点</td>
+</tr>
+
+<tr>
+<td align="center">Ubuntu 18.04</td>
+<td align="center">192.168.159.104</td>
+<td align="center">knode-3</td>
+<td align="right">worker节点</td>
+</tr>
+</tbody>
+</table>
+</section>
+                        <aside class="aside clearfix">
+                            <a class="btn btn-primary btn-lg pull-right" href="/2019/6/30/kubernetes-install.html">继续阅读</a>
+                        </aside>
+                    </div>
+                </div>
+            </article>
+            
+            <article class="article" style="margin-bottom: 4em;">
+                <div class="row">
+                    <div class="col-md-10 col-md-offset-1 panel panel-default">
+                        <header class="header">
+                            <div class="meta">
+                        <span class="date">
                             <span class="month">3</span>
                             <span class="day">22</span>
                         </span>
@@ -171,39 +241,6 @@ server {
 </section>
                         <aside class="aside clearfix">
                             <a class="btn btn-primary btn-lg pull-right" href="/2019/2/16/linux-vfs.html">继续阅读</a>
-                        </aside>
-                    </div>
-                </div>
-            </article>
-            
-            <article class="article" style="margin-bottom: 4em;">
-                <div class="row">
-                    <div class="col-md-10 col-md-offset-1 panel panel-default">
-                        <header class="header">
-                            <div class="meta">
-                        <span class="date">
-                            <span class="month">1</span>
-                            <span class="day">27</span>
-                        </span>
-                            </div>
-                            <h5 class="title">
-                                <a href="/2019/1/27/linux-mem-manage.html">Linux内核学习：内存管理</a>
-                            </h5>
-                        </header>
-                        <section class="brief"><p>理解Linux内存管理能够更好地理解进程的虚拟空间排布（当一个进程需要某块内存时，它会把自己的一个内存地址交由OS处理）。</p>
-
-<p>虽然进程只关心如何使用自己的线性排列的虚拟地址，而不需要关心物理内存的实际容量，以及如何使用真实的物理内存，但内存管理是内核最复杂的同时也是最重要的一部分；它是协作处理器与内核的关键流程，所以本文我们主要介绍Linux内存管理的相关知识点。</p>
-
-<p>典型的进程内存排布如下：</p>
-
-<p><img src="/media/2019/pm.png" alt="process mem" /></p>
-
-<blockquote>
-<p>操作系统有保护措施，阻止堆和栈的越界行为发生</p>
-</blockquote>
-</section>
-                        <aside class="aside clearfix">
-                            <a class="btn btn-primary btn-lg pull-right" href="/2019/1/27/linux-mem-manage.html">继续阅读</a>
                         </aside>
                     </div>
                 </div>
