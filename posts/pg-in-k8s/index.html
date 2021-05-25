@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-cn" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="author" content="domac" />
+	
+	
+	
+	<title>部署Kubernetes PostgreSQL实例 ｜ domac的菜园子</title>
+	
+    
+    
+    <meta name="description" content="本文主要演示如何通过Kubernetes提供的持久化卷（PV）和Statefulset来部署Pg数据库容器。
+" />
+    
+
+    
+    
+    <meta name="keywords" content="go, linux, domac, kubernetes, k8s, gopher" />
+    
+
+	
+    
+    <link rel="shortcut icon" href="http://localhost:1313/images/favicon.ico" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/normalize.css" />
+    <link rel="stylesheet" type="text/css" media="screen" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.0/animate.min.css" />
+    <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/zozo.css" />
+	<link rel="stylesheet" type="text/css" media="screen" href="https://cdn.jsdelivr.net/npm/remixicon@2.5.0/fonts/remixicon.css" />
+    <link rel="stylesheet" type="text/css" media="screen" href="http://localhost:1313/css/highlight.css" />
+
+    
+    
+</head>
+
+<body>
+    <div class="main animate__animated animate__fadeInDown">
+        <div class="nav_container animated fadeInDown">
+    <div class="site_nav" id="site_nav">
+        <ul>
+            
+            <li>
+                <a href="/">主页</a>
+            </li>
+            
+            <li>
+                <a href="/posts/">文章</a>
+            </li>
+            
+            <li>
+                <a href="/tags/">标签</a>
+            </li>
+            
+            <li>
+                <a href="/about/">关于我</a>
+            </li>
+            
+        </ul>
+    </div>
+    <div class="menu_icon">
+        <a id="menu_icon"><i class="ri-menu-line"></i></a>
+    </div>
+</div>
+        <div class="header animated fadeInDown">
+    <div class="site_title_container">
+        <div class="site_title">
+            <h1>
+                <a href="http://localhost:1313/">
+                    <span>domac的菜园子</span>
+                </a>
+            </h1>
+        </div>
+        <div class="description">
+            <p class="sub_title"></p>
+            <div class="my_socials">
+                
+                
+                <a href="https://github.com/domac" title="github" target="_blank"><i class="ri-github-fill"></i></a>
+                
+                
+                
+                <a href="https://twitter.com/domacHQ" title="twitter" target="_blank"><i class="ri-twitter-fill"></i></a>
+                
+                
+                
+                <a href="https://weibo.com/328080453" title="weibo" target="_blank"><i class="ri-weibo-fill"></i></a>
+                
+                
+                <a href="http://localhost:1313/index.xml" type="application/rss+xml" title="rss" target="_blank"><i
+                        class="ri-rss-fill"></i></a>
+            </div>
+        </div>
+    </div>
+</div>
+        <div class="content">
+            <div class="post_page">
+                <div class="post animate__animated animate__fadeInDown">
+                    <div class="post_title post_detail_title">
+                        <h2><a href='/posts/pg-in-k8s/'>部署Kubernetes PostgreSQL实例</a></h2>
+                        <span class="date">2020.03.01</span>
+                    </div>
+                    <div class="post_content markdown"><p><img src="/2020/pg1.png" alt="pg-in-k8s"></p>
+<p>本文主要演示如何通过Kubernetes提供的持久化卷（PV）和Statefulset来部署Pg数据库容器。</p>
+<h2 id="镜像准备">镜像准备</h2>
+<p>我们打算使用官方提供的Postgresql 12.1：https://hub.docker.com/_/postgres 版本的镜像作为我们的部署镜像，这个版本的镜像提供了齐全的功能，并且支持我们使用编排文件配置环境变量，如用户名、密码、默认数据库、pgdata路径等。</p>
+<p>下面我们可以正式开始实例的演示了&hellip;</p>
+<h2 id="创建pv">创建PV</h2>
+<p>这个步骤里我们编写第一份配置声明：pg-pv.yaml</p>
+<p>下面是主要例子，这里我们创建一个名字为 postgresql-pv的持久化卷，并使用<code>hostpath</code>作为pv的持久化类型，你也可以根据需要配置为gce或nfs等。作为测试的例子，我们先配置一个10G的大小。</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml">apiVersion<span class="p">:</span><span class="w"> </span>v1<span class="w">
+</span><span class="w"></span>kind<span class="p">:</span><span class="w"> </span>PersistentVolume<span class="w">
+</span><span class="w"></span>metadata<span class="p">:</span><span class="w">
+</span><span class="w">  </span>name<span class="p">:</span><span class="w"> </span>postgresql-pv<span class="w">
+</span><span class="w">  </span>labels<span class="p">:</span><span class="w">
+</span><span class="w">    </span>type<span class="p">:</span><span class="w"> </span>local<span class="w">
+</span><span class="w"></span>spec<span class="p">:</span><span class="w">
+</span><span class="w">  </span>storageClassName<span class="p">:</span><span class="w"> </span>manual<span class="w">
+</span><span class="w">  </span>capacity<span class="p">:</span><span class="w">
+</span><span class="w">    </span>storage<span class="p">:</span><span class="w"> </span>10Gi<span class="w">
+</span><span class="w">  </span>accessModes<span class="p">:</span><span class="w">
+</span><span class="w">    </span>-<span class="w"> </span>ReadWriteOnce<span class="w">
+</span><span class="w">  </span>hostPath<span class="p">:</span><span class="w">
+</span><span class="w">    </span>path<span class="p">:</span><span class="w"> </span><span class="s2">&#34;/data/svr/pgdb&#34;</span><span class="w">
+</span><span class="w">
+</span></code></pre></div><p>然后通过kubectl执行创建命令</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ kubectl create -f pg-pv.yaml
+</code></pre></div><h2 id="创建pvc">创建PVC</h2>
+<p>接下来，我们再创建pvc配置&ndash; pg-pvc.yaml</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml">apiVersion<span class="p">:</span><span class="w"> </span>v1<span class="w">
+</span><span class="w"></span>kind<span class="p">:</span><span class="w"> </span>PersistentVolumeClaim<span class="w">
+</span><span class="w"></span>metadata<span class="p">:</span><span class="w">
+</span><span class="w">  </span>name<span class="p">:</span><span class="w"> </span>postgresql-pv-claim<span class="w">
+</span><span class="w"></span>spec<span class="p">:</span><span class="w">
+</span><span class="w">  </span>storageClassName<span class="p">:</span><span class="w"> </span>manual<span class="w">
+</span><span class="w">  </span>accessModes<span class="p">:</span><span class="w">
+</span><span class="w">    </span>-<span class="w"> </span>ReadWriteOnce<span class="w">
+</span><span class="w">  </span>resources<span class="p">:</span><span class="w">
+</span><span class="w">    </span>requests<span class="p">:</span><span class="w">
+</span><span class="w">      </span>storage<span class="p">:</span><span class="w"> </span>5Gi<span class="w">
+</span></code></pre></div><p>执行创建命令</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ kubectl create -f pg-pvc.yaml
+</code></pre></div><p>到了这里，我们可以从环境中检查刚刚创建的资源情况：</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ kubectl get pv
+
+NAME            CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                         STORAGECLASS   REASON   AGE
+postgresql-pv   10Gi       RWO            Retain           Bound    default/postgresql-pv-claim   manual                  63m
+
+
+$ kubectl get pvc
+
+NAME                  STATUS   VOLUME          CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+postgresql-pv-claim   Bound    postgresql-pv   10Gi       RWO            manual         60m
+</code></pre></div><p>从上面的环境信息输出可以看到，postgresql-pv 的状态已经处于 Bound，这表明我们的pv已经我pvc绑定成功。</p>
+<h2 id="创建-deployment">创建 Deployment</h2>
+<p>我们可以通过 Kubernetes Deployment 的方式来创建一个有状态服务，然后使用PVC（PersistentVolumeClaim）来连接已经存在的PV。</p>
+<p>下面我们通过编写Deployment 的YAML文件描述了一个运行PostgreSQL并使用PVC的Deployment。文件定义了一个mount到/var/lib/postgresql/data的卷（因为官方Pg容器initdb的时候数据会创建在此）</p>
+<p>注意：密码定义在YAML配置文件中，这是不安全的，建议使用ConfigMap的方式，这里只是方便测试，所以就直接定义在配置文件中。</p>
+<p>pg-deployment.yaml 配置如下：</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml">apiVersion<span class="p">:</span><span class="w"> </span>apps/v1<span class="w">
+</span><span class="w"></span>kind<span class="p">:</span><span class="w"> </span>Deployment<span class="w">
+</span><span class="w"></span>metadata<span class="p">:</span><span class="w">
+</span><span class="w">  </span>name<span class="p">:</span><span class="w"> </span>postgresql-deployment<span class="w">
+</span><span class="w"></span>spec<span class="p">:</span><span class="w">
+</span><span class="w">  </span>strategy<span class="p">:</span><span class="w">
+</span><span class="w">    </span>type<span class="p">:</span><span class="w"> </span>Recreate<span class="w">
+</span><span class="w">  </span>selector<span class="p">:</span><span class="w">
+</span><span class="w">    </span>matchLabels<span class="p">:</span><span class="w">
+</span><span class="w">      </span>app<span class="p">:</span><span class="w"> </span>postgresql<span class="w">
+</span><span class="w">  </span>template<span class="p">:</span><span class="w">
+</span><span class="w">    </span>metadata<span class="p">:</span><span class="w">
+</span><span class="w">      </span>labels<span class="p">:</span><span class="w">
+</span><span class="w">        </span>app<span class="p">:</span><span class="w"> </span>postgresql<span class="w">
+</span><span class="w">    </span>spec<span class="p">:</span><span class="w">
+</span><span class="w">      </span>containers<span class="p">:</span><span class="w">
+</span><span class="w">        </span>-<span class="w"> </span>image<span class="p">:</span><span class="w"> </span>postgres<span class="p">:</span><span class="m">12.1</span><span class="w">
+</span><span class="w">          </span>name<span class="p">:</span><span class="w"> </span>postgresql<span class="w">
+</span><span class="w">          </span>env<span class="p">:</span><span class="w">
+</span><span class="w">            </span>-<span class="w"> </span>name<span class="p">:</span><span class="w"> </span>POSTGRES_PASSWORD<span class="w">
+</span><span class="w">              </span>value<span class="p">:</span><span class="w"> </span>pgsql@<span class="m">123</span><span class="w">
+</span><span class="w">          </span>ports<span class="p">:</span><span class="w">
+</span><span class="w">            </span>-<span class="w"> </span>containerPort<span class="p">:</span><span class="w"> </span><span class="m">5432</span><span class="w">
+</span><span class="w">              </span>name<span class="p">:</span><span class="w"> </span>postgresql<span class="w">
+</span><span class="w">          </span>volumeMounts<span class="p">:</span><span class="w">
+</span><span class="w">            </span>-<span class="w"> </span>name<span class="p">:</span><span class="w"> </span>postgresql-persistent-storage<span class="w">
+</span><span class="w">              </span>mountPath<span class="p">:</span><span class="w"> </span>/var/lib/postgresql/data<span class="w">
+</span><span class="w">      </span>volumes<span class="p">:</span><span class="w">
+</span><span class="w">        </span>-<span class="w"> </span>name<span class="p">:</span><span class="w"> </span>postgresql-persistent-storage<span class="w">
+</span><span class="w">          </span>persistentVolumeClaim<span class="p">:</span><span class="w">
+</span><span class="w">            </span>claimName<span class="p">:</span><span class="w"> </span>postgresql-pv-claim<span class="w">
+</span><span class="w">
+</span></code></pre></div><p>通过kubectl创建Deployment</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ kubectl create -f pg-deployment.yaml
+
+$ kubectl get deployment -o wide
+NAME                    READY   UP-TO-DATE   AVAILABLE   AGE    CONTAINERS   IMAGES          SELECTOR
+postgresql-deployment   1/1     <span class="m">1</span>            <span class="m">1</span>           1m     postgresql   postgres:12.1   <span class="nv">app</span><span class="o">=</span>postgresql
+</code></pre></div><p>此时，我们目标的pod也会被创建</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ kubectl get pods
+
+NAME                                     READY   STATUS    RESTARTS   AGE
+postgresql-deployment-7cfb6c95db-5r2v8   1/1     Running   <span class="m">0</span>          1m
+</code></pre></div><h2 id="创建service">创建Service</h2>
+<p>为了能正常访问deployment或者容器，我们还需要暴露一个Servive。</p>
+<p>Kubernetes提供了不同的Service访问类型，如：ClusterIP、NodePort、LoadBlancer、NodePort。</p>
+<p>本例子，我们利用NodePort暴露一个服务端口，用于外部服务能正常访问我们的数据库。</p>
+<p>pg-service.yaml定义如下，我们定义nodePort为30432，这样集群里外的服务都能使用这个端口进行访问。</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml">apiVersion<span class="p">:</span><span class="w"> </span>v1<span class="w">
+</span><span class="w"></span>kind<span class="p">:</span><span class="w"> </span>Service<span class="w">
+</span><span class="w"></span>metadata<span class="p">:</span><span class="w">
+</span><span class="w">  </span>name<span class="p">:</span><span class="w"> </span>postgresql-client-service<span class="w">
+</span><span class="w">  </span>labels<span class="p">:</span><span class="w">
+</span><span class="w">    </span>app<span class="p">:</span><span class="w"> </span>postgresql<span class="w">
+</span><span class="w"></span>spec<span class="p">:</span><span class="w">
+</span><span class="w">  </span>type<span class="p">:</span><span class="w"> </span>NodePort<span class="w">
+</span><span class="w">  </span>ports<span class="p">:</span><span class="w">
+</span><span class="w">    </span>-<span class="w"> </span>port<span class="p">:</span><span class="w"> </span><span class="m">5432</span><span class="w">
+</span><span class="w">      </span>targetPort<span class="p">:</span><span class="w"> </span><span class="m">5432</span><span class="w">
+</span><span class="w">      </span>nodePort<span class="p">:</span><span class="w"> </span><span class="m">30432</span><span class="w">
+</span><span class="w">      </span>protocol<span class="p">:</span><span class="w"> </span>TCP<span class="w">
+</span><span class="w">  </span>selector<span class="p">:</span><span class="w">
+</span><span class="w">    </span>app<span class="p">:</span><span class="w"> </span>postgresql<span class="w">
+</span><span class="w">
+</span></code></pre></div><p>接下来，就可以创建Service了：</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ kubectl apply -f pg-service.yaml
+
+$ kubectl get service -o wide
+
+NAME                        TYPE        CLUSTER-IP       EXTERNAL-IP   PORT<span class="o">(</span>S<span class="o">)</span>          AGE    SELECTOR
+kubernetes                  ClusterIP   10.96.0.1        &lt;none&gt;        443/TCP          12d    &lt;none&gt;
+postgresql-client-service   NodePort    10.96.41.96      &lt;none&gt;        5432:30432/TCP   1m     <span class="nv">app</span><span class="o">=</span>postgresql
+</code></pre></div><h2 id="连接数据库">连接数据库</h2>
+<p>这里我们使用psql客户端进行测试连接</p>
+<p>集群内</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ psql -U postgres -h 10.96.41.96 -p <span class="m">5432</span>
+</code></pre></div><p>或</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ psql -U postgres -h localhost -p <span class="m">30432</span>
+</code></pre></div><p>正常情况下，我们可以顺利连接上：</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">Password <span class="k">for</span> user postgres:
+psql <span class="o">(</span>10.1, server 12.1 <span class="o">(</span>Debian 12.1-1.pgdg100+1<span class="o">)</span><span class="o">)</span>
+WARNING: psql major version 10, server major version 12.
+         Some psql features might not work.
+Type <span class="s2">&#34;help&#34;</span> <span class="k">for</span> help.
+
+<span class="nv">postgres</span><span class="o">=</span>#
+</code></pre></div><p>为了继续测试环境是否有状态，我们接下来会创建一个新的datase和表，并插入数据，再销毁pod。</p>
+<p>然后观察新的pod是否能继续持有之前的数据，达到数据状态持久化的目的？</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">create database pgtest
+</code></pre></div><p>连接测试数据库</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ psql -U postgres -h localhost -p <span class="m">30432</span> pgtest
+</code></pre></div><p>或</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ psql -U postgres -h 10.96.41.96 -p <span class="m">5432</span> pgtest
+</code></pre></div><p>再创建测试表，并插入数据</p>
+<div class="highlight"><pre class="chroma"><code class="language-sql" data-lang="sql"><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">test</span><span class="p">(</span>
+   <span class="n">ID</span> <span class="nb">INT</span> <span class="k">PRIMARY</span> <span class="k">KEY</span>     <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="n">NAME</span>           <span class="nb">TEXT</span>    <span class="k">NOT</span> <span class="k">NULL</span>
+<span class="p">)</span><span class="p">;</span>
+
+<span class="k">insert</span> <span class="k">into</span> <span class="n">test</span> <span class="p">(</span><span class="n">id</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> <span class="k">values</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&#34;</span><span class="s2">tom</span><span class="s2">&#34;</span><span class="p">)</span><span class="p">;</span>
+</code></pre></div><h2 id="删除-pod">删除 pod</h2>
+<p>下面，我们开始删除刚刚通过Deployment的pod</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">kubectl delete pod/postgresql-deployment-7cfb6c95db-5r2v8
+pod <span class="s2">&#34;postgresql-deployment-7cfb6c95db-5r2v8&#34;</span> deleted
+
+</code></pre></div><p>这时，我们再观察环境中pod的情况可以发现，通过deployment，一个新的pg pod被创建出来了</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">kubectl get pods
+
+NAME                                     READY   STATUS    RESTARTS   AGE
+postgresql-deployment-7cfb6c95db-hd8ks   1/1     Running   <span class="m">0</span>          13s
+</code></pre></div><p>这个时候，我们通过上面的psql客户端工具，重新连接我们的db,观察我们之前维护的数据是否还正常保持？</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ./psql -U postgres -h localhost -p <span class="m">30432</span> pgtest -c <span class="s2">&#34;select * from test&#34;</span>
+
+ id <span class="p">|</span> name
+----+------
+  <span class="m">1</span> <span class="p">|</span> tom
+<span class="o">(</span><span class="m">1</span> row<span class="o">)</span>
+</code></pre></div><p>跟我们预期一样，哪怕pod被删除了，我们的K8s环境依旧有能力通过持久化卷恢复数据。</p></div>
+                    <div class="post_footer">
+                        
+                        <div class="meta">
+                            <div class="info">
+                                <span class="field tags">
+                                    <i class="ri-stack-line"></i>
+                                    
+                                    <a href="http://localhost:1313/tags/%E5%AD%98%E5%82%A8/">存储</a>
+                                    
+                                    <a href="http://localhost:1313/tags/k8s/">k8s</a>
+                                    
+                                </span>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                
+                <div class="doc_comments"></div>
+                
+            </div>
+        </div>
+    </div>
+    <a id="back_to_top" href="#" class="back_to_top"><i class="ri-arrow-up-s-line"></i></a>
+    <footer class="footer">
+    
+
+    <div class="footer_slogan">
+        <span>用自律诠释坚持</span>
+    </div>
+</footer>
+    <script src="http://localhost:1313/js/jquery-3.5.1.min.js"></script>
+<link href="http://localhost:1313/css/fancybox.min.css" rel="stylesheet">
+<script src="http://localhost:1313/js/fancybox.min.js"></script>
+<script src="http://localhost:1313/js/zozo.js"></script>
+
+
+<script type="text/javascript" async
+    src="https://cdn.bootcss.com/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\[\[', '\]\]']],
+                processEscapes: true,
+                processEnvironments: true,
+                skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+                TeX: {
+                    equationNumbers: { autoNumber: "AMS" },
+                    extensions: ["AMSmath.js", "AMSsymbols.js"]
+                }
+            }
+        });
+
+        MathJax.Hub.Queue(function () {
+            
+            
+            
+            var all = MathJax.Hub.getAllJax(), i;
+            for (i = 0; i < all.length; i += 1) {
+                all[i].SourceElement().parentNode.className += ' has-jax';
+            }
+        });
+    </script>
+
+<style>
+    code.has-jax {
+        font: inherit;
+        font-size: 100%;
+        background: inherit;
+        border: inherit;
+        color: #515151;
+    }
+</style>
+
+
+
+</body>
+
+</html>
