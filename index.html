@@ -99,6 +99,89 @@
 
 <div class="post animated fadeInDown">
     <div class="post_title">
+        <h2><a href='/posts/k8s-crd-develop/'>Kubernetes CRD 开发实践</a></h2>
+    </div>
+    
+    <div class="list">
+        <div class="post_content markdown">
+            <p><h2 id="背景">背景</h2>
+<p>Kubernetes的最大亮点之一必定是它的声明式API设计，所谓的声明式就是告诉kubernetes你要什么，而不是告诉它怎么做命令。我们日常使用kubernetes做编排工作的时候，经常会接触 <code>Deployment</code>、<code>Service</code>、<code>Pod</code> 等资源对象，我们可以很灵活地创建其定义配置，然后执行 kubectl apply 命令，kubernetes总能为我们创建相关资源对象并完成资源的注册，进而执行资源所负责的功能。</p>
+<p>但是我们有没想过，日常业务开发过程中，虽然常规的资源基本满足需求，但是这些常规的资源大多仅仅是代表相对底层、通用的概念的对象， 某些情况下我们总是想根据业务定制我们的资源类型，并且利用kubernetes的声明式API，对资源的<code>增删改查</code>进行监听并作出具体的业务功能。随着Kubernetes生态系统的持续发展，越来越多高层次的对象将会不断涌现，比起目前使用的对象，新对象将更加专业化。</p>
+<p>有了自定义资源定义API，开发者将不需要逐一进行 Deployment、Service、ConfigMap 等步骤，而是创建并关联一些用于表述整个应用程序或者软件服务的对象。除此，我们能使用自定义的高阶对象，并在这些高阶对象的基础上创建底层对象。例如：我们想要一个Backup资源，我们创建它的对象时，就希望通过spec的定义进行日常的备份操作声明，当提交给k8s集群的时候，相关的Deployment、Service资源会被自动创建，很大程度让业务扩展性加大。</p>......</p>
+        </div>
+    </div>
+    
+    <div class="post_footer">
+        <div class="meta">
+            <div class="info">
+                <span class="field">
+                    <i class="ri-map-pin-time-line"></i>
+                    <span class="date">2020.03.08</span>
+                </span>
+                
+                <span class="field tags">
+                    <i class="ri-stack-line"></i>
+                    
+                    <a href="https://domac.github.io/tags/kubernetes/">kubernetes</a>
+                    
+                    <a href="https://domac.github.io/tags/go/">go</a>
+                    
+                </span>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="post animated fadeInDown">
+    <div class="post_title">
+        <h2><a href='/posts/mysql-master-slave-statefulset/'>Kubernetes部署本地有状态mysql主从服务</a></h2>
+    </div>
+    
+    <div class="list">
+        <div class="post_content markdown">
+            <p><p>一般情况下Kubernetes可以通过ReplicaSet以一个Pod模板创建多个pod副本，但是它们都是无状态的，任何时候它们都可以被一个全新的pod替换。然而有状态的pod需要另外的方案确保当一个有状态的pod挂掉后，这个pod实例需要在别的节点上重建，但是新的实例必须与被替换的实例拥有相同的名称、网络标识和状态。这就是Statefulset管理pod的手段。</p>
+<p>对于容器集群，有状态服务的挑战在于，通常集群中的任何节点都并非100%可靠的，服务所需的资源也会动态地更新改变。当节点由于故障或服务由于需要更多的资源而无法继续运行在原有节点上时，集群管理系统会为该服务重新分配一个新的运行位置，从而确保从整体上看，集群对外的服务不会中断。若采用本地存储，当服务漂移后数据并不会随着服务转移到新的节点，重启服务就会出现数据丢失的困境。</p>
+<p>本文目的是通过一个mysql的主从集群搭建，深入了解kubernetes的statfulset管理。为了降低实验的外部依赖，存储层面上，我采用的是本地存储，当然生产上不建议这样做，生产环境的存储推荐官方介绍到的的gce、nfs、ceph等存储方案，因为这些方案支持动态供给的特性，允许开发人员通过pvc的定义，快速实现数据有效存储，所以你绝不应该把一个宿主机上的目录当作 PV 使用， 只是本文用于实验需要，采用Local Persistent Volume的手段，目的只是为了验证Statefulset的状态管理功能。</p>
+<h3 id="实验环境">实验环境</h3>
+<ul>
+<li>kubernetes Master</li>
+<li>kubernetes Node （测试演示，所有的副本都会在其上运行）</li>
+<li>kubernetes DNS服务已开启</li>
+</ul>
+<h3 id="实验目的">实验目的</h3>
+<ul>
+<li>搭建一个主从复制（Master-Slave）的MySQL 集群</li>
+<li>从节点可以水平扩展</li>
+<li>所有的写操作只能在主节点上执行</li>
+<li>读操作可以在主从节点上执行</li>
+<li>从节点能同步主节点的数据</li>
+</ul>......</p>
+        </div>
+    </div>
+    
+    <div class="post_footer">
+        <div class="meta">
+            <div class="info">
+                <span class="field">
+                    <i class="ri-map-pin-time-line"></i>
+                    <span class="date">2020.03.06</span>
+                </span>
+                
+                <span class="field tags">
+                    <i class="ri-stack-line"></i>
+                    
+                    <a href="https://domac.github.io/tags/kubernetes/">kubernetes</a>
+                    
+                </span>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="post animated fadeInDown">
+    <div class="post_title">
         <h2><a href='/posts/pg-in-k8s/'>部署Kubernetes PostgreSQL实例</a></h2>
     </div>
     
@@ -122,7 +205,7 @@
                     
                     <a href="https://domac.github.io/tags/%E5%AD%98%E5%82%A8/">存储</a>
                     
-                    <a href="https://domac.github.io/tags/k8s/">k8s</a>
+                    <a href="https://domac.github.io/tags/kubernetes/">kubernetes</a>
                     
                 </span>
                 

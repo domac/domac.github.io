@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>go on domac的菜园子</title>
+    <link>https://domac.github.io/tags/go/</link>
+    <description>Recent content in go on domac的菜园子</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Sun, 08 Mar 2020 11:34:56 +0800</lastBuildDate>
+    
+	<atom:link href="https://domac.github.io/tags/go/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Kubernetes CRD 开发实践</title>
+      <link>https://domac.github.io/posts/k8s-crd-develop/</link>
+      <pubDate>Sun, 08 Mar 2020 11:34:56 +0800</pubDate>
+      
+      <guid>https://domac.github.io/posts/k8s-crd-develop/</guid>
+      <description>&lt;h2 id=&#34;背景&#34;&gt;背景&lt;/h2&gt;
+&lt;p&gt;Kubernetes的最大亮点之一必定是它的声明式API设计，所谓的声明式就是告诉kubernetes你要什么，而不是告诉它怎么做命令。我们日常使用kubernetes做编排工作的时候，经常会接触 &lt;code&gt;Deployment&lt;/code&gt;、&lt;code&gt;Service&lt;/code&gt;、&lt;code&gt;Pod&lt;/code&gt; 等资源对象，我们可以很灵活地创建其定义配置，然后执行 kubectl apply 命令，kubernetes总能为我们创建相关资源对象并完成资源的注册，进而执行资源所负责的功能。&lt;/p&gt;
+&lt;p&gt;但是我们有没想过，日常业务开发过程中，虽然常规的资源基本满足需求，但是这些常规的资源大多仅仅是代表相对底层、通用的概念的对象， 某些情况下我们总是想根据业务定制我们的资源类型，并且利用kubernetes的声明式API，对资源的&lt;code&gt;增删改查&lt;/code&gt;进行监听并作出具体的业务功能。随着Kubernetes生态系统的持续发展，越来越多高层次的对象将会不断涌现，比起目前使用的对象，新对象将更加专业化。&lt;/p&gt;
+&lt;p&gt;有了自定义资源定义API，开发者将不需要逐一进行 Deployment、Service、ConfigMap 等步骤，而是创建并关联一些用于表述整个应用程序或者软件服务的对象。除此，我们能使用自定义的高阶对象，并在这些高阶对象的基础上创建底层对象。例如：我们想要一个Backup资源，我们创建它的对象时，就希望通过spec的定义进行日常的备份操作声明，当提交给k8s集群的时候，相关的Deployment、Service资源会被自动创建，很大程度让业务扩展性加大。&lt;/p&gt;</description>
+    </item>
+    
+  </channel>
+</rss>

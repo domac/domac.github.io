@@ -6,10 +6,35 @@
     <description>Recent content in k8s on domac的菜园子</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
-    <lastBuildDate>Sun, 01 Mar 2020 23:48:31 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 06 Mar 2020 11:26:58 +0800</lastBuildDate>
     
 	<atom:link href="https://domac.github.io/tags/k8s/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Kubernetes部署本地有状态mysql主从服务</title>
+      <link>https://domac.github.io/posts/mysql-master-slave-statefulset/</link>
+      <pubDate>Fri, 06 Mar 2020 11:26:58 +0800</pubDate>
+      
+      <guid>https://domac.github.io/posts/mysql-master-slave-statefulset/</guid>
+      <description>&lt;p&gt;一般情况下Kubernetes可以通过ReplicaSet以一个Pod模板创建多个pod副本，但是它们都是无状态的，任何时候它们都可以被一个全新的pod替换。然而有状态的pod需要另外的方案确保当一个有状态的pod挂掉后，这个pod实例需要在别的节点上重建，但是新的实例必须与被替换的实例拥有相同的名称、网络标识和状态。这就是Statefulset管理pod的手段。&lt;/p&gt;
+&lt;p&gt;对于容器集群，有状态服务的挑战在于，通常集群中的任何节点都并非100%可靠的，服务所需的资源也会动态地更新改变。当节点由于故障或服务由于需要更多的资源而无法继续运行在原有节点上时，集群管理系统会为该服务重新分配一个新的运行位置，从而确保从整体上看，集群对外的服务不会中断。若采用本地存储，当服务漂移后数据并不会随着服务转移到新的节点，重启服务就会出现数据丢失的困境。&lt;/p&gt;
+&lt;p&gt;本文目的是通过一个mysql的主从集群搭建，深入了解kubernetes的statfulset管理。为了降低实验的外部依赖，存储层面上，我采用的是本地存储，当然生产上不建议这样做，生产环境的存储推荐官方介绍到的的gce、nfs、ceph等存储方案，因为这些方案支持动态供给的特性，允许开发人员通过pvc的定义，快速实现数据有效存储，所以你绝不应该把一个宿主机上的目录当作 PV 使用， 只是本文用于实验需要，采用Local Persistent Volume的手段，目的只是为了验证Statefulset的状态管理功能。&lt;/p&gt;
+&lt;h3 id=&#34;实验环境&#34;&gt;实验环境&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;kubernetes Master&lt;/li&gt;
+&lt;li&gt;kubernetes Node （测试演示，所有的副本都会在其上运行）&lt;/li&gt;
+&lt;li&gt;kubernetes DNS服务已开启&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;实验目的&#34;&gt;实验目的&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;搭建一个主从复制（Master-Slave）的MySQL 集群&lt;/li&gt;
+&lt;li&gt;从节点可以水平扩展&lt;/li&gt;
+&lt;li&gt;所有的写操作只能在主节点上执行&lt;/li&gt;
+&lt;li&gt;读操作可以在主从节点上执行&lt;/li&gt;
+&lt;li&gt;从节点能同步主节点的数据&lt;/li&gt;
+&lt;/ul&gt;</description>
+    </item>
     
     <item>
       <title>部署Kubernetes PostgreSQL实例</title>

@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Posts on domac的菜园子</title>
-    <link>https://domac.github.io/posts/</link>
-    <description>Recent content in Posts on domac的菜园子</description>
+    <title>kubernetes on domac的菜园子</title>
+    <link>https://domac.github.io/tags/kubernetes/</link>
+    <description>Recent content in kubernetes on domac的菜园子</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-cn</language>
     <lastBuildDate>Sun, 08 Mar 2020 11:34:56 +0800</lastBuildDate>
     
-	<atom:link href="https://domac.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+	<atom:link href="https://domac.github.io/tags/kubernetes/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
