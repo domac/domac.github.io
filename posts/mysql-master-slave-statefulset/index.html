@@ -15,7 +15,7 @@
     <meta name="description" content="一般情况下Kubernetes可以通过ReplicaSet以一个Pod模板创建多个pod副本，但是它们都是无状态的，任何时候它们都可以被一个全新的pod替换。然而有状态的pod需要另外的方案确保当一个有状态的pod挂掉后，这个pod实例需要在别的节点上重建，但是新的实例必须与被替换的实例拥有相同的名称、网络标识和状态。这就是Statefulset管理pod的手段。
 对于容器集群，有状态服务的挑战在于，通常集群中的任何节点都并非100%可靠的，服务所需的资源也会动态地更新改变。当节点由于故障或服务由于需要更多的资源而无法继续运行在原有节点上时，集群管理系统会为该服务重新分配一个新的运行位置，从而确保从整体上看，集群对外的服务不会中断。若采用本地存储，当服务漂移后数据并不会随着服务转移到新的节点，重启服务就会出现数据丢失的困境。
 本文目的是通过一个mysql的主从集群搭建，深入了解kubernetes的statfulset管理。为了降低实验的外部依赖，存储层面上，我采用的是本地存储，当然生产上不建议这样做，生产环境的存储推荐官方介绍到的的gce、nfs、ceph等存储方案，因为这些方案支持动态供给的特性，允许开发人员通过pvc的定义，快速实现数据有效存储，所以你绝不应该把一个宿主机上的目录当作 PV 使用， 只是本文用于实验需要，采用Local Persistent Volume的手段，目的只是为了验证Statefulset的状态管理功能。
-实验环境  kubernetes Master kubernetes Node （测试演示，所有的副本都会在其上运行） kubernetes DNS服务已开启  实验目的  搭建一个主从复制（Master-Slave）的MySQL 集群 从节点可以水平扩展 所有的写操作只能在主节点上执行 读操作可以在主从节点上执行 从节点能同步主节点的数据 " />
+实验环境 kubernetes Master kubernetes Node （测试演示，所有的副本都会在其上运行） kubernetes DNS服务已开启 实验目的 搭建一个主从复制（Master-Slave）的MySQL 集群 从节点可以水平扩展 所有的写操作只能在主节点上执行 读操作可以在主从节点上执行 从节点能同步主节点的数据 " />
     
 
     
@@ -128,485 +128,485 @@
 </blockquote>
 <p>给这个 Pod 加上一个 nodeAffinity 行不行？</p>
 <p>当然行，但是这变相破坏了开发人员对资源对象的定义规范了，开发人员应该不需要时刻考虑调度的细节。调度的改动应该交给运维就行。所以我们为了实现本地存储，我们采用了 <code>延迟绑定</code> 的方法。方法很简单，我们都知道 <code>storageclass</code> 一般由运维人员设计，我们只需要在storageclass 指定 <code>no-provisioner</code>。这是因为 <code>Local Persistent Volume</code> 目前尚不支持 <code>Dynamic Provisioning</code>，所以它没办法在用户创建 PVC 的时候，就自动创建出对应的 PV。与此同时，这个 StorageClass 还定义了一个 <code>volumeBindingMode=WaitForFirstConsumer</code> 的属性。它是 Local Persistent Volume 里一个非常重要的特性，即：<code>延迟绑定</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">StorageClass</span><span class="w">
-</span><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">storage.k8s.io/v1</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
-</span><span class="w"></span><span class="nt">provisioner</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/no-provisioner</span><span class="w">
-</span><span class="w"></span><span class="nt">volumeBindingMode</span><span class="p">:</span><span class="w"> </span><span class="l">WaitForFirstConsumer</span><span class="w">
-</span></code></pre></div><h3 id="实验步骤">实验步骤</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">StorageClass</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">storage.k8s.io/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">provisioner</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/no-provisioner</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">volumeBindingMode</span><span class="p">:</span><span class="w"> </span><span class="l">WaitForFirstConsumer</span><span class="w">
+</span></span></span></code></pre></div><h3 id="实验步骤">实验步骤</h3>
 <h4 id="一先在node-实验用的node节点ip是1723117051-节点上预先分配几个pv-不建议在生产上这样操作">一、先在node （实验用的node节点IP是172.31.170.51 ）节点上，预先分配几个pv (不建议在生产上这样操作)</h4>
 <p>01-persistentVolume-1.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">PersistentVolume</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">example-mysql-pv</span><span class="w">
-</span><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">capacity</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l">15Gi</span><span class="w">
-</span><span class="w">  </span><span class="nt">volumeMode</span><span class="p">:</span><span class="w"> </span><span class="l">Filesystem</span><span class="w">
-</span><span class="w">  </span><span class="nt">accessModes</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span>- <span class="l">ReadWriteOnce</span><span class="w">
-</span><span class="w">  </span><span class="nt">persistentVolumeReclaimPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">Delete</span><span class="w">
-</span><span class="w">  </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
-</span><span class="w">  </span><span class="nt">local</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/data/svr/projects/mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">nodeAffinity</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">nodeSelectorTerms</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="nt">matchExpressions</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/hostname</span><span class="w">
-</span><span class="w">          </span><span class="nt">operator</span><span class="p">:</span><span class="w"> </span><span class="l">In</span><span class="w">
-</span><span class="w">          </span><span class="nt">values</span><span class="p">:</span><span class="w">
-</span><span class="w">          </span>- <span class="m">172.31.170.51</span><span class="w">
-</span></code></pre></div><p>01-persistentVolume-2.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">PersistentVolume</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">example-mysql-pv-2</span><span class="w">
-</span><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">capacity</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l">15Gi</span><span class="w">
-</span><span class="w">  </span><span class="nt">volumeMode</span><span class="p">:</span><span class="w"> </span><span class="l">Filesystem</span><span class="w">
-</span><span class="w">  </span><span class="nt">accessModes</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span>- <span class="l">ReadWriteOnce</span><span class="w">
-</span><span class="w">  </span><span class="nt">persistentVolumeReclaimPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">Delete</span><span class="w">
-</span><span class="w">  </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
-</span><span class="w">  </span><span class="nt">local</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/data/svr/projects/mysql2</span><span class="w">
-</span><span class="w">  </span><span class="nt">nodeAffinity</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">nodeSelectorTerms</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="nt">matchExpressions</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/hostname</span><span class="w">
-</span><span class="w">          </span><span class="nt">operator</span><span class="p">:</span><span class="w"> </span><span class="l">In</span><span class="w">
-</span><span class="w">          </span><span class="nt">values</span><span class="p">:</span><span class="w">
-</span><span class="w">          </span>- <span class="m">172.31.170.51</span><span class="w">
-</span></code></pre></div><p>01-persistentVolume-3.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">PersistentVolume</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">example-mysql-pv-3</span><span class="w">
-</span><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">capacity</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l">15Gi</span><span class="w">
-</span><span class="w">  </span><span class="nt">volumeMode</span><span class="p">:</span><span class="w"> </span><span class="l">Filesystem</span><span class="w">
-</span><span class="w">  </span><span class="nt">accessModes</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span>- <span class="l">ReadWriteOnce</span><span class="w">
-</span><span class="w">  </span><span class="nt">persistentVolumeReclaimPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">Delete</span><span class="w">
-</span><span class="w">  </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
-</span><span class="w">  </span><span class="nt">local</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/data/svr/projects/mysql3</span><span class="w">
-</span><span class="w">  </span><span class="nt">nodeAffinity</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">nodeSelectorTerms</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="nt">matchExpressions</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/hostname</span><span class="w">
-</span><span class="w">          </span><span class="nt">operator</span><span class="p">:</span><span class="w"> </span><span class="l">In</span><span class="w">
-</span><span class="w">          </span><span class="nt">values</span><span class="p">:</span><span class="w">
-</span><span class="w">          </span>- <span class="m">172.31.170.51</span><span class="w">
-</span></code></pre></div><p>记住，这是在生产上不推荐的做法，我只是实验用途才这样手动预先创建，正规的做法应该通过storageclass采用 Dynamic Provisioning， 而不是 Static Provisioning机制生产PV。</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f 01-persistentVolume-<span class="o">{</span>1..3<span class="o">}</span>.yaml
-
-persistentvolume/example-mysql-pv1 created
-persistentvolume/example-mysql-pv2 created
-persistentvolume/example-mysql-pv3 created
-</code></pre></div><h4 id="二创建-storageclass">二、创建 StorageClass</h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">PersistentVolume</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">example-mysql-pv</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">capacity</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l">15Gi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">volumeMode</span><span class="p">:</span><span class="w"> </span><span class="l">Filesystem</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">accessModes</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="l">ReadWriteOnce</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">persistentVolumeReclaimPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">Delete</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">local</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/data/svr/projects/mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">nodeAffinity</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">nodeSelectorTerms</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">matchExpressions</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/hostname</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">operator</span><span class="p">:</span><span class="w"> </span><span class="l">In</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">values</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span>- <span class="m">172.31.170.51</span><span class="w">
+</span></span></span></code></pre></div><p>01-persistentVolume-2.yaml</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">PersistentVolume</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">example-mysql-pv-2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">capacity</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l">15Gi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">volumeMode</span><span class="p">:</span><span class="w"> </span><span class="l">Filesystem</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">accessModes</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="l">ReadWriteOnce</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">persistentVolumeReclaimPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">Delete</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">local</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/data/svr/projects/mysql2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">nodeAffinity</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">nodeSelectorTerms</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">matchExpressions</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/hostname</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">operator</span><span class="p">:</span><span class="w"> </span><span class="l">In</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">values</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span>- <span class="m">172.31.170.51</span><span class="w">
+</span></span></span></code></pre></div><p>01-persistentVolume-3.yaml</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">PersistentVolume</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">example-mysql-pv-3</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">capacity</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l">15Gi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">volumeMode</span><span class="p">:</span><span class="w"> </span><span class="l">Filesystem</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">accessModes</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="l">ReadWriteOnce</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">persistentVolumeReclaimPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">Delete</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">local</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/data/svr/projects/mysql3</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">nodeAffinity</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">required</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">nodeSelectorTerms</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">matchExpressions</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/hostname</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">operator</span><span class="p">:</span><span class="w"> </span><span class="l">In</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">values</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span>- <span class="m">172.31.170.51</span><span class="w">
+</span></span></span></code></pre></div><p>记住，这是在生产上不推荐的做法，我只是实验用途才这样手动预先创建，正规的做法应该通过storageclass采用 Dynamic Provisioning， 而不是 Static Provisioning机制生产PV。</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f 01-persistentVolume-<span class="o">{</span>1..3<span class="o">}</span>.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">persistentvolume/example-mysql-pv1 created
+</span></span><span class="line"><span class="cl">persistentvolume/example-mysql-pv2 created
+</span></span><span class="line"><span class="cl">persistentvolume/example-mysql-pv3 created
+</span></span></code></pre></div><h4 id="二创建-storageclass">二、创建 StorageClass</h4>
 <p>02-storageclass.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">StorageClass</span><span class="w">
-</span><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">storage.k8s.io/v1</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
-</span><span class="w"></span><span class="nt">provisioner</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/no-provisioner</span><span class="w">
-</span><span class="w"></span><span class="nt">volumeBindingMode</span><span class="p">:</span><span class="w"> </span><span class="l">WaitForFirstConsumer</span><span class="w">
-</span></code></pre></div><p>执行创建</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f 02-storageclass.yaml
-
-storageclass.storage.k8s.io/local-storage created
-</code></pre></div><h4 id="三创建namespace">三、创建Namespace</h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">StorageClass</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">storage.k8s.io/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">provisioner</span><span class="p">:</span><span class="w"> </span><span class="l">kubernetes.io/no-provisioner</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">volumeBindingMode</span><span class="p">:</span><span class="w"> </span><span class="l">WaitForFirstConsumer</span><span class="w">
+</span></span></span></code></pre></div><p>执行创建</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f 02-storageclass.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">storageclass.storage.k8s.io/local-storage created
+</span></span></code></pre></div><h4 id="三创建namespace">三、创建Namespace</h4>
 <p>03-mysql-namespace.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Namespace</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span></code></pre></div><p>执行创建</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f 03-mysql-namespace.yaml
-
-namespace/mysql created
-</code></pre></div><h4 id="四使用-configmap-为-masterslave-节点分配不同的配置文件">四、使用 ConfigMap 为 Master/Slave 节点分配不同的配置文件</h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Namespace</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span></code></pre></div><p>执行创建</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f 03-mysql-namespace.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">namespace/mysql created
+</span></span></code></pre></div><h4 id="四使用-configmap-为-masterslave-节点分配不同的配置文件">四、使用 ConfigMap 为 Master/Slave 节点分配不同的配置文件</h4>
 <p>04-mysql-configmap.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">ConfigMap</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w"></span><span class="nt">data</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">master.cnf</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
-</span><span class="sd">    # Master配置
-</span><span class="sd">    [mysqld]
-</span><span class="sd">    log-bin=mysqllog
-</span><span class="sd">    skip-name-resolve</span><span class="w">    
-</span><span class="w">  </span><span class="nt">slave.cnf</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
-</span><span class="sd">    # Slave配置
-</span><span class="sd">    [mysqld]
-</span><span class="sd">    super-read-only
-</span><span class="sd">    skip-name-resolve
-</span><span class="sd">    log-bin=mysql-bin
-</span><span class="sd">    replicate-ignore-db=mysql</span><span class="w">    
-</span></code></pre></div><p>创建执行</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f 04-mysql-configmap.yaml
-
-configmap/mysql created
-</code></pre></div><h4 id="五创建mysql密码secret">五、创建mysql密码Secret</h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">ConfigMap</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">data</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">master.cnf</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">    # Master配置
+</span></span></span><span class="line"><span class="cl"><span class="sd">    [mysqld]
+</span></span></span><span class="line"><span class="cl"><span class="sd">    log-bin=mysqllog
+</span></span></span><span class="line"><span class="cl"><span class="sd">    skip-name-resolve</span><span class="w">    
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">slave.cnf</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">    # Slave配置
+</span></span></span><span class="line"><span class="cl"><span class="sd">    [mysqld]
+</span></span></span><span class="line"><span class="cl"><span class="sd">    super-read-only
+</span></span></span><span class="line"><span class="cl"><span class="sd">    skip-name-resolve
+</span></span></span><span class="line"><span class="cl"><span class="sd">    log-bin=mysql-bin
+</span></span></span><span class="line"><span class="cl"><span class="sd">    replicate-ignore-db=mysql</span><span class="w">    
+</span></span></span></code></pre></div><p>创建执行</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f 04-mysql-configmap.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">configmap/mysql created
+</span></span></code></pre></div><h4 id="五创建mysql密码secret">五、创建mysql密码Secret</h4>
 <p>05-mysql-secret.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Secret</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
-</span><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w"></span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">Opaque</span><span class="w">
-</span><span class="w"></span><span class="nt">data</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l">MTIzNDU2</span><span class="w"> </span><span class="c"># echo -n &#34;123456&#34; | base64</span><span class="w">
-</span></code></pre></div><p>创建执行</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f 05-mysql-secret.yaml
-
-secret/mysql-secret created
-</code></pre></div><h4 id="六使用-service-为-mysql-提供读写分离">六、使用 Service 为 MySQL 提供读写分离</h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">Opaque</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">data</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l">MTIzNDU2</span><span class="w"> </span><span class="c"># echo -n &#34;123456&#34; | base64</span><span class="w">
+</span></span></span></code></pre></div><p>创建执行</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f 05-mysql-secret.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">secret/mysql-secret created
+</span></span></code></pre></div><h4 id="六使用-service-为-mysql-提供读写分离">六、使用 Service 为 MySQL 提供读写分离</h4>
 <p>06-mysql-services.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">3306</span><span class="w">
-</span><span class="w">  </span><span class="nt">clusterIP</span><span class="p">:</span><span class="w"> </span><span class="l">None</span><span class="w">
-</span><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w"></span><span class="nn">---</span><span class="w">
-</span><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-read</span><span class="w">
-</span><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">3306</span><span class="w">
-</span><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span></code></pre></div><p>用户所有写请求，必须以 DNS 记录的方式直接访问到 Master 节点，也就是 mysql-0.mysql 这条 DNS 记录。</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">3306</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">clusterIP</span><span class="p">:</span><span class="w"> </span><span class="l">None</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-read</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">3306</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span></code></pre></div><p>用户所有写请求，必须以 DNS 记录的方式直接访问到 Master 节点，也就是 mysql-0.mysql 这条 DNS 记录。</p>
 <p>用户所有读请求，必须访问自动分配的 DNS 记录可以被转发到任意一个 Master 或 Slave 节点上，也就是 mysql-read 这条 DNS 记录</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f 06-mysql-services.yaml
-
-$ kubectl get svc -n mysql
-NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT<span class="o">(</span>S<span class="o">)</span>    AGE
-mysql        ClusterIP   None         &lt;none&gt;        3306/TCP   20s
-mysql-read   ClusterIP   10.0.0.63    &lt;none&gt;        3306/TCP   20s
-</code></pre></div><h4 id="七使用-statefulset-搭建-mysql-主从集群">七、使用 StatefulSet 搭建 MySQL 主从集群</h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f 06-mysql-services.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">$ kubectl get svc -n mysql
+</span></span><span class="line"><span class="cl">NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT<span class="o">(</span>S<span class="o">)</span>    AGE
+</span></span><span class="line"><span class="cl">mysql        ClusterIP   None         &lt;none&gt;        3306/TCP   20s
+</span></span><span class="line"><span class="cl">mysql-read   ClusterIP   10.0.0.63    &lt;none&gt;        3306/TCP   20s
+</span></span></code></pre></div><h4 id="七使用-statefulset-搭建-mysql-主从集群">七、使用 StatefulSet 搭建 MySQL 主从集群</h4>
 <p>07-mysql-statefulset.yaml</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
-</span><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">StatefulSet</span><span class="w">
-</span><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">serviceName</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
-</span><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
-</span><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">initContainers</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">init-mysql</span><span class="w">
-</span><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">mysql:5.7</span><span class="w">
-</span><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">MYSQL_ROOT_PASSWORD</span><span class="w">
-</span><span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
-</span><span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
-</span><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
-</span><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">password</span><span class="w">
-</span><span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="l">bash</span><span class="w">
-</span><span class="w">        </span>- <span class="s2">&#34;-c&#34;</span><span class="w">
-</span><span class="w">        </span>- <span class="p">|</span><span class="sd">
-</span><span class="sd">          set -ex
-</span><span class="sd">          # 从 Pod 的序号，生成 server-id
-</span><span class="sd">          [[ $(hostname) =~ -([0-9]+)$ ]] || exit 1
-</span><span class="sd">          ordinal=${BASH_REMATCH[1]}
-</span><span class="sd">          echo [mysqld] &gt; /mnt/conf.d/server-id.cnf
-</span><span class="sd">          # 由于 server-id 不能为 0，因此给 ID 加 100 来避开它
-</span><span class="sd">          echo server-id=$((100 + $ordinal)) &gt;&gt; /mnt/conf.d/server-id.cnf
-</span><span class="sd">          # 如果 Pod 的序号为 0，说明它是 Master 节点，从 ConfigMap 里把 Master 的配置文件拷贝到 /mnt/conf.d 目录下
-</span><span class="sd">          # 否则，拷贝 ConfigMap 里的 Slave 的配置文件
-</span><span class="sd">          if [[ ${ordinal} -eq 0 ]]; then
-</span><span class="sd">            cp /mnt/config-map/master.cnf /mnt/conf.d
-</span><span class="sd">          else
-</span><span class="sd">            cp /mnt/config-map/slave.cnf /mnt/conf.d
-</span><span class="sd">          fi</span><span class="w">          
-</span><span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
-</span><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/mnt/conf.d</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">config-map</span><span class="w">
-</span><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/mnt/config-map</span><span class="w">
-</span><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">clone-mysql</span><span class="w">
-</span><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">gcr.io/google-samples/xtrabackup:1.0</span><span class="w">
-</span><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">MYSQL_ROOT_PASSWORD</span><span class="w">
-</span><span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
-</span><span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
-</span><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
-</span><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">password</span><span class="w">
-</span><span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="l">bash</span><span class="w">
-</span><span class="w">        </span>- <span class="s2">&#34;-c&#34;</span><span class="w">
-</span><span class="w">        </span>- <span class="p">|</span><span class="sd">
-</span><span class="sd">          set -ex
-</span><span class="sd">          # 拷贝操作只需要在第一次启动时进行，所以数据已经存在则跳过
-</span><span class="sd">          [[ -d /var/lib/mysql/mysql ]] &amp;&amp; exit 0
-</span><span class="sd">          # Master 节点（序号为 0）不需要这个操作
-</span><span class="sd">          [[ $(hostname) =~ -([0-9]+)$ ]] || exit 1
-</span><span class="sd">          ordinal=${BASH_REMATCH[1]}
-</span><span class="sd">          [[ $ordinal == 0 ]] &amp;&amp; exit 0
-</span><span class="sd">          # 使用 ncat 指令，远程地从前一个节点拷贝数据到本地
-</span><span class="sd">          ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
-</span><span class="sd">          # 执行 --prepare，这样拷贝来的数据就可以用作恢复了
-</span><span class="sd">          xtrabackup --prepare --target-dir=/var/lib/mysql</span><span class="w">          
-</span><span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">data</span><span class="w">
-</span><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/var/lib/mysql</span><span class="w">
-</span><span class="w">          </span><span class="nt">subPath</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
-</span><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/etc/mysql/conf.d</span><span class="w">
-</span><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">mysql:5.7</span><span class="w">
-</span><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
-</span><span class="w"></span><span class="c">#        - name: MYSQL_ALLOW_EMPTY_PASSWORD</span><span class="w">
-</span><span class="w"></span><span class="c">#          value: &#34;1&#34;</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">MYSQL_ROOT_PASSWORD</span><span class="w">
-</span><span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
-</span><span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
-</span><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
-</span><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">password</span><span class="w">
-</span><span class="w">        </span><span class="nt">ports</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">          </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">3306</span><span class="w">
-</span><span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">data</span><span class="w">
-</span><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/var/lib/mysql</span><span class="w">
-</span><span class="w">          </span><span class="nt">subPath</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
-</span><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/etc/mysql/conf.d</span><span class="w">
-</span><span class="w">        </span><span class="nt">resources</span><span class="p">:</span><span class="w">
-</span><span class="w">          </span><span class="nt">requests</span><span class="p">:</span><span class="w">
-</span><span class="w">            </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">500m</span><span class="w">
-</span><span class="w">            </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">1Gi</span><span class="w">
-</span><span class="w">        </span><span class="nt">livenessProbe</span><span class="p">:</span><span class="w">
-</span><span class="w">          </span><span class="nt">exec</span><span class="p">:</span><span class="w">
-</span><span class="w">            </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;mysqladmin&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;ping&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;-uroot&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;-p${MYSQL_ROOT_PASSWORD}&#34;</span><span class="p">]</span><span class="w">
-</span><span class="w">          </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">30</span><span class="w">
-</span><span class="w">          </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
-</span><span class="w">          </span><span class="nt">timeoutSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
-</span><span class="w">        </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
-</span><span class="w">          </span><span class="nt">exec</span><span class="p">:</span><span class="w">
-</span><span class="w">            </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;mysqladmin&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;ping&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;-uroot&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;-p${MYSQL_ROOT_PASSWORD}&#34;</span><span class="p">]</span><span class="w">
-</span><span class="w">          </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
-</span><span class="w">          </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
-</span><span class="w">          </span><span class="nt">timeoutSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
-</span><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">xtrabackup</span><span class="w">
-</span><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">gcr.io/google-samples/xtrabackup:1.0</span><span class="w">
-</span><span class="w">        </span><span class="nt">ports</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">xtrabackup</span><span class="w">
-</span><span class="w">          </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">3307</span><span class="w">
-</span><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">MYSQL_ROOT_PASSWORD</span><span class="w">
-</span><span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
-</span><span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
-</span><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
-</span><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">password</span><span class="w">
-</span><span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="l">bash</span><span class="w">
-</span><span class="w">        </span>- <span class="s2">&#34;-c&#34;</span><span class="w">
-</span><span class="w">        </span>- <span class="p">|</span><span class="sd">
-</span><span class="sd">          set -ex
-</span><span class="sd">          cd /var/lib/mysql
-</span><span class="sd">          # 从备份信息文件里读取 MASTER_LOG_FILE 和 MASTER_LOG_POS 这 2 个字段的值，用来拼装集群初始化 SQL
-</span><span class="sd">          if [[ -f xtrabackup_slave_info ]]; then
-</span><span class="sd">            # 如果 xtrabackup_slave_info 文件存在，说明这个备份数据来自于另一个 Slave 节点
-</span><span class="sd">            # 这种情况下，XtraBackup 工具在备份的时候，就已经在这个文件里自动生成了 &#34;CHANGE MASTER TO&#34; SQL 语句
-</span><span class="sd">            # 所以，只需要把这个文件重命名为 change_master_to.sql.in，后面直接使用即可
-</span><span class="sd">            mv xtrabackup_slave_info change_master_to.sql.in
-</span><span class="sd">            # 所以，也就用不着 xtrabackup_binlog_info 了
-</span><span class="sd">            rm -f xtrabackup_binlog_info
-</span><span class="sd">          elif [[ -f xtrabackup_binlog_info ]]; then
-</span><span class="sd">            # 如果只是存在 xtrabackup_binlog_info 文件，说明备份来自于 Master 节点，就需要解析这个备份信息文件，读取所需的两个字段的值
-</span><span class="sd">            [[ $(cat xtrabackup_binlog_info) =~ ^(.*?)[[:space:]]+(.*?)$ ]] || exit 1
-</span><span class="sd">            rm xtrabackup_binlog_info
-</span><span class="sd">            # 把两个字段的值拼装成 SQL，写入 change_master_to.sql.in 文件
-</span><span class="sd">            echo &#34;CHANGE MASTER TO MASTER_LOG_FILE=&#39;${BASH_REMATCH[1]}&#39;,\
-</span><span class="sd">                  MASTER_LOG_POS=${BASH_REMATCH[2]}&#34; &gt; change_master_to.sql.in
-</span><span class="sd">          fi
-</span><span class="sd">          # 如果存在 change_master_to.sql.in，就意味着需要做集群初始化工作
-</span><span class="sd">          if [[ -f change_master_to.sql.in ]]; then
-</span><span class="sd">            # 但一定要先等 MySQL 容器启动之后才能进行下一步连接 MySQL 的操作
-</span><span class="sd">            echo &#34;Waiting for mysqld to be ready（accepting connections）&#34;
-</span><span class="sd">            until mysql -h 127.0.0.1 -uroot -p${MYSQL_ROOT_PASSWORD} -e &#34;SELECT 1&#34;; do sleep 1; done
-</span><span class="sd">            echo &#34;Initializing replication from clone position&#34;
-</span><span class="sd">            # 将文件 change_master_to.sql.in 改个名字
-</span><span class="sd">            # 防止这个 Container 重启的时候，因为又找到了 change_master_to.sql.in，从而重复执行一遍初始化流程
-</span><span class="sd">            mv change_master_to.sql.in change_master_to.sql.orig
-</span><span class="sd">            # 使用 change_master_to.sql.orig 的内容，也就是前面拼装的 SQL，组成一个完整的初始化和启动 Slave 的 SQL 语句
-</span><span class="sd">            mysql -h 127.0.0.1 -uroot -p${MYSQL_ROOT_PASSWORD} &lt;&lt; EOF
-</span><span class="sd">          $(&lt; change_master_to.sql.orig),
-</span><span class="sd">            MASTER_HOST=&#39;mysql-0.mysql.mysql&#39;,
-</span><span class="sd">            MASTER_USER=&#39;root&#39;,
-</span><span class="sd">            MASTER_PASSWORD=&#39;${MYSQL_ROOT_PASSWORD}&#39;,
-</span><span class="sd">            MASTER_CONNECT_RETRY=10;
-</span><span class="sd">          START SLAVE;
-</span><span class="sd">          EOF
-</span><span class="sd">          fi
-</span><span class="sd">          # 使用 ncat 监听 3307 端口。
-</span><span class="sd">          # 它的作用是，在收到传输请求的时候，直接执行 xtrabackup --backup 命令，备份 MySQL 的数据并发送给请求者
-</span><span class="sd">          exec ncat --listen --keep-open --send-only --max-conns=1 3307 -c \
-</span><span class="sd">            &#34;xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root --password=${MYSQL_ROOT_PASSWORD}&#34;</span><span class="w">          
-</span><span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">data</span><span class="w">
-</span><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/var/lib/mysql</span><span class="w">
-</span><span class="w">          </span><span class="nt">subPath</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
-</span><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/etc/mysql/conf.d</span><span class="w">
-</span><span class="w">      </span><span class="nt">volumes</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
-</span><span class="w">        </span><span class="nt">emptyDir</span><span class="p">:</span><span class="w"> </span>{}<span class="w">
-</span><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">config-map</span><span class="w">
-</span><span class="w">        </span><span class="nt">configMap</span><span class="p">:</span><span class="w">
-</span><span class="w">          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
-</span><span class="w">  </span><span class="nt">volumeClaimTemplates</span><span class="p">:</span><span class="w">
-</span><span class="w">  </span>- <span class="nt">metadata</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">data</span><span class="w">
-</span><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span><span class="nt">accessModes</span><span class="p">:</span><span class="w">
-</span><span class="w">      </span>- <span class="s2">&#34;ReadWriteOnce&#34;</span><span class="w">
-</span><span class="w">      </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
-</span><span class="w">      </span><span class="nt">resources</span><span class="p">:</span><span class="w">
-</span><span class="w">        </span><span class="nt">requests</span><span class="p">:</span><span class="w">
-</span><span class="w">          </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l">3Gi</span><span class="w">
-</span></code></pre></div><p>整体的statefulset有两个replicas，一个Master, 一个Slave，然后使用 init-mysql 这个 initContainers 进行配置文件的初始化。接着使用 clone-mysql 这个 <code>initContainers</code> 进行数据的传输；同时使用 xtrabackup 这个 sidecar 容器进行SQL初始化和数据传输功能</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">StatefulSet</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">serviceName</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">initContainers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">init-mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">mysql:5.7</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">MYSQL_ROOT_PASSWORD</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">password</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="s2">&#34;-c&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -ex
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 从 Pod 的序号，生成 server-id
+</span></span></span><span class="line"><span class="cl"><span class="sd">          [[ $(hostname) =~ -([0-9]+)$ ]] || exit 1
+</span></span></span><span class="line"><span class="cl"><span class="sd">          ordinal=${BASH_REMATCH[1]}
+</span></span></span><span class="line"><span class="cl"><span class="sd">          echo [mysqld] &gt; /mnt/conf.d/server-id.cnf
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 由于 server-id 不能为 0，因此给 ID 加 100 来避开它
+</span></span></span><span class="line"><span class="cl"><span class="sd">          echo server-id=$((100 + $ordinal)) &gt;&gt; /mnt/conf.d/server-id.cnf
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 如果 Pod 的序号为 0，说明它是 Master 节点，从 ConfigMap 里把 Master 的配置文件拷贝到 /mnt/conf.d 目录下
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 否则，拷贝 ConfigMap 里的 Slave 的配置文件
+</span></span></span><span class="line"><span class="cl"><span class="sd">          if [[ ${ordinal} -eq 0 ]]; then
+</span></span></span><span class="line"><span class="cl"><span class="sd">            cp /mnt/config-map/master.cnf /mnt/conf.d
+</span></span></span><span class="line"><span class="cl"><span class="sd">          else
+</span></span></span><span class="line"><span class="cl"><span class="sd">            cp /mnt/config-map/slave.cnf /mnt/conf.d
+</span></span></span><span class="line"><span class="cl"><span class="sd">          fi</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/mnt/conf.d</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">config-map</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/mnt/config-map</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">clone-mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">gcr.io/google-samples/xtrabackup:1.0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">MYSQL_ROOT_PASSWORD</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">password</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="s2">&#34;-c&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -ex
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 拷贝操作只需要在第一次启动时进行，所以数据已经存在则跳过
+</span></span></span><span class="line"><span class="cl"><span class="sd">          [[ -d /var/lib/mysql/mysql ]] &amp;&amp; exit 0
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # Master 节点（序号为 0）不需要这个操作
+</span></span></span><span class="line"><span class="cl"><span class="sd">          [[ $(hostname) =~ -([0-9]+)$ ]] || exit 1
+</span></span></span><span class="line"><span class="cl"><span class="sd">          ordinal=${BASH_REMATCH[1]}
+</span></span></span><span class="line"><span class="cl"><span class="sd">          [[ $ordinal == 0 ]] &amp;&amp; exit 0
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 使用 ncat 指令，远程地从前一个节点拷贝数据到本地
+</span></span></span><span class="line"><span class="cl"><span class="sd">          ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 执行 --prepare，这样拷贝来的数据就可以用作恢复了
+</span></span></span><span class="line"><span class="cl"><span class="sd">          xtrabackup --prepare --target-dir=/var/lib/mysql</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">data</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/var/lib/mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">subPath</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/etc/mysql/conf.d</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">mysql:5.7</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="c">#        - name: MYSQL_ALLOW_EMPTY_PASSWORD</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="c">#          value: &#34;1&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">MYSQL_ROOT_PASSWORD</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">password</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">3306</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">data</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/var/lib/mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">subPath</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/etc/mysql/conf.d</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">500m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">1Gi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">livenessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">exec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;mysqladmin&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;ping&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;-uroot&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;-p${MYSQL_ROOT_PASSWORD}&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">30</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">timeoutSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">exec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;mysqladmin&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;ping&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;-uroot&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;-p${MYSQL_ROOT_PASSWORD}&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">timeoutSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">xtrabackup</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">gcr.io/google-samples/xtrabackup:1.0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">xtrabackup</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">3307</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">MYSQL_ROOT_PASSWORD</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">valueFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">secretKeyRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l">password</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="s2">&#34;-c&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -ex
+</span></span></span><span class="line"><span class="cl"><span class="sd">          cd /var/lib/mysql
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 从备份信息文件里读取 MASTER_LOG_FILE 和 MASTER_LOG_POS 这 2 个字段的值，用来拼装集群初始化 SQL
+</span></span></span><span class="line"><span class="cl"><span class="sd">          if [[ -f xtrabackup_slave_info ]]; then
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 如果 xtrabackup_slave_info 文件存在，说明这个备份数据来自于另一个 Slave 节点
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 这种情况下，XtraBackup 工具在备份的时候，就已经在这个文件里自动生成了 &#34;CHANGE MASTER TO&#34; SQL 语句
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 所以，只需要把这个文件重命名为 change_master_to.sql.in，后面直接使用即可
+</span></span></span><span class="line"><span class="cl"><span class="sd">            mv xtrabackup_slave_info change_master_to.sql.in
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 所以，也就用不着 xtrabackup_binlog_info 了
+</span></span></span><span class="line"><span class="cl"><span class="sd">            rm -f xtrabackup_binlog_info
+</span></span></span><span class="line"><span class="cl"><span class="sd">          elif [[ -f xtrabackup_binlog_info ]]; then
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 如果只是存在 xtrabackup_binlog_info 文件，说明备份来自于 Master 节点，就需要解析这个备份信息文件，读取所需的两个字段的值
+</span></span></span><span class="line"><span class="cl"><span class="sd">            [[ $(cat xtrabackup_binlog_info) =~ ^(.*?)[[:space:]]+(.*?)$ ]] || exit 1
+</span></span></span><span class="line"><span class="cl"><span class="sd">            rm xtrabackup_binlog_info
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 把两个字段的值拼装成 SQL，写入 change_master_to.sql.in 文件
+</span></span></span><span class="line"><span class="cl"><span class="sd">            echo &#34;CHANGE MASTER TO MASTER_LOG_FILE=&#39;${BASH_REMATCH[1]}&#39;,\
+</span></span></span><span class="line"><span class="cl"><span class="sd">                  MASTER_LOG_POS=${BASH_REMATCH[2]}&#34; &gt; change_master_to.sql.in
+</span></span></span><span class="line"><span class="cl"><span class="sd">          fi
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 如果存在 change_master_to.sql.in，就意味着需要做集群初始化工作
+</span></span></span><span class="line"><span class="cl"><span class="sd">          if [[ -f change_master_to.sql.in ]]; then
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 但一定要先等 MySQL 容器启动之后才能进行下一步连接 MySQL 的操作
+</span></span></span><span class="line"><span class="cl"><span class="sd">            echo &#34;Waiting for mysqld to be ready（accepting connections）&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">            until mysql -h 127.0.0.1 -uroot -p${MYSQL_ROOT_PASSWORD} -e &#34;SELECT 1&#34;; do sleep 1; done
+</span></span></span><span class="line"><span class="cl"><span class="sd">            echo &#34;Initializing replication from clone position&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 将文件 change_master_to.sql.in 改个名字
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 防止这个 Container 重启的时候，因为又找到了 change_master_to.sql.in，从而重复执行一遍初始化流程
+</span></span></span><span class="line"><span class="cl"><span class="sd">            mv change_master_to.sql.in change_master_to.sql.orig
+</span></span></span><span class="line"><span class="cl"><span class="sd">            # 使用 change_master_to.sql.orig 的内容，也就是前面拼装的 SQL，组成一个完整的初始化和启动 Slave 的 SQL 语句
+</span></span></span><span class="line"><span class="cl"><span class="sd">            mysql -h 127.0.0.1 -uroot -p${MYSQL_ROOT_PASSWORD} &lt;&lt; EOF
+</span></span></span><span class="line"><span class="cl"><span class="sd">          $(&lt; change_master_to.sql.orig),
+</span></span></span><span class="line"><span class="cl"><span class="sd">            MASTER_HOST=&#39;mysql-0.mysql.mysql&#39;,
+</span></span></span><span class="line"><span class="cl"><span class="sd">            MASTER_USER=&#39;root&#39;,
+</span></span></span><span class="line"><span class="cl"><span class="sd">            MASTER_PASSWORD=&#39;${MYSQL_ROOT_PASSWORD}&#39;,
+</span></span></span><span class="line"><span class="cl"><span class="sd">            MASTER_CONNECT_RETRY=10;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          START SLAVE;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          EOF
+</span></span></span><span class="line"><span class="cl"><span class="sd">          fi
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 使用 ncat 监听 3307 端口。
+</span></span></span><span class="line"><span class="cl"><span class="sd">          # 它的作用是，在收到传输请求的时候，直接执行 xtrabackup --backup 命令，备份 MySQL 的数据并发送给请求者
+</span></span></span><span class="line"><span class="cl"><span class="sd">          exec ncat --listen --keep-open --send-only --max-conns=1 3307 -c \
+</span></span></span><span class="line"><span class="cl"><span class="sd">            &#34;xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root --password=${MYSQL_ROOT_PASSWORD}&#34;</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">volumeMounts</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">data</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/var/lib/mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">subPath</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l">/etc/mysql/conf.d</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">volumes</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">conf</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">emptyDir</span><span class="p">:</span><span class="w"> </span>{}<span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">config-map</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">configMap</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">mysql</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">volumeClaimTemplates</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">data</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">accessModes</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="s2">&#34;ReadWriteOnce&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l">local-storage</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l">3Gi</span><span class="w">
+</span></span></span></code></pre></div><p>整体的statefulset有两个replicas，一个Master, 一个Slave，然后使用 init-mysql 这个 initContainers 进行配置文件的初始化。接着使用 clone-mysql 这个 <code>initContainers</code> 进行数据的传输；同时使用 xtrabackup 这个 sidecar 容器进行SQL初始化和数据传输功能</p>
 <p>创建 StatefulSet</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl apply -f 07-mysql-statefulset.yaml
-
-$ kubectl get po -n mysql
-NAME      READY   STATUS    RESTARTS   AGE
-mysql-0   2/2     Running   <span class="m">0</span>          70s
-mysql-1   0/2     Pending   <span class="m">0</span>          5s
-</code></pre></div><p>可以看到，StatefulSet 启动成功后，会有两个Pod运行。</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f 07-mysql-statefulset.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">$ kubectl get po -n mysql
+</span></span><span class="line"><span class="cl">NAME      READY   STATUS    RESTARTS   AGE
+</span></span><span class="line"><span class="cl">mysql-0   2/2     Running   <span class="m">0</span>          70s
+</span></span><span class="line"><span class="cl">mysql-1   0/2     Pending   <span class="m">0</span>          5s
+</span></span></code></pre></div><p>可以看到，StatefulSet 启动成功后，会有两个Pod运行。</p>
 <p>接下来，我们可以尝试向这个MySQL集群发起请求，执行一些<code>SQL操作</code>来验证它是否正常</p>
 <h4 id="服务验证">服务验证</h4>
 <p>验证主从状态</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl -n mysql <span class="nb">exec</span> mysql-1 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;show slave status \G&#39;&#34;</span>
-
-
-mysql: <span class="o">[</span>Warning<span class="o">]</span> Using a password on the <span class="nb">command</span> line interface can be insecure.
-*************************** 1. row ***************************
-               Slave_IO_State: Waiting <span class="k">for</span> master to send event
-                  Master_Host: mysql-0.mysql.mysql
-                  Master_User: root
-                  Master_Port: <span class="m">3306</span>
-                Connect_Retry: <span class="m">10</span>
-              Master_Log_File: mysqllog.000003
-          Read_Master_Log_Pos: <span class="m">154</span>
-               Relay_Log_File: mysql-1-relay-bin.000002
-                Relay_Log_Pos: <span class="m">319</span>
-        Relay_Master_Log_File: mysqllog.000003
-             Slave_IO_Running: Yes
-            Slave_SQL_Running: Yes
-              Replicate_Do_DB: 
-          Replicate_Ignore_DB: mysql
-           Replicate_Do_Table: 
-       Replicate_Ignore_Table: 
-      Replicate_Wild_Do_Table: 
-  Replicate_Wild_Ignore_Table: 
-                   Last_Errno: <span class="m">0</span>
-                   Last_Error: 
-                 Skip_Counter: <span class="m">0</span>
-          Exec_Master_Log_Pos: <span class="m">154</span>
-              Relay_Log_Space: <span class="m">528</span>
-              Until_Condition: None
-               Until_Log_File: 
-                Until_Log_Pos: <span class="m">0</span>
-           Master_SSL_Allowed: No
-           Master_SSL_CA_File: 
-           Master_SSL_CA_Path: 
-              Master_SSL_Cert: 
-            Master_SSL_Cipher: 
-               Master_SSL_Key: 
-        Seconds_Behind_Master: <span class="m">0</span>
-Master_SSL_Verify_Server_Cert: No
-                Last_IO_Errno: <span class="m">0</span>
-                Last_IO_Error: 
-               Last_SQL_Errno: <span class="m">0</span>
-               Last_SQL_Error: 
-  Replicate_Ignore_Server_Ids: 
-             Master_Server_Id: <span class="m">100</span>
-                  Master_UUID: 1bad4d64-6290-11ea-8376-0242ac113802
-             Master_Info_File: /var/lib/mysql/master.info
-                    SQL_Delay: <span class="m">0</span>
-          SQL_Remaining_Delay: NULL
-      Slave_SQL_Running_State: Slave has <span class="nb">read</span> all relay log<span class="p">;</span> waiting <span class="k">for</span> more updates
-           Master_Retry_Count: <span class="m">86400</span>
-                  Master_Bind: 
-      Last_IO_Error_Timestamp: 
-     Last_SQL_Error_Timestamp: 
-               Master_SSL_Crl: 
-           Master_SSL_Crlpath: 
-           Retrieved_Gtid_Set: 
-            Executed_Gtid_Set: 
-                Auto_Position: <span class="m">0</span>
-         Replicate_Rewrite_DB: 
-                 Channel_Name: 
-           Master_TLS_Version:
-</code></pre></div><p>接下来，我们通过Master容器创建数据库和表、插入数据库</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl -n mysql <span class="nb">exec</span> mysql-0 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;create database test’&#34;</span>
-kubectl -n mysql <span class="nb">exec</span> mysql-0 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;use test;create table counter(c int);’&#34;</span>
-kubectl -n mysql <span class="nb">exec</span> mysql-0 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;use test;insert into counter values(123)’&#34;</span>
-</code></pre></div><p>然后，我们观察Slave节点是否都同步到数据了</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl -n mysql <span class="nb">exec</span> mysql-1 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;use test;select * from counter’&#34;</span>  
-c
-<span class="m">123</span>
-</code></pre></div><p>当看到输出结果，主从同步正常了</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n mysql <span class="nb">exec</span> mysql-1 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;show slave status \G&#39;&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">mysql: <span class="o">[</span>Warning<span class="o">]</span> Using a password on the <span class="nb">command</span> line interface can be insecure.
+</span></span><span class="line"><span class="cl">*************************** 1. row ***************************
+</span></span><span class="line"><span class="cl">               Slave_IO_State: Waiting <span class="k">for</span> master to send event
+</span></span><span class="line"><span class="cl">                  Master_Host: mysql-0.mysql.mysql
+</span></span><span class="line"><span class="cl">                  Master_User: root
+</span></span><span class="line"><span class="cl">                  Master_Port: <span class="m">3306</span>
+</span></span><span class="line"><span class="cl">                Connect_Retry: <span class="m">10</span>
+</span></span><span class="line"><span class="cl">              Master_Log_File: mysqllog.000003
+</span></span><span class="line"><span class="cl">          Read_Master_Log_Pos: <span class="m">154</span>
+</span></span><span class="line"><span class="cl">               Relay_Log_File: mysql-1-relay-bin.000002
+</span></span><span class="line"><span class="cl">                Relay_Log_Pos: <span class="m">319</span>
+</span></span><span class="line"><span class="cl">        Relay_Master_Log_File: mysqllog.000003
+</span></span><span class="line"><span class="cl">             Slave_IO_Running: Yes
+</span></span><span class="line"><span class="cl">            Slave_SQL_Running: Yes
+</span></span><span class="line"><span class="cl">              Replicate_Do_DB: 
+</span></span><span class="line"><span class="cl">          Replicate_Ignore_DB: mysql
+</span></span><span class="line"><span class="cl">           Replicate_Do_Table: 
+</span></span><span class="line"><span class="cl">       Replicate_Ignore_Table: 
+</span></span><span class="line"><span class="cl">      Replicate_Wild_Do_Table: 
+</span></span><span class="line"><span class="cl">  Replicate_Wild_Ignore_Table: 
+</span></span><span class="line"><span class="cl">                   Last_Errno: <span class="m">0</span>
+</span></span><span class="line"><span class="cl">                   Last_Error: 
+</span></span><span class="line"><span class="cl">                 Skip_Counter: <span class="m">0</span>
+</span></span><span class="line"><span class="cl">          Exec_Master_Log_Pos: <span class="m">154</span>
+</span></span><span class="line"><span class="cl">              Relay_Log_Space: <span class="m">528</span>
+</span></span><span class="line"><span class="cl">              Until_Condition: None
+</span></span><span class="line"><span class="cl">               Until_Log_File: 
+</span></span><span class="line"><span class="cl">                Until_Log_Pos: <span class="m">0</span>
+</span></span><span class="line"><span class="cl">           Master_SSL_Allowed: No
+</span></span><span class="line"><span class="cl">           Master_SSL_CA_File: 
+</span></span><span class="line"><span class="cl">           Master_SSL_CA_Path: 
+</span></span><span class="line"><span class="cl">              Master_SSL_Cert: 
+</span></span><span class="line"><span class="cl">            Master_SSL_Cipher: 
+</span></span><span class="line"><span class="cl">               Master_SSL_Key: 
+</span></span><span class="line"><span class="cl">        Seconds_Behind_Master: <span class="m">0</span>
+</span></span><span class="line"><span class="cl">Master_SSL_Verify_Server_Cert: No
+</span></span><span class="line"><span class="cl">                Last_IO_Errno: <span class="m">0</span>
+</span></span><span class="line"><span class="cl">                Last_IO_Error: 
+</span></span><span class="line"><span class="cl">               Last_SQL_Errno: <span class="m">0</span>
+</span></span><span class="line"><span class="cl">               Last_SQL_Error: 
+</span></span><span class="line"><span class="cl">  Replicate_Ignore_Server_Ids: 
+</span></span><span class="line"><span class="cl">             Master_Server_Id: <span class="m">100</span>
+</span></span><span class="line"><span class="cl">                  Master_UUID: 1bad4d64-6290-11ea-8376-0242ac113802
+</span></span><span class="line"><span class="cl">             Master_Info_File: /var/lib/mysql/master.info
+</span></span><span class="line"><span class="cl">                    SQL_Delay: <span class="m">0</span>
+</span></span><span class="line"><span class="cl">          SQL_Remaining_Delay: NULL
+</span></span><span class="line"><span class="cl">      Slave_SQL_Running_State: Slave has <span class="nb">read</span> all relay log<span class="p">;</span> waiting <span class="k">for</span> more updates
+</span></span><span class="line"><span class="cl">           Master_Retry_Count: <span class="m">86400</span>
+</span></span><span class="line"><span class="cl">                  Master_Bind: 
+</span></span><span class="line"><span class="cl">      Last_IO_Error_Timestamp: 
+</span></span><span class="line"><span class="cl">     Last_SQL_Error_Timestamp: 
+</span></span><span class="line"><span class="cl">               Master_SSL_Crl: 
+</span></span><span class="line"><span class="cl">           Master_SSL_Crlpath: 
+</span></span><span class="line"><span class="cl">           Retrieved_Gtid_Set: 
+</span></span><span class="line"><span class="cl">            Executed_Gtid_Set: 
+</span></span><span class="line"><span class="cl">                Auto_Position: <span class="m">0</span>
+</span></span><span class="line"><span class="cl">         Replicate_Rewrite_DB: 
+</span></span><span class="line"><span class="cl">                 Channel_Name: 
+</span></span><span class="line"><span class="cl">           Master_TLS_Version:
+</span></span></code></pre></div><p>接下来，我们通过Master容器创建数据库和表、插入数据库</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n mysql <span class="nb">exec</span> mysql-0 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;create database test’&#34;</span>
+</span></span><span class="line"><span class="cl">kubectl -n mysql <span class="nb">exec</span> mysql-0 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;use test;create table counter(c int);’&#34;</span>
+</span></span><span class="line"><span class="cl">kubectl -n mysql <span class="nb">exec</span> mysql-0 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;use test;insert into counter values(123)’&#34;</span>
+</span></span></code></pre></div><p>然后，我们观察Slave节点是否都同步到数据了</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n mysql <span class="nb">exec</span> mysql-1 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;use test;select * from counter’&#34;</span>  
+</span></span><span class="line"><span class="cl">c
+</span></span><span class="line"><span class="cl"><span class="m">123</span>
+</span></span></code></pre></div><p>当看到输出结果，主从同步正常了</p>
 <h4 id="扩展从节点">扩展从节点</h4>
 <p>在有了 StatefulSet 以后，你就可以像 Deployment 那样，非常方便地扩展这个 MySQL 集群，比如</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl -n mysql scale statefulset mysql -—replicas<span class="o">=</span><span class="m">3</span>
-
-$ kubectl get po -n mysql
-NAME      READY   STATUS    RESTARTS   AGE
-mysql-0   2/2     Running   <span class="m">0</span>          22m
-mysql-1   2/2     Running   <span class="m">0</span>          22m
-mysql-2   2/2     Running   <span class="m">0</span>          20s
-</code></pre></div><p>这时候，一个新的mysql-2就创建出来了，我们继续验证新扩容的节点是否都同步到主节点的数据</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">kubectl -n mysql <span class="nb">exec</span> mysql-2 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;use test;select * from counter’&#34;</span>  
-c
-<span class="m">123</span>
-</code></pre></div><p>当看到输出结果，主从同步正常了。也就是说从 StatefulSet 为我们新创建的 mysql-2 上，同样可以读取到之前插入的记录。也就是说，我们的数据备份和恢复，都是有效的</p></div>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n mysql scale statefulset mysql -—replicas<span class="o">=</span><span class="m">3</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">$ kubectl get po -n mysql
+</span></span><span class="line"><span class="cl">NAME      READY   STATUS    RESTARTS   AGE
+</span></span><span class="line"><span class="cl">mysql-0   2/2     Running   <span class="m">0</span>          22m
+</span></span><span class="line"><span class="cl">mysql-1   2/2     Running   <span class="m">0</span>          22m
+</span></span><span class="line"><span class="cl">mysql-2   2/2     Running   <span class="m">0</span>          20s
+</span></span></code></pre></div><p>这时候，一个新的mysql-2就创建出来了，我们继续验证新扩容的节点是否都同步到主节点的数据</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n mysql <span class="nb">exec</span> mysql-2 -c mysql -- bash -c <span class="s2">&#34;mysql -uroot -p123456 -e &#39;use test;select * from counter’&#34;</span>  
+</span></span><span class="line"><span class="cl">c
+</span></span><span class="line"><span class="cl"><span class="m">123</span>
+</span></span></code></pre></div><p>当看到输出结果，主从同步正常了。也就是说从 StatefulSet 为我们新创建的 mysql-2 上，同样可以读取到之前插入的记录。也就是说，我们的数据备份和恢复，都是有效的</p></div>
                     <div class="post_footer">
                         
                         <div class="meta">
