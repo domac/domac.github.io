@@ -5,10 +5,6 @@
     <link>https://domac.github.io/categories/</link>
     <description>Recent content in Categories on domac的菜园子</description>
     <generator>Hugo -- gohugo.io</generator>
-    <language>zh-cn</language>
-    
-	<atom:link href="https://domac.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
-    
-    
+    <language>zh-cn</language><atom:link href="https://domac.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
