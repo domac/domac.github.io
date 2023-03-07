@@ -451,7 +451,7 @@ hr {
 }
 
 .markdown {
-  line-height: 1.8em;
+  line-height: 1.5em;
   word-wrap: break-word;
   word-break: normal;
   overflow-wrap: break-word;
@@ -492,7 +492,7 @@ hr {
 .markdown pre,
 .markdown code {
   font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.9em;
+  font-size: 13px;
   background: #f8fafc;
   border: none;
   white-space: pre;
